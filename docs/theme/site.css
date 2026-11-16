@@ -141,7 +141,7 @@ body {
 /* ===== Thanh trên cùng ===== */
 .github-corner, .sidebar-toggle { display: none !important; }
 .site-bar {
-  position: fixed; top: 0; right: 0; left: var(--sidebar-w); z-index: 20; height: var(--bar-h);
+  position: fixed; top: 0; right: 0; left: 0; z-index: 20; height: var(--bar-h);
   display: flex; align-items: center; gap: 8px; padding: 0 24px 0 20px;
   background: transparent; border-bottom: 1px solid transparent;
   transition: left 250ms ease-out, transform 250ms ease-out, background 200ms, border-color 200ms, box-shadow 200ms;
@@ -296,7 +296,7 @@ body:not(.is-home) .bar-cta { display: none; }
 
 /* ===== Cột giữa: khoá đang học ===== */
 .course-panel {
-  position: fixed; top: var(--bar-h); bottom: 0; left: var(--sidebar-w); z-index: 6; width: var(--panel-w);
+  position: fixed; top: var(--bar-h); bottom: 0; left: 0; z-index: 6; width: var(--panel-w);
   display: none; flex-direction: column; gap: 16px; padding: 10px 14px 24px 22px; overflow-y: auto; scrollbar-width: thin;
 }
 body.is-lesson .course-panel.has-course { display: flex; }
@@ -379,8 +379,8 @@ main { z-index: auto; }
 body.nav-open .nav-backdrop { opacity: 1; pointer-events: auto; }
 
 /* ===== Nội dung ===== */
-.content { left: var(--sidebar-w); padding-top: var(--bar-h); background: transparent; transition: none; }
-@media (min-width: 1024px) { body.is-lesson .content { left: calc(var(--sidebar-w) + var(--panel-w)); } }
+.content { left: 0; padding-top: var(--bar-h); background: transparent; transition: none; }
+@media (min-width: 1024px) { body.is-lesson .content { left: var(--panel-w); } }
 .markdown-section { max-width: 860px; margin: 0 auto; padding: 32px 28px 64px; color: var(--text); line-height: 1.8; }
 .markdown-section p, .markdown-section ul, .markdown-section ol { color: var(--text); line-height: 1.8; }
 .markdown-section p { margin: 1em 0; }
@@ -910,12 +910,22 @@ li.is-locked { opacity: .6; }
 .hub-layers li:nth-child(4) .home-ico { background: var(--c6-soft); color: var(--c6); }
 .markdown-section .hub-note { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--border); }
 
-/* Trang chủ trên máy tính: menu ngang thay cho cột trái */
+/* Máy tính: menu ngang trên mọi trang; cột trái chung chỉ còn là ngăn kéo (nút ba gạch) */
 body.is-hub #bar-find { display: inline-flex; }
 @media (min-width: 901px) {
   body.is-hub .site-bar { padding: 0 32px; }
   body.is-hub #bar-menu { display: none; }
-  body.is-hub .bar-brand, body.is-hub .bar-nav { display: flex; }
+  .bar-brand, .bar-nav { display: flex; }
+}
+/* Trang bài học/tài liệu: thanh có thêm ô tìm kiếm, nên rút gọn thương hiệu và menu */
+@media (min-width: 901px) and (max-width: 1439px) {
+  body:not(.is-hub) .bar-brand b, body:not(.is-hub) .bar-nav .opt { display: none; }
+  body:not(.is-hub) .bar-brand { padding-right: 10px; margin-right: 4px; }
+  body:not(.is-hub) .bar-nav { flex: none; }
+}
+@media (min-width: 901px) and (max-width: 1100px) {
+  body:not(.is-hub) .bar-nav > a, body:not(.is-hub) .bar-menu > button { padding: 0 10px; }
+  body:not(.is-hub) .bar-nav > a .lbl-long, body:not(.is-hub) .bar-kbd { display: none; }
 }
 
 /* ===== Thông báo nhỏ (toast) và pháo giấy ===== */
@@ -1036,15 +1046,11 @@ body.is-wide .markdown-section { max-width: 1080px; }
 }
 
 /* ===== Bố cục theo độ rộng màn hình =====
-   ≥1600: cột trái + cột khoá + nội dung + cột phải
-   1280–1599: bỏ cột phải · 1024–1279: cột trái thành ngăn kéo · <1024: cột khoá cũng vào ngăn kéo */
-.site-bar { left: var(--sidebar-w); }
-body.is-lesson .site-bar { left: var(--sidebar-w); }
-body.is-hub .site-bar, body.is-hub .content { left: 0; }
-body.is-hub .sidebar { transform: translateX(-105%); box-shadow: none; }
-body.is-hub.nav-open .sidebar { transform: none; box-shadow: var(--shadow-lg); }
-#bar-menu { display: none; }
-@media (min-width: 1600px) {
+   Cột trái chung luôn là ngăn kéo; điều hướng chính nằm trên thanh ngang.
+   ≥1480: cột khoá + nội dung + cột phải · 1024–1479: bỏ cột phải · <1024: cột khoá vào ngăn kéo */
+.sidebar { transform: translateX(-105%); box-shadow: none; }
+body.nav-open .sidebar { transform: none; box-shadow: var(--shadow-lg); }
+@media (min-width: 1480px) {
   body.is-lesson .content { padding-right: calc(var(--rail-w) + 36px); }
   body.is-lesson .lesson-rail {
     position: fixed; top: calc(var(--bar-h) + 10px); right: 24px; bottom: 16px; z-index: 5; width: var(--rail-w);
@@ -1052,18 +1058,10 @@ body.is-hub.nav-open .sidebar { transform: none; box-shadow: var(--shadow-lg); }
   }
 }
 @media (max-width: 1279px) {
-  .sidebar { transform: translateX(-105%); box-shadow: none; }
-  body.nav-open .sidebar { transform: none; box-shadow: var(--shadow-lg); }
-  .site-bar, body.is-lesson .site-bar, .content { left: 0; }
-  #bar-menu { display: inline-flex; }
-  .course-panel { left: 0; }
   .hub-dash { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
   .markdown-section a.hub-dream { grid-column: 1 / -1; min-height: 0; aspect-ratio: 21 / 8; }
   .hub-topics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .bar-nav > a .lbl-long { display: none; }
-}
-@media (min-width: 1024px) and (max-width: 1279px) {
-  body.is-lesson .content { left: var(--panel-w); }
 }
 @media (max-width: 1180px) {
   .home-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
