@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sơ đồ tư duy học máy · Hope for Future</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f3f8ff; --card: #ffffff; --text: #0f1d45; --muted: #5b6b8c; --border: #e1eaf8; --line: #c9d8f2;
+  --accent: #3b82f6; --shadow: 0 6px 20px rgba(30, 64, 175, .10); --hit: #f59e0b;
+  --b1: #8b5cf6; --b2: #0ea5e9; --b3: #10b981; --b4: #3b82f6; --b5: #ec4899;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a1124; --card: #101b36; --text: #e8efff; --muted: #97a7c9; --border: #22335c; --line: #2c4170;
+    --accent: #60a5fa; --shadow: 0 6px 20px rgba(0, 0, 0, .35); --hit: #fbbf24;
+    --b1: #a78bfa; --b2: #38bdf8; --b3: #34d399; --b4: #60a5fa; --b5: #f472b6; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a1124; --card: #101b36; --text: #e8efff; --muted: #97a7c9; --border: #22335c; --line: #2c4170;
+  --accent: #60a5fa; --shadow: 0 6px 20px rgba(0, 0, 0, .35); --hit: #fbbf24;
+  --b1: #a78bfa; --b2: #38bdf8; --b3: #34d399; --b4: #60a5fa; --b5: #f472b6; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: var(--text); overflow: hidden;
+  background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--accent) 16%, transparent) 1px, transparent 1.5px) 0 0 / 26px 26px, var(--bg);
+}
+.tools { position: absolute; left: 16px; right: 16px; top: 14px; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.title { margin-right: auto; }
+.title b { display: block; font-size: 18px; font-weight: 800; }
+.title span { font-size: 12.5px; color: var(--muted); }
+.find { position: relative; }
+.find input {
+  width: 240px; height: 40px; padding: 0 64px 0 36px; border: 1px solid var(--border); border-radius: 999px; outline: none;
+  font: 500 14px inherit; font-family: inherit; color: var(--text); background: var(--card); box-shadow: var(--shadow);
+}
+.find input:focus { border-color: var(--accent); }
+.find svg { position: absolute; left: 13px; top: 12px; width: 16px; height: 16px; color: var(--muted); }
+.find output { position: absolute; right: 14px; top: 11px; font-size: 12px; font-weight: 700; color: var(--muted); pointer-events: none; }
+button, a.btn {
+  display: inline-flex; align-items: center; height: 40px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+  font: 600 13px inherit; font-family: inherit; color: var(--text); background: var(--card); box-shadow: var(--shadow); text-decoration: none;
+}
+button:hover, a.btn:hover { border-color: var(--accent); color: var(--accent); }
+button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+svg#map { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+svg#map.drag { cursor: grabbing; }
+.link { fill: none; stroke: var(--c); stroke-opacity: .45; stroke-width: 2; }
+.node { cursor: pointer; }
+.node > rect.box { fill: var(--card); stroke: var(--border); stroke-width: 1.5; filter: drop-shadow(0 3px 8px rgba(30, 64, 175, .10)); transition: stroke 150ms; }
+.node:hover > rect.box { stroke: var(--c); }
+.node.leaf { cursor: default; }
+.node.leaf:hover > rect.box { stroke: var(--border); }
+.node.url { cursor: pointer; }
+.node text, #map > text { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+.node text { font-size: 13px; font-weight: 600; fill: var(--text); dominant-baseline: middle; pointer-events: none; }
+.node.note text { font-size: 12.5px; font-weight: 500; fill: var(--muted); }
+.node.note > rect.box { fill: color-mix(in srgb, var(--card) 70%, transparent); stroke-dasharray: 4 3; }
+.node.url text { fill: var(--accent); text-decoration: underline; }
+.node.d0 > rect.box { fill: var(--accent); stroke: none; }
+.node.d0 text { fill: #fff; font-size: 17px; font-weight: 800; }
+.node.d1 > rect.box { fill: var(--c); stroke: none; }
+.node.d1 text { fill: #fff; font-size: 15px; font-weight: 800; }
+.node .sub { font-size: 11px !important; font-weight: 600 !important; fill: rgba(255, 255, 255, .88) !important; }
+.node.d2:not(.note) > rect.box { fill: color-mix(in srgb, var(--c) 12%, var(--card)); stroke: color-mix(in srgb, var(--c) 40%, transparent); }
+.node.d2:not(.note) text { font-weight: 800; }
+.node .pic { fill: #fff; stroke: var(--border); }
+.node image { cursor: zoom-in; }
+.node .tog { fill: var(--card); stroke: var(--c); stroke-width: 1.5; }
+.node .tog-t { font-size: 11px; font-weight: 800; fill: var(--c); text-anchor: middle; }
+.badge { cursor: pointer; }
+.badge rect { fill: var(--c); }
+.badge text { fill: #fff !important; font-size: 11px !important; font-weight: 800 !important; text-decoration: none !important; }
+.badge:hover rect { filter: brightness(1.1); }
+.node.hit > rect.box { stroke: var(--hit); stroke-width: 3; }
+.node.dim { opacity: .3; }
+.legend {
+  position: absolute; left: 16px; bottom: 14px; z-index: 2; max-width: calc(100% - 32px); display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+  font-size: 12px; color: var(--muted); background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow);
+}
+.legend a { color: var(--accent); }
+.legend .bd { display: inline-block; padding: 1px 7px; border-radius: 999px; background: var(--b4); color: #fff; font-weight: 800; font-size: 11px; }
+.legend .nt { display: inline-block; width: 18px; height: 11px; border: 1.5px dashed var(--muted); border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
+.lightbox { position: fixed; inset: 0; z-index: 5; display: none; place-items: center; padding: 24px; background: rgba(8, 15, 35, .72); cursor: zoom-out; }
+.lightbox.on { display: grid; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 12px; background: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .4); }
+@media (max-width: 700px) {
+  .title span, #pdf { display: none; }
+  .find input { width: 170px; }
+  .legend { font-size: 11px; }
+}
+</style>
+</head>
+<body>
+<div class="tools">
+  <div class="title"><b>Sơ đồ tư duy học máy</b><span>Bấm để mở nhánh, kéo để di chuyển, cuộn để phóng to.</span></div>
+  <label class="find"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" placeholder="Tìm, ví dụ: entropy" aria-label="Tìm trên sơ đồ"><output id="qn"></output></label>
+  <button id="all" type="button">Mở tất cả</button>
+  <button id="none" type="button">Thu gọn</button>
+  <button id="fit" type="button">Vừa màn hình</button>
+  <button id="lang" type="button" aria-pressed="false" title="Xem phần giải thích bằng tiếng Anh gốc">Tiếng Anh gốc</button>
+  <a class="btn" id="pdf" href="ml-mindmap.pdf" target="_blank" rel="noopener">PDF gốc</a>
+</div>
+<svg id="map" role="img" aria-label="Sơ đồ tư duy học máy dạng cây"><g id="view"><g id="links"></g><g id="nodes"></g></g></svg>
+<div class="legend">
+  <span><span class="bd">Bài học</span> có bài tương ứng trên site</span>
+  <span><i class="nt"></i>ghi chú, giải thích</span>
+  <span>Nguồn: <a id="src" href="https://github.com/dformoso/machine-learning-mindmap" target="_blank" rel="noopener">Machine Learning Mindmap</a> của Daniel Martinez; tên mục giữ tiếng Anh, phần giải thích đã dịch</span>
+</div>
+<div class="lightbox" id="lb" role="dialog" aria-label="Ảnh phóng to"><img alt=""></div>
+<script>
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  // Một trang cho cả hai sơ đồ: ml.html (học máy) và ml.html?map=dl (học sâu).
+  var MAPS = {
+    ml: { name: 'Sơ đồ tư duy học máy', subs: ['Khái niệm', 'Quy trình', 'Xử lý dữ liệu', 'Toán', 'Mô hình'],
+      src: ['https://github.com/dformoso/machine-learning-mindmap', 'Machine Learning Mindmap'] },
+    dl: { name: 'Sơ đồ tư duy học sâu', subs: ['Khái niệm', 'Kiến trúc', 'Ứng dụng', 'Thư viện', 'TensorFlow'],
+      src: ['https://github.com/dformoso/deeplearning-mindmap', 'Deep Learning Mindmap'] }
+  };
+  var KEY = /[?&]map=dl\b/.test(location.search) ? 'dl' : 'ml', CFG = MAPS[KEY], SUBS = CFG.subs;
+  document.title = CFG.name + ' · Hope for Future';
+  document.querySelector('.title b').textContent = CFG.name;
+  document.getElementById('map').setAttribute('aria-label', CFG.name + ' dạng cây');
+  document.getElementById('pdf').href = KEY + '-mindmap.pdf';
+  document.getElementById('src').href = CFG.src[0];
+  document.getElementById('src').textContent = CFG.src[1];
+  var GAP = 58, VGAP = 10, NOTE_W = 300, IMG_W = 320, LINE = 17;
+
+  var probe = document.createElementNS(NS, 'text'), cache = {};
+  function textW(t, size, weight) {
+    var k = size + '|' + weight + '|' + t;
+    if (cache[k] != null) return cache[k];
+    probe.setAttribute('font-size', size); probe.setAttribute('font-weight', weight); probe.textContent = t;
+    return (cache[k] = probe.getComputedTextLength());
+  }
+  function wrap(t, maxW, size, weight) {
+    var out = [];
+    t.split('\n').forEach(function (para) {
+      var line = '';
+      para.split(' ').forEach(function (w) {
+        var tryL = line ? line + ' ' + w : w;
+        if (line && textW(tryL, size, weight) > maxW) { out.push(line); line = w; } else line = tryL;
+      });
+      out.push(line);
+    });
+    return out;
+  }
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  var root, all = [], scale = 1, tx = 40, ty = 90, query = '', hits = [], hitAt = -1;
+
+  function prep(n, depth, parent, branch) {
+    n.depth = depth; n.parent = parent; n.branch = depth === 1 ? all.filter(function (x) { return x.depth === 1; }).length + 1 : branch;
+    n.children = n.c || []; n.open = depth === 0;
+    n.isNote = depth >= 2 && (n.t.length > 48 || n.t.indexOf('\n') >= 0) && !n.u;
+    n.en = n.t;
+    all.push(n);
+    n.children.forEach(function (c) { prep(c, depth + 1, n, n.branch); });
+    if (depth === 1) { n.sub = SUBS[n.branch - 1]; n.open = true; }
+  }
+
+  function measure(n) {
+    if (n.w) return;
+    var size = n.depth === 0 ? 17 : n.depth === 1 ? 15 : n.isNote ? 12.5 : 13;
+    var weight = n.depth < 3 ? 800 : n.isNote ? 500 : 600;
+    if (n.depth === 2 && n.isNote) weight = 500;
+    n.size = size; n.weight = weight;
+    var tw = 0;
+    n.lines = n.t ? (n.isNote ? wrap(n.t, NOTE_W, size, weight) : [n.t]) : [];
+    n.lines.forEach(function (l) { tw = Math.max(tw, textW(l, size, weight)); });
+    if (n.sub) tw = Math.max(tw, textW(n.sub, 11, 600));
+    n.badgeW = n.l ? Math.ceil(textW('Bài học ›', 11, 800)) + 16 : 0;
+    var textH = n.lines.length ? (n.isNote ? n.lines.length * LINE : 0) : 0;
+    var h = n.depth === 0 ? 50 : n.depth === 1 ? (n.sub ? 50 : 40) : n.isNote ? textH + 16 : n.lines.length ? 32 : 10;
+    var w = Math.ceil(tw) + (n.depth < 2 ? 36 : 26) + (n.badgeW ? n.badgeW + 8 : 0);
+    if (n.isNote) w += 14;  // đo chữ nhiều dòng hơi hụt so với lúc vẽ thật
+    if (n.i) {
+      n.iw = Math.min(n.i[1], IMG_W); n.ih = Math.round(n.i[2] * n.iw / n.i[1]);
+      n.imgY = n.lines.length ? h - 2 : 10;
+      h = n.imgY + n.ih + 10;
+      w = Math.max(w, n.iw + 20);
+    }
+    n.w = w; n.h = h;
+  }
+
+  function layout() {
+    var y = 0;
+    (function walk(n, x) {
+      measure(n);
+      n.x = x;
+      var kids = n.open ? n.children : [], top = y;
+      if (!kids.length) { n.y = y + n.h / 2; y += n.h + VGAP; return; }
+      kids.forEach(function (k) { walk(k, x + n.w + GAP); });
+      // Nút cao hơn cụm con (có ảnh) không được đè lên nút phía trên.
+      n.y = Math.max((kids[0].y + kids[kids.length - 1].y) / 2, top + n.h / 2);
+      y = Math.max(y, n.y + n.h / 2 + VGAP);
+    })(root, 0);
+  }
+
+  function color(n) { return n.depth === 0 ? 'var(--accent)' : 'var(--b' + n.branch + ')'; }
+
+  function render() {
+    layout();
+    var L = document.getElementById('links'), N = document.getElementById('nodes');
+    L.innerHTML = ''; N.innerHTML = '';
+    var q = query.toLowerCase();
+    (function walk(n) {
+      var kids = n.open ? n.children : [];
+      kids.forEach(function (k) {
+        var x1 = n.x + n.w + (n.children.length ? 11 : 0), y1 = n.y, x2 = k.x, y2 = k.y, mx = (x1 + x2) / 2;
+        var p = el('path', { class: 'link', d: 'M' + x1 + ' ' + y1 + 'C' + mx + ' ' + y1 + ' ' + mx + ' ' + y2 + ' ' + x2 + ' ' + y2 }, L);
+        p.style.setProperty('--c', color(k));
+        walk(k);
+      });
+      var hit = q && (n.t.toLowerCase().indexOf(q) >= 0 || n.en.toLowerCase().indexOf(q) >= 0);
+      var cls = 'node d' + Math.min(n.depth, 3) + (n.isNote ? ' note' : '') + (n.u ? ' url' : '') +
+        (!n.children.length && !n.u ? ' leaf' : '') + (hit ? ' hit' : '') + (q && !hit && !n.onPath && n.depth >= 2 ? ' dim' : '');
+      var g = el('g', { class: cls, transform: 'translate(' + n.x + ' ' + (n.y - n.h / 2) + ')' }, N);
+      if (n.children.length || n.u) { g.setAttribute('tabindex', 0); g.setAttribute('role', n.u ? 'link' : 'button'); }
+      g.style.setProperty('--c', color(n));
+      el('rect', { class: 'box', width: n.w, height: n.h, rx: n.depth < 2 ? n.h / 2 : 12 }, g);
+      var x0 = n.depth < 2 ? 18 : 13;
+      if (n.isNote) {
+        n.lines.forEach(function (l, i) { var t = el('text', { x: x0, y: 8 + LINE / 2 + i * LINE }, g); t.textContent = l; });
+      } else if (n.lines.length) {
+        var t = el('text', { x: x0, y: n.sub ? 18 : (n.i ? 16 : n.h / 2) }, g); t.textContent = n.t;
+        if (n.sub) { var s = el('text', { class: 'sub', x: x0, y: 35 }, g); s.textContent = n.sub; }
+      }
+      if (n.l) {
+        var b = el('g', { class: 'badge', transform: 'translate(' + (n.w - n.badgeW - 8) + ' ' + ((n.i ? 32 : n.h) / 2 - 10) + ')', role: 'link', tabindex: 0 }, g);
+        el('rect', { width: n.badgeW, height: 20, rx: 10 }, b);
+        var bt = el('text', { x: 8, y: 10.5 }, b); bt.textContent = 'Bài học ›';
+        el('title', {}, b).textContent = 'Mở bài tương ứng trên site';
+        b.addEventListener('click', function (e) { e.stopPropagation(); if (!lastMoved) go(n.l); });
+        b.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.stopPropagation(); go(n.l); } });
+      }
+      if (n.i) {
+        el('rect', { class: 'pic', x: 10, y: n.imgY, width: n.iw, height: n.ih, rx: 6 }, g);
+        var im = el('image', { x: 10, y: n.imgY, width: n.iw, height: n.ih, href: 'img/' + n.i[0] + '.webp' }, g);
+        im.addEventListener('click', function (e) { e.stopPropagation(); if (!lastMoved) zoomImg(n.i[0]); });
+      }
+      if (n.children.length && n.depth > 0) {
+        el('circle', { class: 'tog', cx: n.w + 11, cy: n.h / 2, r: 11 }, g);
+        var tt = el('text', { class: 'tog-t', x: n.w + 11, y: n.h / 2 + 1 }, g);
+        tt.textContent = n.open ? '−' : String(n.children.length);
+      }
+      if (n.t && !n.isNote) {
+        el('title', {}, g).textContent = n.t + (n.u ? ' · mở liên kết' : n.children.length ? ' · bấm để ' + (n.open ? 'thu gọn' : 'mở nhánh') : '');
+      }
+      g.addEventListener('click', function (e) { e.stopPropagation(); if (!lastMoved) activate(n); });
+      g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(n); } });
+    })(root);
+    apply();
+  }
+
+  function go(path) {
+    var hash = '#/' + path;
+    try { if (window.top !== window) { window.top.location.hash = hash; return; } } catch (e) { /* khác nguồn */ }
+    location.href = '../' + hash;
+  }
+
+  // Mở hoặc thu nhánh mà nút vừa bấm vẫn đứng yên trên màn hình.
+  function activate(n) {
+    if (n.u) { window.open(n.u, '_blank', 'noopener'); return; }
+    if (!n.children.length || n.depth === 0) return;
+    var ox = n.x, oy = n.y;
+    n.open = !n.open;
+    render();
+    tx -= (n.x - ox) * scale; ty -= (n.y - oy) * scale; apply();
+  }
+
+  // Phần giải thích hiện tiếng Việt (n.v), bấm nút để xem câu tiếng Anh gốc (n.en).
+  var lang = 'vi';
+  try { if (localStorage.getItem('hff-mm-lang') === 'en') lang = 'en'; } catch (e) { /* bỏ qua */ }
+  function setLang(l) {
+    lang = l;
+    all.forEach(function (n) { n.t = lang === 'vi' && n.v ? n.v : n.en; n.w = 0; });
+    document.getElementById('lang').setAttribute('aria-pressed', lang === 'en');
+    try { localStorage.setItem('hff-mm-lang', lang); } catch (e) { /* bỏ qua */ }
+  }
+
+  function reset() { all.forEach(function (n) { n.open = n.depth <= 1; }); }
+
+  var view = document.getElementById('view'), svg = document.getElementById('map');
+  function apply() { view.setAttribute('transform', 'translate(' + tx + ' ' + ty + ') scale(' + scale + ')'); }
+  function fit() {
+    var b = view.getBBox();
+    if (!b.width) return;
+    var W = svg.clientWidth, H = svg.clientHeight - 150;
+    scale = Math.max(.12, Math.min(1.1, (W - 40) / b.width, H / b.height));
+    tx = (W - b.width * scale) / 2 - b.x * scale;
+    ty = 80 + (H - b.height * scale) / 2 - b.y * scale;
+    apply();
+  }
+  function centerOn(n) {
+    scale = Math.max(scale, .8);
+    tx = svg.clientWidth / 2 - (n.x + n.w / 2) * scale;
+    ty = svg.clientHeight / 2 - n.y * scale;
+    apply();
+  }
+
+  var lb = document.getElementById('lb');
+  function zoomImg(id) { lb.querySelector('img').src = 'img/' + id + '.webp'; lb.classList.add('on'); }
+  lb.onclick = function () { lb.classList.remove('on'); };
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') lb.classList.remove('on'); });
+
+  // Kéo để di chuyển, cuộn hoặc chụm hai ngón để phóng to.
+  var drag = null, pts = {}, lastMoved = false;
+  svg.addEventListener('pointerdown', function (e) {
+    pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    drag = { x: e.clientX, y: e.clientY, tx: tx, ty: ty, moved: false };
+    lastMoved = false;
+    svg.classList.add('drag');
+  });
+  window.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    if (pts[e.pointerId]) {
+      var ids = Object.keys(pts);
+      if (ids.length === 2) {
+        var o = ids.map(function (i) { return pts[i]; });
+        var d0 = Math.hypot(o[0].x - o[1].x, o[0].y - o[1].y);
+        pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+        o = ids.map(function (i) { return pts[i]; });
+        var d1 = Math.hypot(o[0].x - o[1].x, o[0].y - o[1].y);
+        drag.moved = true;
+        zoomAt((o[0].x + o[1].x) / 2, (o[0].y + o[1].y) / 2, d1 / (d0 || d1));
+        return;
+      }
+      pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    }
+    var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    tx = drag.tx + dx; ty = drag.ty + dy; apply();
+  });
+  window.addEventListener('pointerup', function (e) { delete pts[e.pointerId]; lastMoved = !!(drag && drag.moved); drag = null; svg.classList.remove('drag'); });
+  function zoomAt(cx, cy, k) {
+    var r = svg.getBoundingClientRect();
+    var ns = Math.max(.1, Math.min(2.5, scale * k));
+    k = ns / scale;
+    tx = cx - r.left - (cx - r.left - tx) * k;
+    ty = cy - r.top - (cy - r.top - ty) * k;
+    scale = ns; apply();
+  }
+  svg.addEventListener('wheel', function (e) { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * .0015)); }, { passive: false });
+
+  var qn = document.getElementById('qn');
+  var qi = document.getElementById('q');
+  function clearQuery() { query = ''; hits = []; qi.value = ''; qn.textContent = ''; all.forEach(function (n) { n.onPath = false; }); }
+  // Mở hết thì sơ đồ rất cao: đặt ở cỡ đọc được, bắt đầu từ đầu sơ đồ thay vì thu nhỏ cả cây.
+  document.getElementById('all').onclick = function () {
+    clearQuery(); all.forEach(function (n) { n.open = true; }); render();
+    var b = view.getBBox(); scale = .55; tx = 30 - b.x * scale; ty = 150 - b.y * scale; apply();
+  };
+  document.getElementById('none').onclick = function () { clearQuery(); reset(); render(); fit(); };
+  document.getElementById('fit').onclick = fit;
+  document.getElementById('lang').onclick = function () { setLang(lang === 'vi' ? 'en' : 'vi'); render(); };
+  qi.addEventListener('input', function () {
+    query = this.value.trim();
+    reset(); hits = []; hitAt = -1;
+    all.forEach(function (n) { n.onPath = false; });
+    if (query.length >= 2) {
+      var ql = query.toLowerCase();
+      all.forEach(function (n) {
+        if (n.t.toLowerCase().indexOf(ql) < 0 && n.en.toLowerCase().indexOf(ql) < 0) return;
+        hits.push(n);
+        for (var p = n.parent; p; p = p.parent) { p.open = true; p.onPath = true; }
+      });
+    } else query = '';
+    render();
+    if (hits.length) { hitAt = 0; centerOn(hits[0]); }
+    qn.textContent = query ? (hits.length ? '1/' + hits.length : '0') : '';
+  });
+  qi.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || !hits.length) return;
+    hitAt = (hitAt + 1) % hits.length;
+    qn.textContent = (hitAt + 1) + '/' + hits.length;
+    centerOn(hits[hitAt]);
+  });
+
+  probe.setAttribute('font-family', "'Plus Jakarta Sans', system-ui, sans-serif");
+  probe.setAttribute('visibility', 'hidden');
+  svg.appendChild(probe);
+
+  fetch(KEY + '-mindmap.json?v=20261116d').then(function (r) { return r.json(); }).then(function (data) {
+    root = data;
+    prep(root, 0, null, 0);
+    setLang(lang);
+    (document.fonts ? document.fonts.ready : Promise.resolve()).then(function () { render(); fit(); if (scale < .6) { scale = .6; tx = 30; ty = svg.clientHeight / 2 - root.y * scale; apply(); } });
+  }).catch(function () {
+    document.querySelector('.title span').textContent = 'Không đọc được dữ liệu sơ đồ. Hãy mở trang qua máy chủ web.';
+  });
+  var rt;
+  window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(fit, 150); });
+})();
+</script>
+</body>
+</html>

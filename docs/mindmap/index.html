@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bản đồ kiến thức · Hope for Future</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f3f8ff; --card: #ffffff; --text: #0f1d45; --muted: #5b6b8c; --border: #e1eaf8; --line: #c9d8f2;
+  --accent: #3b82f6; --accent-soft: #e7f0ff; --shadow: 0 6px 20px rgba(30, 64, 175, .10);
+  --math: #3b82f6; --ml: #8b5cf6; --dl: #ec4899; --rl: #0ea5e9; --llm: #f59e0b; --done: #10b981;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a1124; --card: #101b36; --text: #e8efff; --muted: #97a7c9; --border: #22335c; --line: #2c4170;
+    --accent: #60a5fa; --accent-soft: #16284f; --shadow: 0 6px 20px rgba(0, 0, 0, .35);
+    --math: #60a5fa; --ml: #a78bfa; --dl: #f472b6; --rl: #38bdf8; --llm: #fbbf24; --done: #34d399; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a1124; --card: #101b36; --text: #e8efff; --muted: #97a7c9; --border: #22335c; --line: #2c4170;
+  --accent: #60a5fa; --accent-soft: #16284f; --shadow: 0 6px 20px rgba(0, 0, 0, .35);
+  --math: #60a5fa; --ml: #a78bfa; --dl: #f472b6; --rl: #38bdf8; --llm: #fbbf24; --done: #34d399; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: var(--text); overflow: hidden;
+  background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--accent) 16%, transparent) 1px, transparent 1.5px) 0 0 / 26px 26px, var(--bg);
+}
+.tools {
+  position: absolute; left: 16px; right: 16px; top: 14px; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+}
+.title { margin-right: auto; }
+.title b { display: block; font-size: 18px; font-weight: 800; }
+.title span { font-size: 12.5px; color: var(--muted); }
+.find { position: relative; }
+.find input {
+  width: 240px; height: 40px; padding: 0 14px 0 36px; border: 1px solid var(--border); border-radius: 999px; outline: none;
+  font: 500 14px inherit; font-family: inherit; color: var(--text); background: var(--card); box-shadow: var(--shadow);
+}
+.find input:focus { border-color: var(--accent); }
+.find svg { position: absolute; left: 13px; top: 12px; width: 16px; height: 16px; color: var(--muted); }
+button {
+  height: 40px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+  font: 600 13px inherit; font-family: inherit; color: var(--text); background: var(--card); box-shadow: var(--shadow);
+}
+button:hover { border-color: var(--accent); color: var(--accent); }
+button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+svg#map { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+svg#map.drag { cursor: grabbing; }
+.link { fill: none; stroke: var(--line); stroke-width: 2; }
+.dep { fill: none; stroke-width: 2; stroke-dasharray: 6 6; opacity: .75; }
+.node { cursor: pointer; }
+.node rect { fill: var(--card); stroke: var(--border); stroke-width: 1.5; filter: drop-shadow(0 3px 8px rgba(30, 64, 175, .10)); transition: stroke 150ms; }
+.node:hover rect { stroke: var(--c); }
+.node text, #map > text { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+.node text { font-size: 13px; font-weight: 600; fill: var(--text); dominant-baseline: middle; pointer-events: none; }
+.node .sub { font-size: 11px; font-weight: 600; fill: var(--muted); }
+.node.d0 rect { fill: var(--accent); stroke: none; }
+.node.d0 text { fill: #fff; font-size: 16px; font-weight: 800; }
+.node.d1 rect { fill: var(--c); stroke: none; }
+.node.d1 text { fill: #fff; font-size: 14.5px; font-weight: 800; }
+.node.d1 .sub, .node.d0 .sub { fill: rgba(255, 255, 255, .88); }
+.node .sub, .node.d0 .sub, .node.d1 .sub { font-size: 11px; font-weight: 600; }
+.node.d2 rect { fill: color-mix(in srgb, var(--c) 12%, var(--card)); stroke: color-mix(in srgb, var(--c) 40%, transparent); }
+.node.d2 text { font-weight: 800; }
+.node.soon { opacity: .55; }
+.node.done rect { stroke: var(--done); }
+.node .dot { fill: var(--c); }
+.node.done .dot { fill: var(--done); }
+.node .tog { fill: var(--card); stroke: var(--c); stroke-width: 1.5; }
+.node .tog-t { font-size: 12px; font-weight: 800; fill: var(--c); text-anchor: middle; }
+.node.hit rect { stroke: #f59e0b; stroke-width: 3; }
+.node.dim { opacity: .25; }
+.legend { position: absolute; left: 16px; bottom: 14px; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow); }
+.legend i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 50%; vertical-align: -1px; }
+.legend .ln { width: 18px; height: 0; border-radius: 0; border-top: 2px dashed var(--muted); vertical-align: 3px; }
+@media (max-width: 700px) {
+  .title span { display: none; }
+  .find input { width: 160px; }
+  .legend { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="tools">
+  <div class="title"><b>Bản đồ kiến thức</b><span>Toàn bộ khoá học trên một trang. Bấm nhóm để mở, bấm chương để đọc. Kéo để di chuyển, cuộn để phóng to.</span></div>
+  <label class="find"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" placeholder="Tìm chủ đề…" aria-label="Tìm chủ đề trên bản đồ"></label>
+  <button id="all" type="button">Mở tất cả</button>
+  <button id="none" type="button">Thu gọn</button>
+  <button id="deps" type="button" aria-pressed="true">Liên hệ giữa các khoá</button>
+  <button id="fit" type="button">Vừa màn hình</button>
+</div>
+<svg id="map" role="img" aria-label="Sơ đồ cây các khoá học, nhóm chương và chương"><g id="view"><g id="links"></g><g id="deplinks"></g><g id="nodes"></g></g></svg>
+<div class="legend"><span><i style="background:var(--math)"></i>Toán</span><span><i style="background:var(--ml)"></i>Học máy</span><span><i style="background:var(--rl)"></i>Học tăng cường</span><span><i style="background:var(--done)"></i>Đã đọc</span><span><i class="ln"></i>Nên học trước</span></div>
+<script>
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  var COURSES = [
+    { id: 'math', name: 'Toán nền tảng', sub: 'Đại số, xác suất, tối ưu' },
+    { id: 'ml', name: 'Học máy', sub: 'Hồi quy đến SVM' },
+    { id: 'dl', name: 'Học sâu', sub: 'Sắp có', soon: true },
+    { id: 'rl', name: 'Học tăng cường', sub: 'MDP đến PPO, DDPG' },
+    { id: 'llm', name: 'LLM và ứng dụng', sub: 'Sắp có', soon: true }
+  ];
+  // Quan hệ "nên học trước" giữa các khoá (đường nét đứt).
+  var DEPS = [
+    ['math/ch01_vi', 'ml/ch07_vi'], ['math/ch04_vi', 'ml/ch11_vi'], ['math/ch23_vi', 'ml/ch26_vi'], ['math/ch02_vi', 'ml/ch12_vi'],
+    ['math/ch03_vi', 'chapter2/chapter2_vi'], ['ml/ch16_vi', 'chapter6/chapter6_vi'], ['ml/ch12_vi', 'chapter4/chapter4_vi'],
+    ['math/ch03_vi', 'mathrl/ch06_vi']
+  ];
+  var colors = { math: 'var(--math)', ml: 'var(--ml)', dl: 'var(--dl)', rl: 'var(--rl)', llm: 'var(--llm)' };
+  var done = [];
+  try { done = JSON.parse(localStorage.getItem('easyrl-done') || '[]'); } catch (e) { /* bỏ qua */ }
+
+  function courseOf(path) {
+    if (/^math\//.test(path)) return 'math';
+    if (/^ml\//.test(path)) return 'ml';
+    return 'rl';
+  }
+
+  // Đọc mục lục của docsify: nhóm cấp một, chương cấp hai, trang con cấp ba (chỉ đếm).
+  function parse(md) {
+    var groups = [];
+    var g = null, ch = null;
+    md.split('\n').forEach(function (line) {
+      var m;
+      if ((m = line.match(/^- (.+)$/))) { g = { name: m[1].trim(), items: [] }; groups.push(g); ch = null; }
+      else if ((m = line.match(/^  - \[(.+?)\]\((.+?)\)/)) && g) { ch = { name: m[1], path: m[2], subs: 0 }; g.items.push(ch); }
+      else if (/^    - \[/.test(line) && ch) ch.subs++;
+    });
+    return groups;
+  }
+
+  function build(groups) {
+    var root = { name: 'Hope for Future', sub: 'Tự học AI', depth: 0, children: [], open: true };
+    var byCourse = {};
+    COURSES.forEach(function (c) {
+      var n = { name: c.name, sub: c.sub, depth: 1, course: c.id, soon: c.soon, children: [], open: true };
+      byCourse[c.id] = n;
+      root.children.push(n);
+    });
+    groups.forEach(function (g) {
+      if (!g.items.length || g.name === 'Tổng quan') return;
+      var c = courseOf(g.items[0].path);
+      var gn = { name: g.name, depth: 2, course: c, children: [], open: false };
+      g.items.forEach(function (it) {
+        gn.children.push({ name: it.name, path: it.path, depth: 3, course: c, subs: it.subs, done: done.indexOf('/' + it.path) >= 0 });
+      });
+      gn.doneCount = gn.children.filter(function (x) { return x.done; }).length;
+      byCourse[c].children.push(gn);
+    });
+    return root;
+  }
+
+  // Đo chữ bằng chính phần tử text của SVG (đúng font đã tải), có bộ nhớ đệm.
+  var probe = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  var cache = {};
+  function textW(t, size, weight) {
+    var k = size + '|' + weight + '|' + t;
+    if (cache[k] != null) return cache[k];
+    probe.setAttribute('font-size', size);
+    probe.setAttribute('font-weight', weight);
+    probe.textContent = t;
+    return (cache[k] = probe.getComputedTextLength());
+  }
+
+  var root, nodesById = {}, scale = 1, tx = 40, ty = 80, showDeps = true, query = '';
+  var COLX = [0, 230, 500, 800];
+  var ROW = 40;
+
+  function nodeSize(n) {
+    var size = n.depth === 0 ? 16 : n.depth === 1 ? 14.5 : 13;
+    var w = textW(n.name, size, n.depth < 3 ? 800 : 600);
+    if (n.sub) w = Math.max(w, textW(n.sub, 11, 600));
+    return { w: Math.min(Math.ceil(w) + (n.depth === 3 ? 40 : n.depth === 2 ? 44 : 34), 360), h: n.sub ? 48 : 34 };
+  }
+
+  function layout() {
+    var y = 0;
+    (function walk(n) {
+      var s = nodeSize(n);
+      n.w = s.w; n.h = s.h; n.x = COLX[n.depth];
+      var kids = n.open && n.children ? n.children : [];
+      if (!kids.length) { n.y = y + s.h / 2; y += Math.max(ROW, s.h + 8); return; }
+      kids.forEach(walk);
+      n.y = (kids[0].y + kids[kids.length - 1].y) / 2;
+    })(root);
+  }
+
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  function clip(t, maxW, size, weight) {
+    if (textW(t, size, weight) <= maxW) return t;
+    while (t.length > 4 && textW(t + '…', size, weight) > maxW) t = t.slice(0, -1);
+    return t + '…';
+  }
+
+  function render() {
+    layout();
+    var L = document.getElementById('links'), N = document.getElementById('nodes'), DL = document.getElementById('deplinks');
+    L.innerHTML = ''; N.innerHTML = ''; DL.innerHTML = '';
+    nodesById = {};
+    var q = query.toLowerCase();
+    (function walk(n) {
+      var kids = n.open && n.children ? n.children : [];
+      kids.forEach(function (k) {
+        var x1 = n.x + n.w, y1 = n.y, x2 = k.x, y2 = k.y, mx = (x1 + x2) / 2;
+        el('path', { class: 'link', d: 'M' + x1 + ' ' + y1 + 'C' + mx + ' ' + y1 + ' ' + mx + ' ' + y2 + ' ' + x2 + ' ' + y2 }, L);
+        walk(k);
+      });
+      var hit = q && n.name.toLowerCase().indexOf(q) >= 0;
+      var cls = 'node d' + n.depth + (n.soon ? ' soon' : '') + (n.done ? ' done' : '') + (hit ? ' hit' : '') + (q && !hit && n.depth === 3 ? ' dim' : '');
+      var g = el('g', { class: cls, transform: 'translate(' + n.x + ' ' + (n.y - n.h / 2) + ')', tabindex: 0, role: n.path ? 'link' : 'button' }, N);
+      g.style.setProperty('--c', colors[n.course] || 'var(--accent)');
+      el('rect', { width: n.w, height: n.h, rx: n.depth < 2 ? n.h / 2 : 12 }, g);
+      var tx0 = 15;
+      if (n.depth === 3) { el('circle', { class: 'dot', cx: 14, cy: n.h / 2, r: 4.5 }, g); tx0 = 26; }
+      var size = n.depth === 0 ? 16 : n.depth === 1 ? 14.5 : 13;
+      var t = el('text', { x: tx0, y: n.sub ? 17 : n.h / 2 }, g);
+      t.textContent = clip(n.name, n.w - tx0 - 10, size, n.depth < 3 ? 800 : 600);
+      if (n.sub) { var s = el('text', { class: 'sub', x: tx0, y: 33 }, g); s.textContent = n.sub; }
+      if (n.depth === 2) {
+        var info = n.doneCount ? n.doneCount + '/' + n.children.length : String(n.children.length);
+        el('circle', { class: 'tog', cx: n.w, cy: n.h / 2, r: 11 }, g);
+        var tt = el('text', { class: 'tog-t', x: n.w, y: n.h / 2 + 1 }, g);
+        tt.textContent = n.open ? '−' : info;
+      }
+      var title = el('title', {}, g);
+      title.textContent = n.name + (n.path ? (n.done ? ' · đã đọc' : '') + ' · bấm để mở bài' : n.children && n.children.length ? ' · bấm để mở hoặc thu gọn' : '');
+      g.addEventListener('click', function (e) { e.stopPropagation(); if (!lastMoved) activate(n); });
+      g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(n); } });
+      if (n.path) nodesById[n.path] = n;
+    })(root);
+    if (showDeps) DEPS.forEach(function (d) {
+      var a = nodesById[d[0]], b = nodesById[d[1]];
+      if (!a || !b) return;
+      var x1 = a.x + a.w, y1 = a.y, x2 = b.x + b.w, y2 = b.y, bend = 120 + Math.abs(y2 - y1) * .15;
+      el('path', { class: 'dep', stroke: colors[a.course], d: 'M' + x1 + ' ' + y1 + 'C' + (x1 + bend) + ' ' + y1 + ' ' + (x2 + bend) + ' ' + y2 + ' ' + x2 + ' ' + y2 }, DL);
+    });
+    apply();
+  }
+
+  function activate(n) {
+    if (n.path) {
+      var hash = '#/' + n.path;
+      try { if (window.top !== window) { window.top.location.hash = hash; return; } } catch (e) { /* khác nguồn */ }
+      location.href = '../#/' + n.path;
+      return;
+    }
+    if (n.children && n.children.length) { n.open = !n.open; render(); }
+  }
+
+  function setAll(open) {
+    (function walk(n) { if (n.depth >= 1 && n.children && n.children.length) n.open = open || n.depth === 1; (n.children || []).forEach(walk); })(root);
+    render(); fit();
+  }
+
+  var view = document.getElementById('view'), svg = document.getElementById('map');
+  function apply() { view.setAttribute('transform', 'translate(' + tx + ' ' + ty + ') scale(' + scale + ')'); }
+  function fit() {
+    var b = view.getBBox();
+    if (!b.width) return;
+    var W = svg.clientWidth, H = svg.clientHeight - 150;
+    scale = Math.max(.35, Math.min(1.15, (W - 40) / b.width, H / b.height));
+    tx = (W - b.width * scale) / 2 - b.x * scale;
+    ty = 80 + (H - b.height * scale) / 2 - b.y * scale;
+    apply();
+  }
+
+  // Kéo để di chuyển, cuộn hoặc chụm hai ngón để phóng to.
+  var drag = null, pts = {}, lastMoved = false;
+  svg.addEventListener('pointerdown', function (e) {
+    pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    drag = { x: e.clientX, y: e.clientY, tx: tx, ty: ty, moved: false };
+    svg.classList.add('drag');
+  });
+  window.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    if (pts[e.pointerId]) {
+      var ids = Object.keys(pts);
+      if (ids.length === 2) {
+        var o = ids.map(function (i) { return pts[i]; });
+        var d0 = Math.hypot(o[0].x - o[1].x, o[0].y - o[1].y);
+        pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+        o = ids.map(function (i) { return pts[i]; });
+        var d1 = Math.hypot(o[0].x - o[1].x, o[0].y - o[1].y);
+        zoomAt((o[0].x + o[1].x) / 2, (o[0].y + o[1].y) / 2, d1 / (d0 || d1));
+        return;
+      }
+      pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    }
+    var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    tx = drag.tx + dx; ty = drag.ty + dy; apply();
+  });
+  window.addEventListener('pointerup', function (e) { delete pts[e.pointerId]; lastMoved = !!(drag && drag.moved); drag = null; svg.classList.remove('drag'); });
+  function zoomAt(cx, cy, k) {
+    var r = svg.getBoundingClientRect();
+    var ns = Math.max(.25, Math.min(2.5, scale * k));
+    k = ns / scale;
+    tx = cx - r.left - (cx - r.left - tx) * k;
+    ty = cy - r.top - (cy - r.top - ty) * k;
+    scale = ns; apply();
+  }
+  svg.addEventListener('wheel', function (e) { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * .0015)); }, { passive: false });
+
+  document.getElementById('all').onclick = function () { setAll(true); };
+  document.getElementById('none').onclick = function () { setAll(false); };
+  document.getElementById('fit').onclick = fit;
+  document.getElementById('deps').onclick = function () { showDeps = !showDeps; this.setAttribute('aria-pressed', showDeps); render(); };
+  document.getElementById('q').addEventListener('input', function () {
+    query = this.value.trim();
+    if (query) (function walk(n) {
+      if (n.depth === 2) n.open = n.children.some(function (c) { return c.name.toLowerCase().indexOf(query.toLowerCase()) >= 0; }) || n.name.toLowerCase().indexOf(query.toLowerCase()) >= 0;
+      (n.children || []).forEach(walk);
+    })(root);
+    render();
+  });
+
+  probe.setAttribute('font-family', "'Plus Jakarta Sans', system-ui, sans-serif");
+  probe.setAttribute('visibility', 'hidden');
+  document.getElementById('map').appendChild(probe);
+
+  fetch('../_sidebar_vi.md').then(function (r) { return r.text(); }).then(function (md) {
+    root = build(parse(md));
+    var first = true;
+    (document.fonts ? document.fonts.ready : Promise.resolve()).then(function () { render(); if (first) { fit(); first = false; } });
+  }).catch(function () {
+    document.querySelector('.title span').textContent = 'Không đọc được mục lục. Hãy mở trang qua máy chủ web.';
+  });
+  window.addEventListener('resize', function () { fit(); });
+})();
+</script>
+</body>
+</html>
