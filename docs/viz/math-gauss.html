@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phân phối chuẩn hai chiều · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .sl { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; max-width: 620px; margin: 8px auto; }
+  .sl input { width: 100%; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Phân phối chuẩn hai chiều</h1>
+      <div class="crumbs"><a href="../#/math/ch03_vi">← Chương 3 Ôn tập Xác suất</a></div>
+    </div>
+    <p class="lead">Màu nền là mật độ $p(x, y)$. Hai đường cong ở mép là hai phân phối biên $p(x)$ và $p(y)$. Bấm vào bản đồ để chọn $x_0$: đường cong màu hồng bên phải là phân phối có điều kiện $p(y \mid x = x_0)$.</p>
+  </div>
+  <div class="only-embed open-full"><a href="math-gauss.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="sl">
+      <label for="sx">$\sigma_x$</label><input id="sx" type="range" min="0.3" max="2" step="0.05" value="1.2"><span class="val" id="sx-v"></span>
+      <label for="sy">$\sigma_y$</label><input id="sy" type="range" min="0.3" max="2" step="0.05" value="0.8"><span class="val" id="sy-v"></span>
+      <label for="rho">$\rho$</label><input id="rho" type="range" min="-0.95" max="0.95" step="0.05" value="0.7"><span class="val" id="rho-v"></span>
+    </div>
+    <div class="ctrl">
+      <label><input type="checkbox" id="samples"> 400 mẫu</label>
+      <label><input type="checkbox" id="axes" checked> Trục chính (vector riêng của $\mathbf{\Sigma}$)</label>
+    </div>
+    <div class="plotbox click"><canvas id="cv" width="600" height="520"></canvas><svg id="sv" viewBox="0 0 600 520" role="img" aria-label="Mật độ chuẩn hai chiều cùng phân phối biên và có điều kiện"></svg></div>
+    <table class="mtab" id="tab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, CM = '#2f80f5', CC = '#e8487f', CA = '#f08a24';
+  var svg = V_.$('#sv'), cv = V_.$('#cv'), x0 = 1.2, mu = [0, 0];
+  // vùng bản đồ: phần trái-dưới; mép trên vẽ p(x), mép phải vẽ p(y) và p(y | x0)
+  var P = MLV.Plot(svg, { W: 600, H: 520, x: [-4, 4], y: [-3.78, 3.78], m: { l: 34, r: 130, t: 80, b: 28 } });
+  var noise = (function () { var r = MLV.rng(7), a = []; for (var i = 0; i < 400; i++) a.push([MLV.randn(r), MLV.randn(r)]); return a; })();
+  function par() { return { sx: +V_.$('#sx').value, sy: +V_.$('#sy').value, r: +V_.$('#rho').value }; }
+  function npdf(t, m, s) { return Math.exp(-0.5 * (t - m) * (t - m) / (s * s)) / (Math.sqrt(2 * Math.PI) * s); }
+
+  function render() {
+    var q = par(), sx = q.sx, sy = q.sy, r = q.r;
+    V_.$('#sx-v').textContent = V_.fmt(sx, 2); V_.$('#sy-v').textContent = V_.fmt(sy, 2); V_.$('#rho-v').textContent = V_.fmt(r, 2);
+    var det = sx * sx * sy * sy * (1 - r * r), norm = 1 / (2 * Math.PI * Math.sqrt(det)), pmax = norm;
+    function dens(x, y) {
+      var a = (x - mu[0]) / sx, b = (y - mu[1]) / sy;
+      return norm * Math.exp(-0.5 * (a * a - 2 * r * a * b + b * b) / (1 - r * r));
+    }
+    MLV.paint(cv, P, function (x, y) {
+      var v = dens(x, y) / pmax, band = (Math.floor(v * 10) % 2) ? 14 : 0;
+      return [246 - 190 * v, 247 - 150 * v + band * 0.4, 250 - 40 * v, 255];
+    }, 3);
+    P.clear(); P.axes();
+    var g = P.layer(true);
+    if (V_.$('#samples').checked) {
+      var L11 = sx, L21 = r * sy, L22 = sy * Math.sqrt(1 - r * r);          // Cholesky của Sigma
+      noise.forEach(function (z) { var x = mu[0] + L11 * z[0], y = mu[1] + L21 * z[0] + L22 * z[1]; P.el('circle', { cx: P.sx(x), cy: P.sy(y), r: 1.8, fill: '#1d2430', 'fill-opacity': 0.55 }, g); });
+    }
+    // trục chính: vector riêng của Sigma, độ dài 2 sqrt(lambda)
+    var a = sx * sx, b = r * sx * sy, d = sy * sy, tr = a + d, disc = Math.sqrt((a - d) * (a - d) / 4 + b * b);
+    var l1 = tr / 2 + disc, l2 = tr / 2 - disc;
+    var v1 = Math.abs(b) > 1e-9 ? [b, l1 - a] : (a >= d ? [1, 0] : [0, 1]), n1 = Math.hypot(v1[0], v1[1]); v1 = [v1[0] / n1, v1[1] / n1];
+    var v2 = [-v1[1], v1[0]];
+    if (V_.$('#axes').checked) {
+      [[v1, l1], [v2, l2]].forEach(function (e) {
+        var s = 2 * Math.sqrt(e[1]);
+        P.el('line', { x1: P.sx(-e[0][0] * s), y1: P.sy(-e[0][1] * s), x2: P.sx(e[0][0] * s), y2: P.sy(e[0][1] * s), stroke: CA, 'stroke-width': 2.5 }, g);
+      });
+    }
+    // đường x = x0 và kỳ vọng có điều kiện E[y | x] (đường hồi quy)
+    var slope = r * sy / sx;
+    P.el('line', { x1: P.sx(-4), y1: P.sy(slope * -4), x2: P.sx(4), y2: P.sy(slope * 4), stroke: CC, 'stroke-width': 1.5, 'stroke-dasharray': '6 4' }, g);
+    P.el('line', { x1: P.sx(x0), y1: P.sy(-3.78), x2: P.sx(x0), y2: P.sy(3.78), stroke: CC, 'stroke-width': 2 }, g);
+    var cm = mu[1] + slope * (x0 - mu[0]), cs = sy * Math.sqrt(1 - r * r);
+    P.el('circle', { cx: P.sx(x0), cy: P.sy(cm), r: 5, fill: CC, class: 'pl-pt' }, g);
+
+    // mép trên: p(x)
+    var top = P.m.t - 8, hTop = 60, mxTop = npdf(0, 0, sx), dTop = '';
+    for (var i = 0; i <= 200; i++) { var x = -4 + 8 * i / 200; dTop += (i ? 'L' : 'M') + P.sx(x).toFixed(1) + ' ' + (top - hTop * npdf(x, mu[0], sx) / Math.max(mxTop, npdf(0, 0, 0.3) * 0.5)).toFixed(1); }
+    P.el('path', { d: dTop, fill: 'none', stroke: CM, 'stroke-width': 2 });
+    P.el('text', { x: P.sx(4) + 6, y: top - 4, class: 'pl-lab' }).textContent = 'p(x)';
+    // mép phải: p(y) và p(y | x0)
+    var left = P.W - P.m.r + 10, wR = 100, ref = Math.max(npdf(0, 0, sy), npdf(0, 0, cs)), dR = '', dC = '';
+    for (var j = 0; j <= 200; j++) {
+      var y = -3.78 + 7.56 * j / 200;
+      dR += (j ? 'L' : 'M') + (left + wR * npdf(y, mu[1], sy) / ref).toFixed(1) + ' ' + P.sy(y).toFixed(1);
+      dC += (j ? 'L' : 'M') + (left + wR * npdf(y, cm, cs) / ref).toFixed(1) + ' ' + P.sy(y).toFixed(1);
+    }
+    P.el('line', { x1: left, y1: P.sy(-3.78), x2: left, y2: P.sy(3.78), stroke: 'var(--border)' });
+    P.el('path', { d: dR, fill: 'none', stroke: CM, 'stroke-width': 2 });
+    P.el('path', { d: dC, fill: CC, 'fill-opacity': 0.15, stroke: CC, 'stroke-width': 2 });
+    P.el('text', { x: left + 4, y: P.m.t + 12, class: 'pl-lab', style: 'fill:' + CM }).textContent = 'p(y)';
+    P.el('text', { x: left + 4, y: P.m.t + 28, class: 'pl-lab', style: 'fill:' + CC }).textContent = 'p(y | x₀)';
+
+    V_.$('#tab').innerHTML = '<tr><th>Đại lượng</th><th>Công thức</th><th>Giá trị</th></tr>' +
+      '<tr><td>Hiệp phương sai</td><td>$\\mathbf{\\Sigma} = \\begin{bmatrix} \\sigma_x^2 & \\rho\\sigma_x\\sigma_y \\\\ \\rho\\sigma_x\\sigma_y & \\sigma_y^2 \\end{bmatrix}$</td><td>$\\begin{bmatrix} ' + V_.fmt(a, 2) + ' & ' + V_.fmt(b, 2) + ' \\\\ ' + V_.fmt(b, 2) + ' & ' + V_.fmt(d, 2) + ' \\end{bmatrix}$</td></tr>' +
+      '<tr><td>Trị riêng của $\\mathbf{\\Sigma}$</td><td>phương sai dọc hai trục cam</td><td>$' + V_.fmt(l1, 3) + ',\\ ' + V_.fmt(l2, 3) + '$</td></tr>' +
+      '<tr><td>$\\text{E}[y \\mid x = ' + V_.fmt(x0, 2) + ']$</td><td>$\\rho \\frac{\\sigma_y}{\\sigma_x} x_0$</td><td>' + V_.fmt(cm, 3) + '</td></tr>' +
+      '<tr><td>Độ lệch chuẩn của $p(y \\mid x_0)$</td><td>$\\sigma_y\\sqrt{1 - \\rho^2}$</td><td>' + V_.fmt(cs, 3) + '</td></tr>';
+    V_.texAll(V_.$('#tab'));
+    var msg;
+    if (Math.abs(r) < 0.025) msg = '$\\rho = 0$: $\\mathbf{\\Sigma}$ là ma trận đường chéo, $p(x, y) = p(x)p(y)$. Biết $x$ không cho thêm thông tin gì về $y$: đường hồng trùng với đường xanh ở mép phải. Với phân phối chuẩn, không tương quan đồng nghĩa với độc lập (điều này <b>không</b> đúng với phân phối bất kỳ).';
+    else msg = 'Biết $x = x_0$ làm thay đổi phân phối của $y$ theo hai cách: kỳ vọng dịch tới $\\rho\\frac{\\sigma_y}{\\sigma_x}x_0$ (chấm hồng nằm trên đường nét đứt, chính là đường hồi quy tuyến tính của $y$ theo $x$), và độ lệch chuẩn co lại còn $\\sqrt{1 - \\rho^2} = ' + V_.fmt(Math.sqrt(1 - r * r), 2) + '$ lần. $|\\rho|$ càng gần 1, biết $x$ càng cho nhiều thông tin về $y$. Phân phối có điều kiện vẫn là phân phối chuẩn.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  svg.addEventListener('click', function (e) {
+    var a = P.at(e); if (!P.inside(a.px, a.py)) return;
+    x0 = a.x; render();
+  });
+  ['#sx', '#sy', '#rho'].forEach(function (s) { V_.$(s).addEventListener('input', render); });
+  ['#samples', '#axes'].forEach(function (s) { V_.$(s).addEventListener('change', render); });
+  V_.texAll(document.body);
+  render();
+})();
+</script>
+</body>
+</html>

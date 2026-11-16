@@ -39,6 +39,9 @@ def build(md_path):
     md_path = Path(md_path).resolve()
     text = md_path.read_text()
     name = md_path.stem.removesuffix("_vi")
+    # Khoá Toán/Học máy dùng tên chương trùng với mathrl (ch07_code...): thêm tiền tố để không đè thư mục hình của nhau.
+    prefix = {"ml": "ml_", "math": "math_"}.get(md_path.parent.name, "")
+    name = prefix + name
     fig_dir = DOCS / "img" / "code" / name
     shutil.rmtree(fig_dir, ignore_errors=True)
     fig_dir.mkdir(parents=True)

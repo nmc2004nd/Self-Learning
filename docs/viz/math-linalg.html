@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Biến đổi tuyến tính · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .mat { display: inline-grid; grid-template-columns: auto auto; gap: 4px 14px; padding: 4px 12px; border-left: 2px solid var(--text); border-right: 2px solid var(--text); border-radius: 6px; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .sl { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; max-width: 620px; margin: 8px auto; }
+  .sl input { width: 100%; }
+  .tip { cursor: grab; }
+  .tip:active { cursor: grabbing; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Ma trận là một phép biến đổi</h1>
+      <div class="crumbs"><a href="../#/math/ch01_vi">← Chương 1 Ôn tập Đại số tuyến tính</a></div>
+    </div>
+    <p class="lead">Nhân một ma trận $2 \times 2$ với mọi vector của mặt phẳng: lưới ô vuông bị kéo, xoay, lật. Định thức, trị riêng và hạng đều đọc được trên hình.</p>
+  </div>
+  <div class="only-embed open-full"><a href="math-linalg.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <h2>Biến đổi $\mathbf{x} \mapsto \mathbf{A}\mathbf{x}$</h2>
+    <div class="ctrl">
+      <span class="lb">Mẫu</span>
+      <div class="seg" id="preset">
+        <button type="button" data-m="1,0,0,1" aria-pressed="false">Đơn vị</button>
+        <button type="button" data-m="1.5,0.5,0.5,1" aria-pressed="true">Đối xứng</button>
+        <button type="button" data-m="0.866,-0.5,0.5,0.866" aria-pressed="false">Quay 30°</button>
+        <button type="button" data-m="1,1,0,1" aria-pressed="false">Trượt</button>
+        <button type="button" data-m="0,1,1,0" aria-pressed="false">Phản xạ</button>
+        <button type="button" data-m="1,0.5,0.6,0.3" aria-pressed="false">Suy biến</button>
+      </div>
+    </div>
+    <div class="sl">
+      <label for="a">$a_{11}$</label><input id="a" type="range" min="-2" max="2" step="0.05"><span class="val" id="a-v"></span>
+      <label for="b">$a_{12}$</label><input id="b" type="range" min="-2" max="2" step="0.05"><span class="val" id="b-v"></span>
+      <label for="c">$a_{21}$</label><input id="c" type="range" min="-2" max="2" step="0.05"><span class="val" id="c-v"></span>
+      <label for="d">$a_{22}$</label><input id="d" type="range" min="-2" max="2" step="0.05"><span class="val" id="d-v"></span>
+    </div>
+    <div class="ctrl"><label><input type="checkbox" id="showEig" checked> Vector riêng</label><label><input type="checkbox" id="showCirc" checked> Ảnh của đường tròn đơn vị</label><span style="color:var(--muted);font-size:.85rem">Kéo đầu hai mũi tên để đổi cột của $\mathbf{A}$.</span></div>
+    <div class="plotbox"><svg id="sv" viewBox="0 0 520 520" role="img" aria-label="Lưới ô vuông sau khi biến đổi bởi ma trận A"></svg></div>
+    <table class="mtab" id="tab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+
+  <div class="blk">
+    <h2>Quả cầu đơn vị của chuẩn $\ell_p$</h2>
+    <p class="lead" style="margin-bottom:6px">Tập $\{\mathbf{x} \in \mathbb{R}^2 : \|\mathbf{x}\|_p = 1\}$ với $\|\mathbf{x}\|_p = (|x_1|^p + |x_2|^p)^{1/p}$ (mục 1.14). Ba đường mờ là $p = 1, 2, \infty$.</p>
+    <div class="ctrl">
+      <label for="p">$p$</label><input id="p" type="range" min="-1.4" max="3" step="0.02" value="0"><span class="val" id="p-v"></span>
+      <button type="button" class="btn" id="pinf">$p = \infty$</button>
+    </div>
+    <div class="plotbox"><svg id="sv2" viewBox="0 0 460 460" role="img" aria-label="Đường mức một của chuẩn p"></svg></div>
+    <div class="insight" id="insight2"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, C1 = '#2f80f5', C2 = '#e8487f', CE = '#0ea5a4', CH = '#f08a24';
+  var ids = ['a', 'b', 'c', 'd'];
+  var cur = [1, 0, 0, 1];                 // giá trị thật của ma trận (thanh trượt chỉ hiển thị gần đúng)
+  function M() { return cur.slice(); }
+  function setM(m) { cur = m.slice(); ids.forEach(function (k, i) { V_.$('#' + k).value = m[i]; }); }
+  function ap(m, x, y) { return [m[0] * x + m[1] * y, m[2] * x + m[3] * y]; }
+  function n2(v) { return V_.fmt(v, 2); }
+
+  // trị riêng và vector riêng của ma trận 2x2 thực
+  function eig2(m) {
+    var tr = m[0] + m[3], det = m[0] * m[3] - m[1] * m[2], disc = tr * tr / 4 - det;
+    if (disc < -1e-12) return { complex: true, re: tr / 2, im: Math.sqrt(-disc) };
+    var s = Math.sqrt(Math.max(0, disc)), ls = [tr / 2 + s, tr / 2 - s];
+    var vs = ls.map(function (l) {
+      var v = Math.abs(m[1]) > 1e-9 ? [m[1], l - m[0]] : (Math.abs(m[2]) > 1e-9 ? [l - m[3], m[2]] : null);
+      if (!v) return null;
+      var n = Math.hypot(v[0], v[1]); return [v[0] / n, v[1] / n];
+    });
+    if (!vs[0]) vs = Math.abs(ls[0] - m[0]) < 1e-9 ? [[1, 0], [0, 1]] : [[0, 1], [1, 0]];   // ma trận đường chéo
+    return { complex: false, ls: ls, vs: vs };
+  }
+
+  var svg = V_.$('#sv'), P = MLV.Plot(svg, { W: 520, H: 520, x: [-3.2, 3.2], y: [-3.2, 3.2], m: { l: 30, r: 10, t: 10, b: 26 } });
+  var drag = null;
+
+  function arrow(g, p, color, w) {
+    var x1 = P.sx(0), y1 = P.sy(0), x2 = P.sx(p[0]), y2 = P.sy(p[1]);
+    var ang = Math.atan2(y2 - y1, x2 - x1), L = Math.hypot(x2 - x1, y2 - y1), h = Math.min(11, L * 0.4);
+    P.el('line', { x1: x1, y1: y1, x2: x2 - Math.cos(ang) * h * 0.6, y2: y2 - Math.sin(ang) * h * 0.6, stroke: color, 'stroke-width': w || 3 }, g);
+    P.el('path', { d: 'M' + x2 + ' ' + y2 + 'L' + (x2 - h * Math.cos(ang - 0.4)) + ' ' + (y2 - h * Math.sin(ang - 0.4)) + 'L' + (x2 - h * Math.cos(ang + 0.4)) + ' ' + (y2 - h * Math.sin(ang + 0.4)) + 'Z', fill: color }, g);
+  }
+
+  function render() {
+    var m = M();
+    ids.forEach(function (k, i) { V_.$('#' + k + '-v').textContent = n2(m[i]); });
+    P.clear(); P.axes();
+    var g = P.layer(true), det = m[0] * m[3] - m[1] * m[2];
+    // lưới sau biến đổi
+    for (var k = -6; k <= 6; k++) {
+      [[k, -8, k, 8], [-8, k, 8, k]].forEach(function (s) {
+        var p = ap(m, s[0], s[1]), q = ap(m, s[2], s[3]);
+        P.el('line', { x1: P.sx(p[0]), y1: P.sy(p[1]), x2: P.sx(q[0]), y2: P.sy(q[1]), stroke: k === 0 ? 'var(--muted)' : 'var(--term)', 'stroke-width': k === 0 ? 1.6 : 1 }, g);
+      });
+    }
+    // ảnh của hình vuông đơn vị: hình bình hành có diện tích |det|
+    var sq = [[0, 0], [1, 0], [1, 1], [0, 1]].map(function (p) { var q = ap(m, p[0], p[1]); return P.sx(q[0]) + ',' + P.sy(q[1]); }).join(' ');
+    P.el('polygon', { points: sq, fill: det >= 0 ? C1 : C2, 'fill-opacity': 0.2, stroke: det >= 0 ? C1 : C2, 'stroke-width': 1 }, g);
+    if (V_.$('#showCirc').checked) {
+      var pts = [];
+      for (var i = 0; i <= 120; i++) { var t = 2 * Math.PI * i / 120; pts.push(ap(m, Math.cos(t), Math.sin(t))); }
+      P.poly(pts, { stroke: CH, 'stroke-width': 2 }, g);
+    }
+    var E = eig2(m);
+    if (V_.$('#showEig').checked && !E.complex) {
+      E.vs.forEach(function (v, j) {
+        if (!v) return;
+        P.el('line', { x1: P.sx(-5 * v[0]), y1: P.sy(-5 * v[1]), x2: P.sx(5 * v[0]), y2: P.sy(5 * v[1]), stroke: CE, 'stroke-width': 1.5, 'stroke-dasharray': '6 4' }, g);
+        arrow(g, [v[0] * E.ls[j], v[1] * E.ls[j]], CE, 2);
+      });
+    }
+    arrow(g, [m[0], m[2]], C1); arrow(g, [m[1], m[3]], C2);
+    P.el('circle', { cx: P.sx(m[0]), cy: P.sy(m[2]), r: 9, fill: C1, 'fill-opacity': 0.25, class: 'tip', 'data-k': '0' }, svg);
+    P.el('circle', { cx: P.sx(m[1]), cy: P.sy(m[3]), r: 9, fill: C2, 'fill-opacity': 0.25, class: 'tip', 'data-k': '1' }, svg);
+
+    var rank = Math.abs(det) > 1e-9 ? 2 : (m.some(function (v) { return Math.abs(v) > 1e-9; }) ? 1 : 0);
+    var lam = E.complex ? '$' + n2(E.re) + ' \\pm ' + n2(E.im) + 'i$' : '$' + n2(E.ls[0]) + ',\\ ' + n2(E.ls[1]) + '$';
+    V_.$('#tab').innerHTML =
+      '<tr><th>Đại lượng</th><th>Giá trị</th><th>Đọc trên hình</th></tr>' +
+      '<tr><td>$\\det \\mathbf{A}$</td><td>' + n2(det) + '</td><td>diện tích hình bình hành' + (det < 0 ? ', bị lật' : '') + '</td></tr>' +
+      '<tr><td>$\\text{trace}\\,\\mathbf{A}$</td><td>' + n2(m[0] + m[3]) + '</td><td>tổng hai trị riêng</td></tr>' +
+      '<tr><td>Trị riêng</td><td>' + lam + '</td><td>' + (E.complex ? 'không có phương nào được giữ nguyên' : 'đường nét đứt: phương được giữ nguyên') + '</td></tr>' +
+      '<tr><td>Hạng</td><td>' + rank + '</td><td>' + (rank === 2 ? 'mặt phẳng → mặt phẳng' : rank === 1 ? 'mặt phẳng bị ép thành một đường thẳng' : 'mọi thứ về gốc') + '</td></tr>';
+    V_.texAll(V_.$('#tab'));
+
+    var sym = Math.abs(m[1] - m[2]) < 1e-9, msg;
+    if (rank < 2) msg = '$\\det \\mathbf{A} = 0$: hai cột thẳng hàng, mặt phẳng bị ép xuống một đường thẳng (range của $\\mathbf{A}$). Thông tin bị mất nên không thể biến đổi ngược: $\\mathbf{A}$ không khả nghịch. Có một trị riêng bằng 0; vector riêng của nó là null space.';
+    else if (E.complex) msg = 'Trị riêng phức: phép biến đổi có thành phần quay, không vector thực nào giữ nguyên phương. Độ lớn của trị riêng là $' + n2(Math.hypot(E.re, E.im)) + '$; bằng 1 thì phép biến đổi giữ nguyên độ dài (ma trận trực giao).';
+    else if (sym) msg = 'Ma trận đối xứng: trị riêng thực và hai vector riêng <b>vuông góc</b> (mục 1.12). Đường tròn đơn vị thành một elip có hai trục chính nằm đúng trên hai phương riêng, độ dài bán trục là $|\\lambda_1|, |\\lambda_2|$.' + (E.ls[1] > 0 ? ' Hai trị riêng dương: $\\mathbf{A}$ xác định dương.' : '');
+    else if (Math.abs(E.ls[0] - E.ls[1]) < 1e-9 && Math.abs(m[1]) + Math.abs(m[2]) > 1e-9) msg = 'Trị riêng lặp $\\lambda = ' + n2(E.ls[0]) + '$ nhưng chỉ có <b>một</b> phương riêng: không đủ hai vector riêng độc lập để làm cơ sở, nên ma trận này không chéo hoá được (mục 1.12).';
+    else msg = 'Ma trận không đối xứng: trị riêng vẫn thực nhưng hai vector riêng thường không vuông góc. Trục của elip không còn trùng với phương riêng.';
+    if (det < 0 && rank === 2) msg += ' $\\det < 0$: hình bị lật, như soi gương.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+
+  svg.addEventListener('pointerdown', function (e) {
+    var t = e.target; if (!t.classList || !t.classList.contains('tip')) return;
+    drag = +t.getAttribute('data-k'); svg.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  svg.addEventListener('pointermove', function (e) {
+    if (drag === null) return;
+    var a = P.at(e), x = Math.max(-2, Math.min(2, Math.round(a.x * 20) / 20)), y = Math.max(-2, Math.min(2, Math.round(a.y * 20) / 20));
+    var m = M(); if (drag === 0) { m[0] = x; m[2] = y; } else { m[1] = x; m[3] = y; }
+    setM(m); clearPreset(); render();
+  });
+  ['pointerup', 'pointercancel'].forEach(function (ev) { svg.addEventListener(ev, function () { drag = null; }); });
+  function clearPreset() { V_.$$('#preset button').forEach(function (o) { o.setAttribute('aria-pressed', 'false'); }); }
+  V_.$$('#preset button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      V_.$$('#preset button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      setM(b.dataset.m.split(',').map(Number)); render();
+    });
+  });
+  ids.forEach(function (k, i) { V_.$('#' + k).addEventListener('input', function () { cur[i] = +this.value; clearPreset(); render(); }); });
+  ['#showEig', '#showCirc'].forEach(function (s) { V_.$(s).addEventListener('change', render); });
+
+  // ---- quả cầu đơn vị chuẩn p
+  var svg2 = V_.$('#sv2'), P2 = MLV.Plot(svg2, { W: 460, H: 460, x: [-1.6, 1.6], y: [-1.6, 1.6], m: { l: 30, r: 10, t: 10, b: 26 } }), pInf = false;
+  function ball(p) {
+    var pts = [];
+    for (var i = 0; i <= 400; i++) {
+      var t = 2 * Math.PI * i / 400, c = Math.cos(t), s = Math.sin(t), r;
+      if (p === Infinity) r = 1 / Math.max(Math.abs(c), Math.abs(s));
+      else r = 1 / Math.pow(Math.pow(Math.abs(c), p) + Math.pow(Math.abs(s), p), 1 / p);
+      pts.push([r * c, r * s]);
+    }
+    return pts;
+  }
+  function render2() {
+    var p = pInf ? Infinity : Math.pow(2, +V_.$('#p').value);
+    V_.$('#p-v').textContent = pInf ? '∞' : V_.fmt(p, 2);
+    V_.$('#pinf').setAttribute('aria-pressed', pInf ? 'true' : 'false');
+    P2.clear(); P2.axes();
+    var g = P2.layer(true);
+    [1, 2, Infinity].forEach(function (q) { P2.poly(ball(q), { stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '3 3' }, g); });
+    var pts = ball(p);
+    var d = pts.map(function (q, i) { return (i ? 'L' : 'M') + P2.sx(q[0]).toFixed(1) + ' ' + P2.sy(q[1]).toFixed(1); }).join('') + 'Z';
+    P2.el('path', { d: d, fill: p >= 1 ? C1 : C2, 'fill-opacity': 0.18, stroke: p >= 1 ? C1 : C2, 'stroke-width': 2.5 }, g);
+    var msg;
+    if (p < 1) {
+      P2.el('line', { x1: P2.sx(1), y1: P2.sy(0), x2: P2.sx(0), y2: P2.sy(1), stroke: CH, 'stroke-width': 2.5 }, g);
+      [[1, 0], [0, 1]].forEach(function (q) { P2.el('circle', { cx: P2.sx(q[0]), cy: P2.sy(q[1]), r: 5, fill: CH }, g); });
+      var mid = Math.pow(2 * Math.pow(0.5, p), 1 / p);
+      msg = '$p < 1$: hình "lõm" vào. Đoạn thẳng màu cam nối hai điểm thuộc hình nhưng đi ra ngoài hình: tập này không lồi. Trung điểm $(0.5, 0.5)$ có "độ dài" $' + V_.fmt(mid, 2) + ' > 1$ dù hai đầu mút có độ dài 1, tức bất đẳng thức tam giác bị vi phạm. Công thức này không còn là một chuẩn (xem chương 23 về tập lồi).';
+    } else if (p === 1) msg = '$p = 1$: hình thoi. Các đỉnh nằm trên trục toạ độ, đó là lý do chuẩn $\\ell_1$ hay cho nghiệm thưa (nhiều thành phần bằng 0) khi dùng làm hàm phạt.';
+    else if (p === Infinity) msg = '$p = \\infty$: $\\|\\mathbf{x}\\|_\\infty = \\max_i |x_i|$, hình vuông.';
+    else msg = 'Với mọi $p \\ge 1$, quả cầu đơn vị là một tập lồi và công thức thoả mãn cả ba điều kiện của chuẩn. $p$ càng lớn, hình càng tiến về hình vuông của $p = \\infty$.';
+    var ins = V_.$('#insight2'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  V_.$('#p').addEventListener('input', function () { pInf = false; render2(); });
+  V_.$('#pinf').addEventListener('click', function () { pInf = true; render2(); });
+
+  V_.texAll(document.body);
+  setM([1.5, 0.5, 0.5, 1]); render(); render2();
+})();
+</script>
+</body>
+</html>

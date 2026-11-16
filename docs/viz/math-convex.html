@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tập lồi và hàm lồi · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style> .h { cursor: grab; } .h:active { cursor: grabbing; } </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Tập lồi và hàm lồi</h1>
+      <div class="crumbs"><a href="../#/math/ch23_vi">← Chương 23 Tập lồi và hàm lồi</a></div>
+    </div>
+    <p class="lead">Kéo hai điểm tròn. Một tập là lồi nếu đoạn thẳng nối hai điểm bất kỳ của nó nằm trọn trong tập. Một hàm là lồi nếu dây cung nối hai điểm bất kỳ trên đồ thị không nằm phía dưới đồ thị. Phần vi phạm được tô đỏ.</p>
+  </div>
+  <div class="only-embed open-full"><a href="math-convex.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <h2>Tập lồi (Định nghĩa 23.1)</h2>
+    <div class="ctrl"><span class="lb">Tập</span>
+      <div class="seg" id="set">
+        <button type="button" data-v="l2" aria-pressed="false">Hình tròn</button>
+        <button type="button" data-v="l1" aria-pressed="false">Cầu $\ell_1$</button>
+        <button type="button" data-v="inter" aria-pressed="false">Giao</button>
+        <button type="button" data-v="p05" aria-pressed="true">Giả chuẩn $p = 0.5$</button>
+        <button type="button" data-v="union" aria-pressed="false">Hợp hai đĩa</button>
+        <button type="button" data-v="ring" aria-pressed="false">Vành khuyên</button>
+      </div>
+    </div>
+    <div class="plotbox"><canvas id="cv1" width="520" height="420"></canvas><svg id="sv1" viewBox="0 0 520 420" role="img" aria-label="Một tập trong mặt phẳng và đoạn thẳng nối hai điểm"></svg></div>
+    <div class="insight" id="ins1"></div>
+  </div>
+
+  <div class="blk">
+    <h2>Hàm lồi (Định nghĩa 23.6, điều kiện bậc nhất (23.5))</h2>
+    <div class="ctrl"><span class="lb">Hàm</span>
+      <div class="seg" id="fn">
+        <button type="button" data-v="sq" aria-pressed="false">$x^2$</button>
+        <button type="button" data-v="exp" aria-pressed="false">$e^x$</button>
+        <button type="button" data-v="abs" aria-pressed="false">$|x|$</button>
+        <button type="button" data-v="xlogx" aria-pressed="false">$x\log x$</button>
+        <button type="button" data-v="sin" aria-pressed="true">$x^2 + 5\sin x$</button>
+        <button type="button" data-v="sqrt" aria-pressed="false">$\sqrt{x}$</button>
+        <button type="button" data-v="max" aria-pressed="false">$\max(x^2, 2 - x)$</button>
+      </div>
+    </div>
+    <div class="ctrl"><label><input type="checkbox" id="tan" checked> Tiếp tuyến tại điểm vuông (kéo được)</label><label><input type="checkbox" id="curv" checked> Tô vùng $f'' < 0$</label></div>
+    <div class="plotbox"><svg id="sv2" viewBox="0 0 560 360" role="img" aria-label="Đồ thị hàm số, dây cung và tiếp tuyến"></svg></div>
+    <div class="insight" id="ins2"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, OK = '#0ea5a4', BAD = '#e8487f', CS = '#2f80f5';
+  function hyp(x, y) { return Math.sqrt(x * x + y * y); }
+  // ---------- tập lồi
+  var SETS = {
+    l2: { f: function (x, y) { return hyp(x, y) <= 1.6; }, convex: true, note: 'Cầu chuẩn $\\ell_2$ (Định nghĩa 23.4) là tập lồi, theo bất đẳng thức tam giác của chuẩn.' },
+    l1: { f: function (x, y) { return Math.abs(x) + Math.abs(y) <= 1.8; }, convex: true, note: 'Cầu chuẩn $\\ell_1$: hình thoi, cũng lồi như mọi cầu chuẩn.' },
+    inter: { f: function (x, y) { return hyp(x - 0.5, y) <= 1.6 && hyp(x + 0.5, y) <= 1.6 && x + 2 * y <= 1.5; }, convex: true, note: 'Giao của hai hình tròn và một nửa mặt phẳng. Giao của các tập lồi là tập lồi (mục 23.2.3): đoạn thẳng nằm trong từng tập nên nằm trong giao.' },
+    p05: { f: function (x, y) { var s = Math.sqrt(Math.abs(x)) + Math.sqrt(Math.abs(y)); return s * s <= 1.8; }, convex: false, note: '"Cầu" của giả chuẩn $p = 0.5$ (Hình 23.3a): bốn cạnh lõm vào trong. Kéo hai điểm về hai đỉnh kề nhau để thấy đoạn thẳng đi ra ngoài.' },
+    union: { f: function (x, y) { return hyp(x + 1.1, y) <= 1 || hyp(x - 1.1, y) <= 1; }, convex: false, note: 'Hợp của hai tập lồi chưa chắc là tập lồi: đặt mỗi điểm ở một đĩa.' },
+    ring: { f: function (x, y) { var r = hyp(x, y); return r >= 0.8 && r <= 1.8; }, convex: false, note: 'Vành khuyên: đoạn thẳng nối hai điểm ở hai bên lỗ đi qua lỗ.' }
+  };
+  var svg1 = V_.$('#sv1'), cv1 = V_.$('#cv1');
+  var P1 = MLV.Plot(svg1, { W: 520, H: 420, x: [-2.6, 2.6], y: [-2.1, 2.1], m: { l: 30, r: 10, t: 10, b: 26 } });
+  var pts = [[-1.5, 0], [0, 1.5]], drag1 = -1;
+  function S() { return SETS[V_.$('#set [aria-pressed=true]').dataset.v]; }
+  function render1() {
+    var st = S();
+    MLV.paint(cv1, P1, function (x, y) { return st.f(x, y) ? [47, 128, 245, 60] : [0, 0, 0, 0]; }, 1);
+    P1.clear(); P1.axes();
+    var g = P1.layer(true), n = 120, outside = 0, seg = [];
+    for (var i = 0; i <= n; i++) {
+      var t = i / n, x = (1 - t) * pts[0][0] + t * pts[1][0], y = (1 - t) * pts[0][1] + t * pts[1][1], ins = st.f(x, y);
+      if (!ins) outside++;
+      seg.push([x, y, ins]);
+    }
+    for (var k = 0; k < n; k++) {
+      var ok = seg[k][2] && seg[k + 1][2];
+      P1.el('line', { x1: P1.sx(seg[k][0]), y1: P1.sy(seg[k][1]), x2: P1.sx(seg[k + 1][0]), y2: P1.sy(seg[k + 1][1]), stroke: ok ? OK : BAD, 'stroke-width': ok ? 3 : 5, 'stroke-linecap': 'round' }, g);
+    }
+    pts.forEach(function (p, i) {
+      var ins = st.f(p[0], p[1]);
+      P1.el('circle', { cx: P1.sx(p[0]), cy: P1.sy(p[1]), r: 9, fill: ins ? '#1d2430' : '#fff', stroke: '#1d2430', 'stroke-width': 2, class: 'h', 'data-i': i });
+    });
+    var a = st.f(pts[0][0], pts[0][1]), b = st.f(pts[1][0], pts[1][1]), msg;
+    if (!a || !b) msg = 'Một điểm đang nằm ngoài tập (chấm trắng). Định nghĩa chỉ xét hai điểm <b>thuộc</b> tập.';
+    else if (outside) msg = '<b>Vi phạm:</b> hai điểm thuộc tập nhưng ' + Math.round(100 * outside / (n + 1)) + '% đoạn thẳng nối chúng nằm ngoài tập. Một cặp điểm như vậy là đủ để kết luận tập không lồi. ' + st.note;
+    else msg = 'Đoạn thẳng nằm trọn trong tập. ' + (st.convex ? st.note : 'Nhưng tập này không lồi: hãy thử những cặp điểm khác. ' + st.note);
+    var ins = V_.$('#ins1'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  svg1.addEventListener('pointerdown', function (e) { if (e.target.classList.contains('h')) { drag1 = +e.target.getAttribute('data-i'); svg1.setPointerCapture(e.pointerId); e.preventDefault(); } });
+  svg1.addEventListener('pointermove', function (e) {
+    if (drag1 < 0) return; var a = P1.at(e);
+    pts[drag1] = [Math.max(-2.6, Math.min(2.6, a.x)), Math.max(-2.1, Math.min(2.1, a.y))]; render1();
+  });
+  ['pointerup', 'pointercancel'].forEach(function (ev) { svg1.addEventListener(ev, function () { drag1 = -1; }); });
+  V_.$$('#set button').forEach(function (b) {
+    b.addEventListener('click', function () { V_.$$('#set button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); }); render1(); });
+  });
+
+  // ---------- hàm lồi
+  var FN = {
+    sq: { f: function (x) { return x * x; }, d: function (x) { return 2 * x; }, d2: function () { return 2; }, x: [-3, 3], y: [-1, 9], p: [-2, 1.5], t: 0.8, convex: true, note: '$f\'\' = 2 > 0$: lồi chặt.' },
+    exp: { f: Math.exp, d: Math.exp, d2: Math.exp, x: [-3, 2.5], y: [-1, 12], p: [-2, 2], t: 0.5, convex: true, note: '$e^{ax}$ lồi với mọi $a$ (mục 23.3.3).' },
+    abs: { f: Math.abs, d: function (x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }, d2: function () { return 0; }, x: [-3, 3], y: [-1, 3.5], p: [-2, 1], t: 0.6, convex: true, note: '$|x|$ là chuẩn $\\ell_1$ một chiều nên lồi, dù không khả vi tại 0 (khi đó điều kiện đạo hàm không áp dụng được, nhưng Định nghĩa 23.6 thì vẫn được).' },
+    xlogx: { f: function (x) { return x * Math.log(x); }, d: function (x) { return Math.log(x) + 1; }, d2: function (x) { return 1 / x; }, x: [0.001, 3], y: [-0.6, 3.5], p: [0.1, 2.6], t: 1.2, convex: true, dom: [0.001, 3], note: 'Entropy âm $x\\log x$ trên $x > 0$: $f\'\' = 1/x > 0$, lồi chặt.' },
+    sin: { f: function (x) { return x * x + 5 * Math.sin(x); }, d: function (x) { return 2 * x + 5 * Math.cos(x); }, d2: function (x) { return 2 - 5 * Math.sin(x); }, x: [-5, 5], y: [-6, 25], p: [0.4, 2.8], t: 1.6, convex: false, note: 'Hàm của chương 12: $f\'\' = 2 - 5\\sin x$ đổi dấu, nên không lồi; nó có hai cực tiểu địa phương.' },
+    sqrt: { f: Math.sqrt, d: function (x) { return 0.5 / Math.sqrt(x); }, d2: function (x) { return -0.25 * Math.pow(x, -1.5); }, x: [0, 4], y: [-0.3, 2.3], p: [0.2, 3.5], t: 1.5, convex: false, dom: [0.0001, 4], note: '$\\sqrt{x} = x^{0.5}$ là hàm lõm (Hình 23.9): mọi dây cung nằm dưới đồ thị.' },
+    max: { f: function (x) { return Math.max(x * x, 2 - x); }, d: function (x) { return x * x > 2 - x ? 2 * x : -1; }, d2: function (x) { return x * x > 2 - x ? 2 : 0; }, x: [-3, 2.5], y: [-1, 9], p: [-2.5, 2], t: 0.5, convex: true, note: 'Max của hai hàm lồi là hàm lồi (Hình 23.7), dù có hai điểm gãy.' }
+  };
+  var svg2 = V_.$('#sv2'), fx = [-3, 2.8], x0 = 0.8, drag2 = -1, P2;
+  function F() { return FN[V_.$('#fn [aria-pressed=true]').dataset.v]; }
+  function clampX(fn, x) { var lo = fn.dom ? fn.dom[0] : fn.x[0], hi = fn.dom ? fn.dom[1] : fn.x[1]; return Math.max(lo, Math.min(hi, x)); }
+  function render2() {
+    var fn = F();
+    P2 = MLV.Plot(svg2, { W: 560, H: 360, x: fn.x, y: fn.y, m: { l: 40, r: 10, t: 10, b: 28 } });
+    P2.axes();
+    var g = P2.layer(true);
+    if (V_.$('#curv').checked) {
+      var n = 280, start = null;
+      for (var i = 0; i <= n; i++) {
+        var x = fn.x[0] + (fn.x[1] - fn.x[0]) * i / n, neg = (!fn.dom || x >= fn.dom[0]) && fn.d2(x) < 0;
+        if (neg && start === null) start = x;
+        if ((!neg || i === n) && start !== null) { P2.el('rect', { x: P2.sx(start), y: P2.m.t, width: Math.max(1, P2.sx(x) - P2.sx(start)), height: P2.ph, fill: BAD, 'fill-opacity': 0.08 }, g); start = null; }
+      }
+    }
+    P2.curve(function (x) { return fn.dom && (x < fn.dom[0] || x > fn.dom[1]) ? NaN : fn.f(x); }, { stroke: 'var(--text)', 'stroke-width': 2.5 }, g);
+    // dây cung
+    var a = fx[0], b = fx[1], fa = fn.f(a), fb = fn.f(b), viol = 0, m = 200;
+    for (var k = 0; k < m; k++) {
+      var t1 = k / m, t2 = (k + 1) / m, xa = a + (b - a) * t1, xb = a + (b - a) * t2;
+      var ca = fa + (fb - fa) * t1, cb = fa + (fb - fa) * t2, bad = fn.f((xa + xb) / 2) > (ca + cb) / 2 + 1e-9;
+      if (bad) viol++;
+      P2.el('line', { x1: P2.sx(xa), y1: P2.sy(ca), x2: P2.sx(xb), y2: P2.sy(cb), stroke: bad ? BAD : OK, 'stroke-width': bad ? 4.5 : 3 }, g);
+    }
+    // tiếp tuyến
+    var tanBad = false;
+    if (V_.$('#tan').checked) {
+      var f0 = fn.f(x0), d0 = fn.d(x0);
+      for (var j = 0; j <= 300; j++) { var xx = fn.x[0] + (fn.x[1] - fn.x[0]) * j / 300; if ((!fn.dom || (xx >= fn.dom[0] && xx <= fn.dom[1])) && fn.f(xx) < f0 + d0 * (xx - x0) - 1e-9) { tanBad = true; break; } }
+      P2.curve(function (x) { return f0 + d0 * (x - x0); }, { stroke: tanBad ? BAD : CS, 'stroke-width': 1.8, 'stroke-dasharray': '6 4' }, g);
+      P2.el('rect', { x: P2.sx(x0) - 7, y: P2.sy(f0) - 7, width: 14, height: 14, fill: CS, stroke: '#fff', 'stroke-width': 1.5, class: 'h', 'data-i': 2 }, svg2);
+    }
+    [a, b].forEach(function (x, i) { P2.el('circle', { cx: P2.sx(x), cy: P2.sy(fn.f(x)), r: 8, fill: '#1d2430', stroke: '#fff', 'stroke-width': 1.5, class: 'h', 'data-i': i }, svg2); });
+    var msg = (viol ? '<b>Dây cung nằm dưới đồ thị</b> ở phần tô đỏ: vi phạm Định nghĩa 23.6. ' : 'Dây cung không nằm dưới đồ thị. ') +
+      (V_.$('#tan').checked ? (tanBad ? 'Tiếp tuyến tại điểm vuông cắt lên trên đồ thị: vi phạm điều kiện bậc nhất (23.5). ' : 'Tiếp tuyến tại điểm vuông nằm dưới đồ thị. ') : '') + fn.note;
+    var ins = V_.$('#ins2'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  svg2.addEventListener('pointerdown', function (e) { if (e.target.classList.contains('h')) { drag2 = +e.target.getAttribute('data-i'); svg2.setPointerCapture(e.pointerId); e.preventDefault(); } });
+  svg2.addEventListener('pointermove', function (e) {
+    if (drag2 < 0) return; var fn = F(), x = clampX(fn, P2.at(e).x);
+    if (drag2 === 2) x0 = x; else fx[drag2] = x; render2();
+  });
+  ['pointerup', 'pointercancel'].forEach(function (ev) { svg2.addEventListener(ev, function () { drag2 = -1; }); });
+  V_.$$('#fn button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      V_.$$('#fn button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      fx = F().p.slice(); x0 = F().t; render2();
+    });
+  });
+  ['#tan', '#curv'].forEach(function (s) { V_.$(s).addEventListener('change', render2); });
+
+  V_.texAll(document.body);
+  render1(); fx = F().p.slice(); x0 = F().t; render2();
+})();
+</script>
+</body>
+</html>

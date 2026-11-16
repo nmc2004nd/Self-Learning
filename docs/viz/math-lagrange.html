@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nhân tử Lagrange · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style> .h { cursor: grab; } .h:active { cursor: grabbing; } </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Nhân tử Lagrange</h1>
+      <div class="crumbs"><a href="../#/math/appendix_a_vi">← Phụ lục A Phương pháp nhân tử Lagrange</a></div>
+    </div>
+    <p class="lead">Tìm cực trị của $f_0(x, y)$ trên đường tròn $f_1(x, y) = x^2 + y^2 - 2 = 0$. Kéo điểm đen dọc đường tròn. Tại điểm cực trị, gradient của $f_0$ song song với gradient của $f_1$: $\nabla f_0 + \lambda\nabla f_1 = \mathbf{0}$ (A.2).</p>
+  </div>
+  <div class="only-embed open-full"><a href="math-lagrange.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl"><span class="lb">Hàm mục tiêu</span>
+      <div class="seg" id="fn">
+        <button type="button" data-v="lin" aria-pressed="true">$x + y$ (Ví dụ 1)</button>
+        <button type="button" data-v="quad" aria-pressed="false">$x^2 + 4xy + 2y^2$</button>
+        <button type="button" data-v="exp" aria-pressed="false">$e^{x} + y^2$</button>
+      </div>
+    </div>
+    <div class="two-plots">
+      <div class="plotbox"><canvas id="cv" width="420" height="420"></canvas><svg id="sv" viewBox="0 0 420 420" role="img" aria-label="Đường đồng mức và đường ràng buộc"></svg></div>
+      <div class="plotbox"><svg id="ch" viewBox="0 0 380 300" role="img" aria-label="Giá trị hàm mục tiêu dọc đường tròn"></svg></div>
+    </div>
+    <table class="mtab" id="tab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, CF = '#0ea5a4', CG = '#1d2430', CX = '#e8487f', CN = '#2f80f5', R = Math.SQRT2;
+  var FN = {
+    lin: { f: function (x, y) { return x + y; }, g: function () { return [1, 1]; }, note: 'Đúng như sách: cực đại 2 tại $(1, 1)$ với $\\lambda = -1/2$, cực tiểu $-2$ tại $(-1, -1)$ với $\\lambda = 1/2$.' },
+    quad: { f: function (x, y) { return x * x + 4 * x * y + 2 * y * y; }, g: function (x, y) { return [2 * x + 4 * y, 4 * x + 4 * y]; }, note: 'Với dạng toàn phương $\\mathbf{x}^T\\mathbf{A}\\mathbf{x}$, điều kiện Lagrange là $\\mathbf{A}\\mathbf{x} = -\\lambda\\mathbf{x}$: các điểm cực trị nằm trên các phương riêng của $\\mathbf{A}$ (như Ví dụ 2 của sách). Có 4 điểm dừng: hai cực đại, hai cực tiểu.' },
+    exp: { f: function (x, y) { return Math.exp(x) + y * y; }, g: function (x, y) { return [Math.exp(x), 2 * y]; }, note: 'Hàm này có nhiều điểm dừng trên đường tròn hơn: không phải điểm nào thoả mãn (A.2)–(A.3) cũng là cực trị toàn cục. Phải so sánh giá trị $f_0$ tại tất cả các điểm dừng.' }
+  };
+  var th = 2.2, drag = false;
+  var svg = V_.$('#sv'), cv = V_.$('#cv'), P = MLV.Plot(svg, { W: 420, H: 420, x: [-2.4, 2.4], y: [-2.4, 2.4], m: { l: 30, r: 10, t: 10, b: 26 } });
+  function F() { return FN[V_.$('#fn [aria-pressed=true]').dataset.v]; }
+  function arrow(g, from, v, color, dash) {
+    var x1 = P.sx(from[0]), y1 = P.sy(from[1]), x2 = P.sx(from[0] + v[0]), y2 = P.sy(from[1] + v[1]), ang = Math.atan2(y2 - y1, x2 - x1);
+    P.el('line', { x1: x1, y1: y1, x2: x2 - 6 * Math.cos(ang), y2: y2 - 6 * Math.sin(ang), stroke: color, 'stroke-width': 3, 'stroke-dasharray': dash || null }, g);
+    P.el('path', { d: 'M' + x2 + ' ' + y2 + 'L' + (x2 - 11 * Math.cos(ang - 0.4)) + ' ' + (y2 - 11 * Math.sin(ang - 0.4)) + 'L' + (x2 - 11 * Math.cos(ang + 0.4)) + ' ' + (y2 - 11 * Math.sin(ang + 0.4)) + 'Z', fill: color }, g);
+  }
+  function stationary(fn) {      // các điểm dừng của f0 dọc đường tròn: đạo hàm theo góc đổi dấu
+    var out = [], n = 3600, prev = null;
+    for (var i = 0; i <= n; i++) {
+      var t = 2 * Math.PI * i / n, x = R * Math.cos(t), y = R * Math.sin(t), gr = fn.g(x, y), d = gr[0] * (-y) + gr[1] * x;
+      if (prev !== null && prev * d < 0) out.push(t);
+      prev = d;
+    }
+    return out;
+  }
+  function render() {
+    var fn = F(), x = R * Math.cos(th), y = R * Math.sin(th);
+    var lo = Infinity, hi = -Infinity;
+    for (var i = 0; i <= 30; i++) for (var j = 0; j <= 30; j++) { var v = fn.f(-2.4 + 4.8 * i / 30, -2.4 + 4.8 * j / 30); lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    MLV.paint(cv, P, function (a, b) {
+      var s = (fn.f(a, b) - lo) / (hi - lo), band = (Math.floor(s * 16) % 2) ? 22 : 0;
+      return [70 + 170 * s, 110 + 110 * s + band, 210 - 40 * s, 150];
+    }, 2);
+    P.clear(); P.axes();
+    var g = P.layer(true), pts = [];
+    for (var k = 0; k <= 200; k++) { var t = 2 * Math.PI * k / 200; pts.push([R * Math.cos(t), R * Math.sin(t)]); }
+    P.poly(pts, { stroke: CG, 'stroke-width': 2.5 }, g);
+    var st = stationary(fn);
+    st.forEach(function (t) { P.el('circle', { cx: P.sx(R * Math.cos(t)), cy: P.sy(R * Math.sin(t)), r: 5, fill: 'none', stroke: CX, 'stroke-width': 2 }, g); });
+    var gf = fn.g(x, y), gc = [2 * x, 2 * y], nf = Math.hypot(gf[0], gf[1]), nc = Math.hypot(gc[0], gc[1]);
+    var s = 0.8;
+    arrow(g, [x, y], [gf[0] / nf * s, gf[1] / nf * s], CF);
+    arrow(g, [x, y], [gc[0] / nc * s, gc[1] / nc * s], CG, '5 3');
+    P.el('circle', { cx: P.sx(x), cy: P.sy(y), r: 9, fill: CG, stroke: '#fff', 'stroke-width': 2, class: 'h' }, svg);
+    var cosang = (gf[0] * gc[0] + gf[1] * gc[1]) / (nf * nc), ang = Math.acos(Math.max(-1, Math.min(1, cosang))) * 180 / Math.PI;
+    var lam = -(gf[0] * gc[0] + gf[1] * gc[1]) / (nc * nc);     // lambda tốt nhất theo bình phương tối thiểu
+    var resid = Math.hypot(gf[0] + lam * gc[0], gf[1] + lam * gc[1]);
+    // đồ thị f0 theo góc
+    var curve = [];
+    for (var q = 0; q <= 240; q++) { var tt = 2 * Math.PI * q / 240; curve.push([tt * 180 / Math.PI, fn.f(R * Math.cos(tt), R * Math.sin(tt))]); }
+    var Pc = MLV.chart(V_.$('#ch'), [{ pts: curve, color: CF }], { x: [0, 360], xlabel: 'góc θ trên đường tròn (độ)', ylabel: 'f₀', vline: ((th * 180 / Math.PI) % 360 + 360) % 360, m: { l: 46, r: 10, t: 8, b: 34 } });
+    st.forEach(function (t) { MLV.el('circle', { cx: Pc.sx(t * 180 / Math.PI), cy: Pc.sy(fn.f(R * Math.cos(t), R * Math.sin(t))), r: 4, fill: 'none', stroke: CX, 'stroke-width': 2 }, V_.$('#ch')); });
+    V_.$('#tab').innerHTML = '<tr><th>Điểm</th><th>$f_0$</th><th>Góc giữa $\\nabla f_0$ và $\\nabla f_1$</th><th>$\\|\\nabla f_0 + \\lambda\\nabla f_1\\|$ nhỏ nhất</th></tr>' +
+      '<tr><td>(' + V_.fmt(x, 3) + ', ' + V_.fmt(y, 3) + ')</td><td>' + V_.fmt(fn.f(x, y), 3) + '</td><td>' + V_.fmt(ang, 1) + '°</td><td>' + V_.fmt(resid, 3) + ' (với $\\lambda = ' + V_.fmt(lam, 3) + '$)</td></tr>';
+    V_.texAll(V_.$('#tab'));
+    var par = ang < 1.5 || ang > 178.5;
+    var msg = (par ? '<b>$\\nabla f_0$ song song với $\\nabla f_1$</b>: đây là một điểm dừng (vòng tròn hồng), đường đồng mức của $f_0$ tiếp xúc với đường tròn. '
+      : 'Hai gradient chưa song song: $\\nabla f_0$ có thành phần dọc theo đường tròn, nên di chuyển dọc đường tròn còn làm $f_0$ tăng (hoặc giảm) được. ') +
+      'Mũi tên xanh lục: $\\nabla f_0$; mũi tên đứt: $\\nabla f_1$ (luôn hướng ra ngoài). ' + fn.note;
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  function setTh(e) { var a = P.at(e); th = Math.atan2(a.y, a.x); render(); }
+  svg.addEventListener('pointerdown', function (e) { drag = true; svg.setPointerCapture(e.pointerId); setTh(e); e.preventDefault(); });
+  svg.addEventListener('pointermove', function (e) { if (drag) setTh(e); });
+  ['pointerup', 'pointercancel'].forEach(function (ev) { svg.addEventListener(ev, function () { drag = false; }); });
+  V_.$$('#fn button').forEach(function (b) {
+    b.addEventListener('click', function () { V_.$$('#fn button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); }); render(); });
+  });
+  V_.texAll(document.body);
+  render();
+})();
+</script>
+</body>
+</html>

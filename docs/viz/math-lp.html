@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quy hoạch tuyến tính và toàn phương · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style> .h { cursor: grab; } .h:active { cursor: grabbing; } </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Quy hoạch tuyến tính và toàn phương</h1>
+      <div class="crumbs"><a href="../#/math/ch24_vi">← Chương 24 Bài toán tối ưu lồi</a></div>
+    </div>
+    <p class="lead">Ngũ giác màu xám là tập khả thi của bài toán canh tác (24.2): $x + y \le 10$, $2x + y \le 16$, $x + 4y \le 32$, $x, y \ge 0$. Đổi hàm mục tiêu và xem nghiệm di chuyển thế nào.</p>
+  </div>
+  <div class="only-embed open-full"><a href="math-lp.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl"><span class="lb">Bài toán</span>
+      <div class="seg" id="mode">
+        <button type="button" data-v="lp" aria-pressed="true">LP: $\max\ c_1 x + c_2 y$</button>
+        <button type="button" data-v="qp" aria-pressed="false">QP: điểm gần $\mathbf{u}$ nhất</button>
+      </div>
+    </div>
+    <div class="ctrl" id="lpctl">
+      <label for="ang">Hướng $\mathbf{c}$</label><input id="ang" type="range" min="0" max="360" step="1" value="31"><span class="val" id="ang-v" style="min-width:7em"></span>
+    </div>
+    <div class="ctrl" id="qpctl" style="display:none"><span style="color:var(--muted);font-size:.9rem">Kéo điểm vuông $\mathbf{u}$ (hoặc bấm vào bất kỳ đâu).</span></div>
+    <div class="plotbox"><svg id="sv" viewBox="0 0 520 470" role="img" aria-label="Tập khả thi, đường đồng mức và nghiệm"></svg></div>
+    <table class="mtab" id="tab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, CF = '#9aa0c8', CO = '#e8487f', CC = '#2f80f5';
+  var G = [[1, 1], [2, 1], [1, 4], [-1, 0], [0, -1]], H = [10, 16, 32, 0, 0];
+  var CN = ['x + y ≤ 10', '2x + y ≤ 16', 'x + 4y ≤ 32', 'x ≥ 0', 'y ≥ 0'];
+  var VERT = [[0, 0], [8, 0], [6, 4], [8 / 3, 22 / 3], [0, 8]];          // các đỉnh, ngược chiều kim đồng hồ
+  var svg = V_.$('#sv'), P = MLV.Plot(svg, { W: 520, H: 470, x: [-1, 13], y: [-1, 11.6], m: { l: 34, r: 10, t: 10, b: 28 } });
+  var u = [10, 10], drag = false;
+  function mode() { return V_.$('#mode [aria-pressed=true]').dataset.v; }
+  function active(p) { return G.map(function (g, i) { return Math.abs(g[0] * p[0] + g[1] * p[1] - H[i]) < 1e-6; }); }
+  function inside(p) { return G.every(function (g, i) { return g[0] * p[0] + g[1] * p[1] <= H[i] + 1e-9; }); }
+  function project(p) {
+    if (inside(p)) return p.slice();
+    var best = null, bd = Infinity;
+    for (var i = 0; i < VERT.length; i++) {
+      var a = VERT[i], b = VERT[(i + 1) % VERT.length], d = [b[0] - a[0], b[1] - a[1]];
+      var t = Math.max(0, Math.min(1, ((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / (d[0] * d[0] + d[1] * d[1])));
+      var q = [a[0] + t * d[0], a[1] + t * d[1]], dist = Math.hypot(p[0] - q[0], p[1] - q[1]);
+      if (dist < bd) { bd = dist; best = q; }
+    }
+    return best;
+  }
+  function arrow(g, from, to, color) {
+    var x1 = P.sx(from[0]), y1 = P.sy(from[1]), x2 = P.sx(to[0]), y2 = P.sy(to[1]), ang = Math.atan2(y2 - y1, x2 - x1);
+    P.el('line', { x1: x1, y1: y1, x2: x2 - 6 * Math.cos(ang), y2: y2 - 6 * Math.sin(ang), stroke: color, 'stroke-width': 3 }, g);
+    P.el('path', { d: 'M' + x2 + ' ' + y2 + 'L' + (x2 - 11 * Math.cos(ang - 0.4)) + ' ' + (y2 - 11 * Math.sin(ang - 0.4)) + 'L' + (x2 - 11 * Math.cos(ang + 0.4)) + ' ' + (y2 - 11 * Math.sin(ang + 0.4)) + 'Z', fill: color }, g);
+  }
+  function render() {
+    var m = mode();
+    V_.$('#lpctl').style.display = m === 'lp' ? '' : 'none'; V_.$('#qpctl').style.display = m === 'qp' ? '' : 'none';
+    P.clear(); P.axes();
+    var g = P.layer(true);
+    // các đường ràng buộc
+    G.slice(0, 3).forEach(function (r, i) {
+      var pts = []; for (var x = -1; x <= 13; x += 14) pts.push([x, (H[i] - r[0] * x) / r[1]]);
+      P.poly(pts, { stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '3 3' }, g);
+    });
+    P.el('polygon', { points: VERT.map(function (v) { return P.sx(v[0]) + ',' + P.sy(v[1]); }).join(' '), fill: CF, 'fill-opacity': 0.35, stroke: CF, 'stroke-width': 1.5 }, g);
+    var sol, rows, msg;
+    if (m === 'lp') {
+      var a = +V_.$('#ang').value * Math.PI / 180, c = [Math.cos(a), Math.sin(a)];
+      V_.$('#ang-v').textContent = 'c = (' + V_.fmt(c[0], 2) + ', ' + V_.fmt(c[1], 2) + ')';
+      var vals = VERT.map(function (v) { return c[0] * v[0] + c[1] * v[1]; }), best = Math.max.apply(null, vals);
+      var opt = VERT.filter(function (v, i) { return vals[i] > best - 1e-9; });
+      // đường đồng mức c^T x = const
+      for (var k = -14; k <= 14; k++) {
+        var lv = best + k * 1.2, pts = [];
+        if (Math.abs(c[1]) > Math.abs(c[0])) { pts = [[-1, (lv + c[0]) / c[1]], [13, (lv - 13 * c[0]) / c[1]]]; }
+        else { pts = [[(lv + c[1]) / c[0], -1], [(lv - 11.6 * c[1]) / c[0], 11.6]]; }
+        P.poly(pts, { stroke: k === 0 ? CO : CC, 'stroke-width': k === 0 ? 2.5 : 0.8, 'stroke-opacity': k === 0 ? 1 : 0.45 }, g);
+      }
+      var cen = [4, 3.5]; arrow(g, cen, [cen[0] + 2.2 * c[0], cen[1] + 2.2 * c[1]], CC);
+      if (opt.length > 1) P.poly(opt, { stroke: CO, 'stroke-width': 6 }, g);
+      opt.forEach(function (v) { P.el('circle', { cx: P.sx(v[0]), cy: P.sy(v[1]), r: 7, fill: CO, class: 'pl-pt' }, g); });
+      sol = opt[0];
+      rows = '<tr><th>Đỉnh</th><th>$c_1x + c_2y$</th></tr>' + VERT.map(function (v, i) { return '<tr' + (vals[i] > best - 1e-9 ? ' style="color:' + CO + ';font-weight:700"' : '') + '><td>(' + V_.fmt(v[0], 2) + ', ' + V_.fmt(v[1], 2) + ')</td><td>' + V_.fmt(vals[i], 3) + '</td></tr>'; }).join('');
+      msg = opt.length > 1 ? '$\\mathbf{c}$ vuông góc với một cạnh: mọi điểm trên cạnh đó đều tối ưu. Nghiệm không duy nhất, nhưng vẫn có một nghiệm là đỉnh.'
+        : 'Đường đồng mức đậm (giá trị lớn nhất) chỉ chạm tập khả thi tại một đỉnh: nghiệm của LP luôn nằm ở một đỉnh (Hình 24.3). Khi $\\mathbf{c} \\propto (5, 3)$ như bài toán canh tác, nghiệm là $(6, 4)$. Xoay $\\mathbf{c}$ chậm: nghiệm đứng yên rồi đột ngột nhảy sang đỉnh kề.';
+    } else {
+      sol = project(u);
+      var r = Math.hypot(u[0] - sol[0], u[1] - sol[1]);
+      if (r > 1e-9) { P.el('circle', { cx: P.sx(u[0]), cy: P.sy(u[1]), r: P.sx(u[0] + r) - P.sx(u[0]), fill: 'none', stroke: CC, 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }, g);
+        P.el('line', { x1: P.sx(u[0]), y1: P.sy(u[1]), x2: P.sx(sol[0]), y2: P.sy(sol[1]), stroke: CC, 'stroke-width': 1.5 }, g); }
+      P.el('circle', { cx: P.sx(sol[0]), cy: P.sy(sol[1]), r: 7, fill: CO, class: 'pl-pt' }, g);
+      P.el('rect', { x: P.sx(u[0]) - 8, y: P.sy(u[1]) - 8, width: 16, height: 16, fill: CC, stroke: '#fff', 'stroke-width': 1.5, class: 'h' }, svg);
+      var act = active(sol).reduce(function (s, v) { return s + v; }, 0);
+      rows = '<tr><th>$\\mathbf{u}$</th><th>Nghiệm $\\mathbf{x}^*$</th><th>Khoảng cách</th></tr><tr><td>(' + V_.fmt(u[0], 2) + ', ' + V_.fmt(u[1], 2) + ')</td><td>(' + V_.fmt(sol[0], 3) + ', ' + V_.fmt(sol[1], 3) + ')</td><td>' + V_.fmt(r, 3) + '</td></tr>';
+      msg = act === 0 ? '$\\mathbf{u}$ nằm trong tập khả thi: nghiệm chính là $\\mathbf{u}$, không ràng buộc nào chặt. Khác với LP, nghiệm của QP có thể nằm bên trong tập khả thi.'
+        : act === 1 ? 'Nghiệm nằm trên một cạnh: hình chiếu vuông góc của $\\mathbf{u}$ lên cạnh đó. Đường tròn đồng mức tiếp xúc với cạnh. Với $\\mathbf{u} = (10, 10)$ như mục 24.5.2, nghiệm là $(5, 5)$.'
+        : 'Nghiệm nằm ở một đỉnh: hai ràng buộc cùng chặt.';
+    }
+    var act2 = active(sol);
+    rows += '<tr><td colspan="' + (m === 'lp' ? 2 : 3) + '" style="text-align:left">Ràng buộc chặt tại nghiệm: ' + (act2.some(Boolean) ? CN.filter(function (_, i) { return act2[i]; }).join(', ') : 'không có') + '</td></tr>';
+    V_.$('#tab').innerHTML = rows; V_.texAll(V_.$('#tab'));
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  function setU(e) { var a = P.at(e); u = [Math.max(-1, Math.min(13, a.x)), Math.max(-1, Math.min(11.6, a.y))]; render(); }
+  svg.addEventListener('pointerdown', function (e) { if (mode() !== 'qp') return; drag = true; svg.setPointerCapture(e.pointerId); setU(e); e.preventDefault(); });
+  svg.addEventListener('pointermove', function (e) { if (drag) setU(e); });
+  ['pointerup', 'pointercancel'].forEach(function (ev) { svg.addEventListener(ev, function () { drag = false; }); });
+  V_.$('#ang').addEventListener('input', render);
+  V_.$$('#mode button').forEach(function (b) {
+    b.addEventListener('click', function () { V_.$$('#mode button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); }); render(); });
+  });
+  V_.texAll(document.body);
+  render();
+})();
+</script>
+</body>
+</html>

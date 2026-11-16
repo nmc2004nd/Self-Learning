@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hàm đối ngẫu Lagrange · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Hàm đối ngẫu Lagrange</h1>
+      <div class="crumbs"><a href="../#/math/ch25_vi">← Chương 25 Đối ngẫu</a></div>
+    </div>
+    <p class="lead">Bài toán: $\min_x f_0(x)$ thoả mãn $f_1(x) = (x - c)^2 - 4 \le 0$, tức $x \in [c - 2, c + 2]$. Với mỗi $\lambda \ge 0$, $g(\lambda)$ là giá trị nhỏ nhất của hàm Lagrange $\mathcal{L}(x, \lambda) = f_0(x) + \lambda f_1(x)$ trên <b>toàn bộ</b> trục số.</p>
+  </div>
+  <div class="only-embed open-full"><a href="math-dual.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl"><span class="lb">Hàm mục tiêu</span>
+      <div class="seg" id="fn">
+        <button type="button" data-v="book" aria-pressed="true">$x^2 + 10\sin x + 10$ (sách)</button>
+        <button type="button" data-v="quad" aria-pressed="false">$(x + 1)^2$</button>
+        <button type="button" data-v="wave" aria-pressed="false">$0.5x^2 - 4\cos 2x$</button>
+      </div>
+    </div>
+    <div class="ctrl">
+      <label for="lam">$\lambda$</label><input id="lam" type="range" min="0" max="10" step="0.05" value="1"><span class="val" id="lam-v"></span>
+      <label for="cc">tâm $c$</label><input id="cc" type="range" min="-3" max="4" step="0.1" value="2"><span class="val" id="cc-v"></span>
+    </div>
+    <div class="two-plots">
+      <div class="plotbox"><svg id="sv1" viewBox="0 0 440 340" role="img" aria-label="Hàm mục tiêu và hàm Lagrange"></svg></div>
+      <div class="plotbox"><svg id="sv2" viewBox="0 0 360 340" role="img" aria-label="Hàm đối ngẫu g(lambda)"></svg></div>
+    </div>
+    <table class="mtab" id="tab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, C0 = 'var(--text)', CL = '#2f80f5', CG = '#e8487f', CF = '#9aa0c8';
+  var FN = {
+    book: { f: function (x) { return x * x + 10 * Math.sin(x) + 10; }, y: [-10, 50] },
+    quad: { f: function (x) { return (x + 1) * (x + 1); }, y: [-10, 40] },
+    wave: { f: function (x) { return 0.5 * x * x - 4 * Math.cos(2 * x); }, y: [-10, 40] }
+  };
+  var XS = []; for (var i = 0; i <= 4000; i++) XS.push(-10 + 20 * i / 4000);
+  function F() { return FN[V_.$('#fn [aria-pressed=true]').dataset.v]; }
+  function argminL(fn, c, lam) {
+    var best = Infinity, bx = 0;
+    XS.forEach(function (x) { var v = fn.f(x) + lam * ((x - c) * (x - c) - 4); if (v < best) { best = v; bx = x; } });
+    return [bx, best];
+  }
+  function render() {
+    var fn = F(), lam = +V_.$('#lam').value, c = +V_.$('#cc').value;
+    V_.$('#lam-v').textContent = V_.fmt(lam, 2); V_.$('#cc-v').textContent = V_.fmt(c, 1);
+    // p*: cực tiểu trên tập khả thi
+    var pst = Infinity, px = 0;
+    XS.forEach(function (x) { if (Math.abs(x - c) <= 2) { var v = fn.f(x); if (v < pst) { pst = v; px = x; } } });
+    // g(lambda) trên lưới
+    var gl = [], dst = -Infinity, dl = 0;
+    for (var k = 0; k <= 200; k++) { var l = 10 * k / 200, gv = argminL(fn, c, l)[1]; gl.push([l, gv]); if (gv > dst) { dst = gv; dl = l; } }
+    var cur = argminL(fn, c, lam);
+
+    var P1 = MLV.Plot(V_.$('#sv1'), { W: 440, H: 340, x: [-6, 8], y: fn.y, m: { l: 40, r: 10, t: 10, b: 30 }, xlabel: 'x' });
+    P1.axes();
+    var g1 = P1.layer(true);
+    P1.el('rect', { x: P1.sx(c - 2), y: P1.m.t, width: P1.sx(c + 2) - P1.sx(c - 2), height: P1.ph, fill: CF, 'fill-opacity': 0.18 }, g1);
+    P1.curve(function (x) { return (x - c) * (x - c) - 4; }, { stroke: CF, 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }, g1);
+    P1.curve(fn.f, { stroke: C0, 'stroke-width': 2.5 }, g1);
+    P1.curve(function (x) { return fn.f(x) + lam * ((x - c) * (x - c) - 4); }, { stroke: CL, 'stroke-width': 2, 'stroke-dasharray': '2 3' }, g1);
+    P1.el('line', { x1: P1.sx(-6), x2: P1.sx(8), y1: P1.sy(pst), y2: P1.sy(pst), stroke: CG, 'stroke-width': 1, 'stroke-dasharray': '6 4' }, g1);
+    P1.el('circle', { cx: P1.sx(px), cy: P1.sy(pst), r: 5, fill: CG, class: 'pl-pt' }, g1);
+    P1.el('circle', { cx: P1.sx(cur[0]), cy: P1.sy(cur[1]), r: 5, fill: CL, class: 'pl-pt' }, g1);
+
+    var lo = Math.min.apply(null, gl.map(function (p) { return p[1]; })), hi = Math.max(pst, dst);
+    var P2 = MLV.Plot(V_.$('#sv2'), { W: 360, H: 340, x: [0, 10], y: [Math.max(lo, hi - 60) - 2, hi + 4], m: { l: 44, r: 10, t: 10, b: 30 }, xlabel: 'λ' });
+    P2.axes();
+    var g2 = P2.layer(true);
+    P2.poly(gl, { stroke: CL, 'stroke-width': 2.5 }, g2);
+    P2.el('line', { x1: P2.sx(0), x2: P2.sx(10), y1: P2.sy(pst), y2: P2.sy(pst), stroke: CG, 'stroke-width': 1.5, 'stroke-dasharray': '6 4' }, g2);
+    P2.el('circle', { cx: P2.sx(lam), cy: P2.sy(cur[1]), r: 6, fill: CL, class: 'pl-pt' }, g2);
+    P2.el('text', { x: P2.sx(10) - 4, y: P2.sy(pst) - 6, 'text-anchor': 'end', class: 'pl-tick', style: 'fill:' + CG }).textContent = 'p*';
+
+    var gap = pst - dst;
+    V_.$('#tab').innerHTML = '<tr><th>Đại lượng</th><th>Giá trị</th></tr>' +
+      '<tr><td>$p^*$ (chấm hồng, đạt tại $x = ' + V_.fmt(px, 2) + '$)</td><td>' + V_.fmt(pst, 3) + '</td></tr>' +
+      '<tr><td>$g(\\lambda)$ tại $\\lambda = ' + V_.fmt(lam, 2) + '$ (chấm xanh, $\\mathcal{L}$ nhỏ nhất tại $x = ' + V_.fmt(cur[0], 2) + '$)</td><td>' + V_.fmt(cur[1], 3) + '</td></tr>' +
+      '<tr><td>$d^* = \\max_\\lambda g(\\lambda)$, đạt tại $\\lambda \\approx ' + V_.fmt(dl, 2) + '$</td><td>' + V_.fmt(dst, 3) + '</td></tr>' +
+      '<tr><td>Khoảng cách đối ngẫu $p^* - d^*$</td><td>' + V_.fmt(Math.max(0, gap), 3) + '</td></tr>';
+    V_.texAll(V_.$('#tab'));
+    var msg = 'Đường chấm xanh là $\\mathcal{L}(x, \\lambda)$: trong vùng khả thi (nền xám) $f_1 \\le 0$ nên $\\mathcal{L} \\le f_0$; vì vậy đáy của $\\mathcal{L}$ không thể cao hơn $p^*$ (đối ngẫu yếu). ';
+    if (gap > 0.05) msg += '<b>Có khoảng cách đối ngẫu</b>: dù chọn $\\lambda$ nào, $g(\\lambda)$ vẫn thấp hơn $p^*$. Bài toán không lồi nên tiêu chuẩn Slater không đảm bảo đối ngẫu mạnh.';
+    else if (dl < 0.03) msg += 'Cực tiểu không ràng buộc của $f_0$ đã nằm trong vùng khả thi: ràng buộc không chặt, $\\lambda^* = 0$ (lỏng lẻo bù trừ).';
+    else msg += 'Ở đây $d^* = p^*$: tăng $\\lambda$ tới khoảng $' + V_.fmt(dl, 2) + '$, đáy của $\\mathcal{L}$ được kéo vào vùng khả thi và chạm đúng $p^*$. Ràng buộc chặt nên $\\lambda^* > 0$.';
+    if (fn === FN.wave) msg += ' Thử đổi tâm $c$: với một số vị trí, hàm này có khoảng cách đối ngẫu dương.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  ['#lam', '#cc'].forEach(function (s) { V_.$(s).addEventListener('input', render); });
+  V_.$$('#fn button').forEach(function (b) {
+    b.addEventListener('click', function () { V_.$$('#fn button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); }); render(); });
+  });
+  V_.texAll(document.body);
+  render();
+})();
+</script>
+</body>
+</html>

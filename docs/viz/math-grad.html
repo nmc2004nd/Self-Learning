@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gradient và đạo hàm số · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Gradient và đạo hàm số</h1>
+      <div class="crumbs"><a href="../#/math/ch02_vi">← Chương 2 Giải tích ma trận</a></div>
+    </div>
+    <p class="lead">Bấm lên bản đồ để chọn một điểm. Mũi tên là gradient $\nabla f$: nó vuông góc với đường đồng mức và chỉ hướng $f$ tăng nhanh nhất. Bên dưới là sai số của hai cách xấp xỉ gradient bằng số, theo $\varepsilon$.</p>
+  </div>
+  <div class="only-embed open-full"><a href="math-grad.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Hàm</span>
+      <div class="seg" id="fn">
+        <button type="button" data-v="quad" aria-pressed="false">Bậc hai $\mathbf{x}^T\mathbf{A}\mathbf{x}$</button>
+        <button type="button" data-v="rosen" aria-pressed="false">Rosenbrock</button>
+        <button type="button" data-v="wave" aria-pressed="true">Sóng</button>
+        <button type="button" data-v="lse" aria-pressed="false">Log-sum-exp</button>
+      </div>
+    </div>
+    <div class="ctrl">
+      <label for="eps">$\varepsilon$</label><input id="eps" type="range" min="-15" max="0" step="0.25" value="-4"><span class="val" id="eps-v" style="min-width:4.5em"></span>
+    </div>
+    <div class="plotbox click"><canvas id="cv" width="560" height="440"></canvas><svg id="sv" viewBox="0 0 560 440" role="img" aria-label="Đường đồng mức và vector gradient"></svg></div>
+    <table class="mtab" id="tab"></table>
+    <div class="plotbox"><svg id="ch" viewBox="0 0 560 230" role="img" aria-label="Sai số của đạo hàm số theo epsilon"></svg></div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, CG = '#2f80f5', CF = '#e8487f', CC = '#0ea5a4';
+  var FN = {
+    quad: { f: function (x, y) { return 1.5 * x * x + x * y + 0.5 * y * y; }, g: function (x, y) { return [3 * x + y, x + y]; },
+            r: [-3, 3, -2.4, 2.4], p: [1.6, -1.2], tex: 'f(\\mathbf{x}) = \\mathbf{x}^T\\mathbf{A}\\mathbf{x},\\ \\mathbf{A} = \\begin{bmatrix} 1.5 & 0.5 \\\\ 0.5 & 0.5 \\end{bmatrix},\\ \\nabla f = (\\mathbf{A} + \\mathbf{A}^T)\\mathbf{x}' },
+    rosen: { f: function (x, y) { var a = 1 - x, b = y - x * x; return a * a + 10 * b * b; }, g: function (x, y) { var b = y - x * x; return [-2 * (1 - x) - 40 * x * b, 20 * b]; },
+             r: [-2, 2, -1, 3], p: [-1.2, 1.6], tex: 'f = (1 - x)^2 + 10(y - x^2)^2' },
+    wave: { f: function (x, y) { return Math.sin(x) * Math.cos(y) + 0.1 * (x * x + y * y); }, g: function (x, y) { return [Math.cos(x) * Math.cos(y) + 0.2 * x, -Math.sin(x) * Math.sin(y) + 0.2 * y]; },
+            r: [-4, 4, -3.2, 3.2], p: [1.1, 0.8], tex: 'f = \\sin x \\cos y + 0.1(x^2 + y^2)' },
+    lse: { f: function (x, y) { var m = Math.max(x, y, 0); return m + Math.log(Math.exp(x - m) + Math.exp(y - m) + Math.exp(-m)); },
+           g: function (x, y) { var m = Math.max(x, y, 0), a = Math.exp(x - m), b = Math.exp(y - m), c = Math.exp(-m), s = a + b + c; return [a / s, b / s]; },
+           r: [-4, 4, -3.2, 3.2], p: [1, -0.5], tex: 'f = \\log(e^x + e^y + 1),\\ \\nabla f = \\text{softmax}' }
+  };
+  var svg = V_.$('#sv'), cv = V_.$('#cv'), pt;
+  function F() { return FN[V_.$('#fn [aria-pressed=true]').dataset.v]; }
+  function plot() { var r = F().r; return MLV.Plot(svg, { W: 560, H: 440, x: [r[0], r[1]], y: [r[2], r[3]], m: { l: 34, r: 10, t: 10, b: 28 } }); }
+  function numg(fn, x, y, e, central) {
+    if (central) return [(fn.f(x + e, y) - fn.f(x - e, y)) / (2 * e), (fn.f(x, y + e) - fn.f(x, y - e)) / (2 * e)];
+    var f0 = fn.f(x, y);
+    return [(fn.f(x + e, y) - f0) / e, (fn.f(x, y + e) - f0) / e];
+  }
+  function err(a, b) { return Math.hypot(a[0] - b[0], a[1] - b[1]); }
+  function arrow(P, g, from, v, color, scale, w) {
+    var x1 = P.sx(from[0]), y1 = P.sy(from[1]), x2 = P.sx(from[0] + v[0] * scale), y2 = P.sy(from[1] + v[1] * scale);
+    var ang = Math.atan2(y2 - y1, x2 - x1), L = Math.hypot(x2 - x1, y2 - y1), h = Math.min(11, L * 0.45);
+    P.el('line', { x1: x1, y1: y1, x2: x2 - Math.cos(ang) * h * 0.6, y2: y2 - Math.sin(ang) * h * 0.6, stroke: color, 'stroke-width': w || 3 }, g);
+    P.el('path', { d: 'M' + x2 + ' ' + y2 + 'L' + (x2 - h * Math.cos(ang - 0.4)) + ' ' + (y2 - h * Math.sin(ang - 0.4)) + 'L' + (x2 - h * Math.cos(ang + 0.4)) + ' ' + (y2 - h * Math.sin(ang + 0.4)) + 'Z', fill: color }, g);
+  }
+  function sci(v) {
+    if (v === 0) return '0';
+    var e = Math.floor(Math.log10(v)), m = v / Math.pow(10, e);
+    return V_.fmt(m, 1) + ' \\times 10^{' + e + '}';
+  }
+
+  function render() {
+    var fn = F(), P = plot(), e = Math.pow(10, +V_.$('#eps').value);
+    V_.$('#eps-v').innerHTML = '10<sup>' + (+V_.$('#eps').value).toString().replace('-', '−') + '</sup>';
+    // nền: giá trị hàm (log để thấy rõ đáy), có dải đồng mức
+    var r = fn.r, lo = Infinity, hi = -Infinity;
+    for (var i = 0; i <= 40; i++) for (var j = 0; j <= 40; j++) {
+      var v = fn.f(r[0] + (r[1] - r[0]) * i / 40, r[2] + (r[3] - r[2]) * j / 40); lo = Math.min(lo, v); hi = Math.max(hi, v);
+    }
+    var tr = function (v) { return Math.log(1 + (v - lo)) / Math.log(1 + (hi - lo)); };
+    MLV.paint(cv, P, function (x, y) {
+      var s = Math.max(0, Math.min(1, tr(fn.f(x, y)))), band = (Math.floor(s * 22) % 2) ? 12 : 0;
+      return [70 + 170 * s, 60 + 160 * s + band, 150 + 90 * s, 255];
+    }, 3);
+    P.clear(); P.axes();
+    var g = P.layer(true), G = fn.g(pt[0], pt[1]), gn = Math.hypot(G[0], G[1]);
+    var scale = gn > 0 ? Math.min(1.4, (r[1] - r[0]) * 0.16 / gn) : 1;
+    // tiếp tuyến của đường đồng mức: vuông góc với gradient
+    if (gn > 0) {
+      var t = [-G[1] / gn, G[0] / gn], L = (r[1] - r[0]) * 0.12;
+      P.el('line', { x1: P.sx(pt[0] - t[0] * L), y1: P.sy(pt[1] - t[1] * L), x2: P.sx(pt[0] + t[0] * L), y2: P.sy(pt[1] + t[1] * L), stroke: '#fff', 'stroke-width': 2, 'stroke-dasharray': '5 4' }, g);
+    }
+    var Gf = numg(fn, pt[0], pt[1], e, false), Gc = numg(fn, pt[0], pt[1], e, true);
+    arrow(P, g, pt, Gf, CF, scale, 2); arrow(P, g, pt, Gc, CC, scale, 2); arrow(P, g, pt, G, CG, scale, 3.5);
+    arrow(P, g, pt, [-G[0], -G[1]], 'rgba(255,255,255,.85)', scale * 0.6, 2);
+    P.el('circle', { cx: P.sx(pt[0]), cy: P.sy(pt[1]), r: 5, fill: '#fff', stroke: '#1d2430', 'stroke-width': 1.5 }, g);
+
+    var ef = err(Gf, G), ec = err(Gc, G);
+    V_.$('#tab').innerHTML = '<tr><th>Cách tính</th><th>$\\partial f/\\partial x$</th><th>$\\partial f/\\partial y$</th><th>Sai số</th></tr>' +
+      '<tr><td style="color:' + CG + ';font-weight:700">Công thức</td><td>' + V_.fmt(G[0], 6) + '</td><td>' + V_.fmt(G[1], 6) + '</td><td>—</td></tr>' +
+      '<tr><td style="color:' + CF + ';font-weight:700">Một phía</td><td>' + V_.fmt(Gf[0], 6) + '</td><td>' + V_.fmt(Gf[1], 6) + '</td><td>$' + sci(ef) + '$</td></tr>' +
+      '<tr><td style="color:' + CC + ';font-weight:700">Hai phía</td><td>' + V_.fmt(Gc[0], 6) + '</td><td>' + V_.fmt(Gc[1], 6) + '</td><td>$' + sci(ec) + '$</td></tr>';
+    V_.texAll(V_.$('#tab'));
+
+    // sai số theo epsilon
+    var sf = [], sc = [];
+    for (var k = -15; k <= 0.001; k += 0.25) {
+      var ee = Math.pow(10, k);
+      sf.push([k, Math.max(1e-16, err(numg(fn, pt[0], pt[1], ee, false), G))]);
+      sc.push([k, Math.max(1e-16, err(numg(fn, pt[0], pt[1], ee, true), G))]);
+    }
+    MLV.chart(V_.$('#ch'), [{ pts: sf, color: CF }, { pts: sc, color: CC }], { logY: true, x: [-15, 0], y: [1e-16, 10], xlabel: 'log₁₀ ε', ylabel: 'sai số', vline: +V_.$('#eps').value, m: { l: 56, r: 12, t: 8, b: 34 } });
+    var bf = sf.reduce(function (a, b) { return b[1] < a[1] ? b : a; }), bc = sc.reduce(function (a, b) { return b[1] < a[1] ? b : a; });
+    var msg = '$' + fn.tex + '$. Mũi tên trắng là $-\\nabla f$, hướng mà gradient descent sẽ đi; nét đứt trắng là tiếp tuyến của đường đồng mức. ' +
+      'Trên đồ thị sai số, phía phải là sai số cắt Taylor ($O(\\varepsilon)$ cho một phía, $O(\\varepsilon^2)$ cho hai phía), phía trái là sai số làm tròn (tăng như $1/\\varepsilon$). ';
+    if (fn === FN.quad) msg += 'Riêng với hàm bậc hai, đạo hàm bậc ba bằng 0 nên xấp xỉ hai phía <b>không có</b> sai số cắt Taylor: đường xanh lục chỉ còn sai số làm tròn, giảm mãi khi $\\varepsilon$ tăng. Thử chọn hàm khác để thấy hình chữ V.';
+    else msg += 'Tại điểm này, một phía tốt nhất ở $\\varepsilon \\approx 10^{' + bf[0] + '}$ (sai số $' + sci(bf[1]) + '$), hai phía tốt nhất ở $\\varepsilon \\approx 10^{' + bc[0] + '}$ (sai số $' + sci(bc[1]) + '$).';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+
+  svg.addEventListener('click', function (e) {
+    var P = plot(), a = P.at(e);
+    if (!P.inside(a.px, a.py)) return;
+    pt = [a.x, a.y]; render();
+  });
+  V_.$$('#fn button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      V_.$$('#fn button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      pt = F().p.slice(); render();
+    });
+  });
+  V_.$('#eps').addEventListener('input', render);
+  V_.texAll(document.body);
+  pt = F().p.slice(); render();
+})();
+</script>
+</body>
+</html>
