@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cây quyết định · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .tv-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 760px) { .tv-main { grid-template-columns: minmax(0, 1fr); } }
+  .ev-h { font-size: .82rem; font-weight: 700; color: var(--muted); margin: 2px 0 6px; text-transform: uppercase; letter-spacing: .03em; }
+  .stack { position: relative; width: 100%; }
+  .stack canvas, .stack svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .stack::before { content: ""; display: block; padding-top: 100%; }
+  #plot { cursor: crosshair; touch-action: none; }
+  .tnode rect { stroke-width: 1.6; }
+  .tnode text { font-size: 13px; font-weight: 600; fill: var(--text); }
+  .tnode.on rect { stroke-width: 3; }
+  .tedge { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Cây quyết định</h1>
+      <div class="crumbs"><a href="../#/ml/tree_vi">← Cây quyết định</a></div>
+    </div>
+    <p class="lead">Thuật toán CART chia mặt phẳng bằng các nhát cắt song song trục, mỗi lần chọn nhát cắt làm độ vẩn đục giảm nhiều nhất. Tăng độ sâu để thấy cây khớp dữ liệu huấn luyện ngày càng sát, rồi quá khớp. Bấm vào hình để thêm điểm.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-tree.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="note">Dữ liệu:</span>
+      <span class="seg" id="ds">
+        <button type="button" data-v="moons" aria-pressed="true">Hai nửa trăng</button>
+        <button type="button" data-v="xor">XOR</button>
+        <button type="button" data-v="circles">Vòng tròn</button>
+        <button type="button" data-v="diag">Đường chéo</button>
+      </span>
+      <button type="button" class="btn" id="resample">Lấy mẫu lại</button>
+    </div>
+    <div class="ctrl">
+      <label for="depth">Độ sâu tối đa</label><input id="depth" type="range" min="0" max="12" step="1" value="3"><span class="val" id="depth-v"></span>
+      <label for="leaf">Số mẫu tối thiểu ở lá</label><input id="leaf" type="range" min="1" max="30" step="1" value="1"><span class="val" id="leaf-v"></span>
+    </div>
+    <div class="ctrl">
+      <label for="noise">Nhiễu</label><input id="noise" type="range" min="0" max="0.6" step="0.02" value="0.25"><span class="val" id="noise-v"></span>
+      <span class="note">Tiêu chí:</span>
+      <span class="seg" id="crit"><button type="button" data-v="gini" aria-pressed="true">Gini</button><button type="button" data-v="entropy">Entropy</button></span>
+      <span class="note">Bấm vào hình để thêm:</span>
+      <span class="seg" id="addc"><button type="button" data-v="0" aria-pressed="true">● xanh</button><button type="button" data-v="1">● hồng</button></span>
+    </div>
+    <div class="tv-main">
+      <div>
+        <div class="ev-h">Vùng quyết định</div>
+        <div class="plotbox stack" style="max-width:460px"><canvas id="cv" width="460" height="460"></canvas><svg id="plot" viewBox="0 0 460 460" role="img" aria-label="Dữ liệu và vùng quyết định của cây"></svg></div>
+        <p class="note" style="text-align:center">Màu nền: tỉ lệ lớp hồng ở lá. Nhát cắt càng đậm thì càng gần gốc. Điểm mờ: tập kiểm tra.</p>
+      </div>
+      <div>
+        <div class="ev-h">Cây (hiện tới độ sâu 4)</div>
+        <svg id="tree" viewBox="0 0 520 400" role="img" aria-label="Sơ đồ cây"></svg>
+        <p class="note" style="text-align:center">Dòng số dưới mỗi nút: số điểm xanh / số điểm hồng đi qua nút đó.</p>
+      </div>
+    </div>
+    <div class="stats"><span>Số lá <b id="nl"></b></span><span>Độ sâu thật <b id="dd"></b></span><span>Accuracy huấn luyện <b id="atr"></b></span><span>Accuracy kiểm tra <b id="ate"></b></span></div>
+    <div class="blk" style="margin:10px 0 0;padding:12px;box-shadow:none">
+      <div class="ev-h">Accuracy theo độ sâu (cùng dữ liệu)</div>
+      <div class="plotbox"><svg id="curve" viewBox="0 0 560 220" role="img" aria-label="Accuracy theo độ sâu"></svg></div>
+      <div class="legend" style="justify-content:center">
+        <span class="li"><span class="sw" style="background:#2f80f5;height:3px"></span>huấn luyện</span>
+        <span class="li"><span class="sw" style="background:#e8487f;height:3px"></span>kiểm tra</span>
+      </div>
+    </div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script src="ml-tree.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, seed = 5, ds = 'moons', crit = 'gini', addClass = 0;
+  var train = [], test = [], extra = [], P, LIM = [-1.5, 1.5];
+  var C0 = '#2f80f5', C1 = '#e8487f';
+
+  function gen(n, r, noise) {
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var x, y, c;
+      if (ds === 'moons') {
+        c = i % 2; var a = Math.PI * r();
+        x = c ? 1 - Math.cos(a) : Math.cos(a); y = c ? 0.5 - Math.sin(a) : Math.sin(a);
+        x = (x - 0.5) * 0.85; y = (y - 0.25) * 0.85;
+      } else if (ds === 'xor') {
+        x = 2 * r() - 1; y = 2 * r() - 1; c = (x * y > 0) ? 1 : 0;
+      } else if (ds === 'circles') {
+        c = i % 2; var t = 2 * Math.PI * r(), rad = c ? 0.45 : 1.0;
+        x = rad * Math.cos(t); y = rad * Math.sin(t);
+      } else {
+        x = 2 * r() - 1; y = 2 * r() - 1; c = (y > 0.8 * x) ? 1 : 0;
+      }
+      x += noise * MLV.randn(r); y += noise * MLV.randn(r);
+      out.push([Math.max(-1.45, Math.min(1.45, x)), Math.max(-1.45, Math.min(1.45, y)), c]);
+    }
+    return out;
+  }
+  function sample() {
+    var noise = +V_.$('#noise').value;
+    train = gen(200, MLV.rng(seed), noise); test = gen(600, MLV.rng(seed * 7919 + 3), noise); extra = [];
+  }
+  function data() { return train.concat(extra); }
+  function fit(depth) {
+    var D = data();
+    return MLTree.build(D.map(function (p) { return [p[0], p[1]]; }), D.map(function (p) { return p[2]; }),
+      { maxDepth: depth, minLeaf: +V_.$('#leaf').value, criterion: crit });
+  }
+  function acc(tree, D) { var k = 0; D.forEach(function (p) { if ((MLTree.predict(tree, p) >= 0.5 ? 1 : 0) === p[2]) k++; }); return k / D.length; }
+
+  function drawPlot(tree) {
+    var svg = V_.$('#plot');
+    P = MLV.Plot(svg, { W: 460, H: 460, x: LIM, y: LIM, m: { l: 10, r: 10, t: 10, b: 10 }, grid: false });
+    P.clear(); P.axes({ xticks: [], yticks: [] });
+    MLV.paint(V_.$('#cv'), P, function (x, y) {
+      var p = MLTree.predict(tree, [x, y]);
+      var a = [207, 224, 253], b = [251, 208, 222], w = [255, 255, 255], t = p < 0.5 ? (0.5 - p) * 2 : (p - 0.5) * 2, c = p < 0.5 ? a : b;
+      return [w[0] + (c[0] - w[0]) * t, w[1] + (c[1] - w[1]) * t, w[2] + (c[2] - w[2]) * t, 255];
+    }, 4);
+    MLTree.cuts(tree, [LIM[0], LIM[1], LIM[0], LIM[1]]).forEach(function (c) {
+      P.el('line', { x1: P.sx(c.x0), x2: P.sx(c.x1), y1: P.sy(c.y0), y2: P.sy(c.y1), stroke: '#f08a24',
+        'stroke-width': Math.max(0.8, 3 - 0.45 * c.depth), opacity: Math.max(0.45, 1 - 0.1 * c.depth) });
+    });
+    test.forEach(function (p) { P.el('circle', { cx: P.sx(p[0]), cy: P.sy(p[1]), r: 2, fill: p[2] ? C1 : C0, opacity: 0.18 }); });
+    data().forEach(function (p, i) { P.el('circle', { cx: P.sx(p[0]), cy: P.sy(p[1]), r: i >= train.length ? 6 : 4, fill: p[2] ? C1 : C0, class: 'pl-pt', stroke: i >= train.length ? '#1f2340' : null }); });
+  }
+
+  function drawTree(tree) {
+    var svg = V_.$('#tree'); while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var MAXD = 4, W = 520, H = 400, rowH = (H - 40) / MAXD;
+    function vis(n) { return n.left && n.depth < MAXD; }
+    function count(n) { return vis(n) ? count(n.left) + count(n.right) : 1; }
+    var total = count(tree), k = 0, pos = [];
+    function lay(n) {
+      var x;
+      if (vis(n)) { var a = lay(n.left), b = lay(n.right); x = (a + b) / 2; }
+      else { x = (k + 0.5) / total * W; k++; }
+      pos.push([n, x, 22 + n.depth * rowH]); n._x = x; n._y = 22 + n.depth * rowH;
+      return x;
+    }
+    lay(tree);
+    var g = MLV.el('g', {}, svg);
+    pos.forEach(function (q) {
+      var n = q[0];
+      if (vis(n)) [n.left, n.right].forEach(function (c) { MLV.el('path', { d: 'M' + n._x + ' ' + (n._y + 17) + 'L' + c._x + ' ' + (c._y - 17), class: 'tedge' }, g); });
+    });
+    var bw = Math.min(110, W / total - 6);
+    pos.forEach(function (q) {
+      var n = q[0], x = q[1], y = q[2], inner = !!n.left, c1 = n.c1, c0 = n.n - n.c1;
+      var gg = MLV.el('g', { class: 'tnode' }, g), w = vis(n) ? Math.max(bw, 96) : bw, h = 34;
+      var col = inner ? '#f08a24' : (n.v >= 0.5 ? C1 : C0), fill = inner ? 'rgba(240,138,36,.12)' : (n.v >= 0.5 ? 'rgba(232,72,127,.14)' : 'rgba(47,128,245,.14)');
+      MLV.el('rect', { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 6, fill: fill, stroke: col }, gg);
+      var t1 = MLV.el('text', { x: x, y: y - 2, 'text-anchor': 'middle' }, gg);
+      if (vis(n)) t1.textContent = (n.f === 0 ? 'x₁' : 'x₂') + ' ≤ ' + n.t.toFixed(2);
+      else if (inner) t1.textContent = '… ' + MLTree.leaves(n) + ' lá';       // cây con sâu hơn, thu gọn
+      else t1.textContent = n.v >= 0.5 ? 'hồng' : 'xanh';
+      var t2 = MLV.el('text', { x: x, y: y + 12, 'text-anchor': 'middle', style: 'font-size:10.5px;font-weight:500;fill:var(--muted)' }, gg);
+      t2.textContent = c0 + ' xanh / ' + c1 + ' hồng';
+      if (w < 104) t2.textContent = c0 + ' / ' + c1;
+    });
+  }
+
+  function drawCurve() {
+    var D = data(), tr = [], te = [];
+    for (var d = 0; d <= 12; d++) { var t = fit(d); tr.push([d, acc(t, D)]); te.push([d, acc(t, test)]); }
+    MLV.chart(V_.$('#curve'), [{ pts: tr, color: '#2f80f5', marker: true }, { pts: te, color: '#e8487f', marker: true }],
+      { x: [0, 12], y: [0.4, 1.0], xlabel: 'độ sâu tối đa', ylabel: 'accuracy', vline: +V_.$('#depth').value, W: 560, H: 220 });
+    return te;
+  }
+
+  function render() {
+    var depth = +V_.$('#depth').value;
+    V_.$('#depth-v').textContent = depth; V_.$('#leaf-v').textContent = V_.$('#leaf').value;
+    V_.$('#noise-v').textContent = V_.fmt(+V_.$('#noise').value, 2);
+    var tree = fit(depth), atr = acc(tree, data()), ate = acc(tree, test);
+    drawPlot(tree); drawTree(tree);
+    var te = drawCurve();
+    var best = te.reduce(function (a, b) { return b[1] > a[1] + 1e-9 ? b : a; });
+    V_.$('#nl').textContent = MLTree.leaves(tree); V_.$('#dd').textContent = MLTree.depth(tree);
+    V_.$('#atr').textContent = V_.fmt(atr, 3); V_.$('#ate').textContent = V_.fmt(ate, 3);
+    var msg;
+    if (depth === 0) msg = 'Độ sâu 0: cây chỉ có một lá, luôn đoán lớp đông hơn. Kéo độ sâu lên 1 để thấy nhát cắt đầu tiên: nhát cắt làm Gini (hoặc entropy) giảm nhiều nhất.';
+    else if (atr - ate > 0.08) msg = 'Quá khớp: accuracy huấn luyện ' + V_.fmt(atr, 3) + ' nhưng kiểm tra chỉ ' + V_.fmt(ate, 3) + '. Cây đang tạo những ô nhỏ xíu quanh từng điểm nhiễu. Độ sâu tốt nhất trên tập kiểm tra là ' + best[0] + '. Thử tăng "số mẫu tối thiểu ở lá" để cắt tỉa trước.';
+    else if (ate < best[1] - 0.03 && depth < best[0]) msg = 'Chưa khớp: cây còn quá nông để mô tả ranh giới. Độ sâu ' + best[0] + ' cho accuracy kiểm tra cao nhất (' + V_.fmt(best[1], 3) + ').';
+    else msg = 'Cây vừa sức: accuracy kiểm tra ' + V_.fmt(ate, 3) + ' (tốt nhất ' + V_.fmt(best[1], 3) + ' ở độ sâu ' + best[0] + '). Để ý các nhát cắt luôn song song trục: với dữ liệu "Đường chéo", cây phải dùng cả bậc thang mới xấp xỉ được một đường thẳng nghiêng.';
+    V_.$('#insight').textContent = msg;
+  }
+
+  function seg(id, cb) {
+    V_.$$('#' + id + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$('#' + id + ' button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+        cb(b.dataset.v);
+      });
+    });
+  }
+  seg('ds', function (v) { ds = v; sample(); render(); });
+  seg('crit', function (v) { crit = v; render(); });
+  seg('addc', function (v) { addClass = +v; });
+  ['#depth', '#leaf'].forEach(function (s) { V_.$(s).addEventListener('input', render); });
+  V_.$('#noise').addEventListener('input', function () { sample(); render(); });
+  V_.$('#resample').addEventListener('click', function () { seed += 1; sample(); render(); });
+  V_.$('#plot').addEventListener('pointerdown', function (e) {
+    if (!P) return; var q = P.at(e);
+    if (q.x < LIM[0] || q.x > LIM[1] || q.y < LIM[0] || q.y > LIM[1]) return;
+    extra.push([q.x, q.y, addClass]); render();
+  });
+  V_.texAll(document.body);
+  sample(); render();
+})();
+</script>
+</body>
+</html>
