@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hồi quy logistic · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Hồi quy logistic</h1>
+      <div class="crumbs"><a href="../#/ml/ch14_vi">← Chương 14 Hồi quy logistic</a></div>
+    </div>
+    <p class="lead">Màu nền là xác suất $P(y = 1 \mid \mathbf{x}) = \sigma(\mathbf{w}^T\bar{\mathbf{x}})$: xanh đậm gần 1, hồng đậm gần 0. Các đường đồng mức là những đường thẳng song song. Huấn luyện bằng gradient descent và xem sigmoid "dốc" dần lên.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-logistic.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Dữ liệu</span>
+      <div class="seg" id="data"><button type="button" data-v="overlap" aria-pressed="true">Chồng lấn</button><button type="button" data-v="sep" aria-pressed="false">Tách biệt</button></div>
+      <span class="lb">Bấm để thêm</span>
+      <div class="seg" id="cls"><button type="button" data-v="1" aria-pressed="true">y = 1 ■</button><button type="button" data-v="0" aria-pressed="false">y = 0 ●</button></div>
+    </div>
+    <div class="ctrl">
+      <label for="lam">$\lambda$</label><input id="lam" type="range" min="-4" max="1" step="0.25" value="-4"><span class="val" id="lam-v"></span>
+      <label for="eta">$\eta$</label><input id="eta" type="range" min="-2" max="1" step="0.1" value="0"><span class="val" id="eta-v"></span>
+      <label for="th">Ngưỡng</label><input id="th" type="range" min="0.05" max="0.95" step="0.05" value="0.5"><span class="val" id="th-v"></span>
+    </div>
+    <div class="ctrl">
+      <button type="button" class="btn pri" id="play"></button>
+      <button type="button" class="btn" id="step">10 bước</button>
+      <button type="button" class="btn" id="reset">Về $\mathbf{w} = \mathbf{0}$</button>
+      <label for="speed">Tốc độ</label><input id="speed" type="range" min="1" max="5" step="1" value="4">
+    </div>
+    <div class="stats"><span>Bước <b id="t"></b></span><span>Mất mát (14.13) <b id="L"></b></span><span>$\|\mathbf{w}\|$ <b id="wn"></b></span><span>Độ chính xác <b id="acc"></b></span></div>
+    <div class="plotbox click"><canvas id="cv" width="560" height="440"></canvas><svg id="sv" viewBox="0 0 560 440" role="img" aria-label="Dữ liệu hai lớp và bề mặt xác suất"></svg></div>
+    <div class="plotbox"><svg id="ch" viewBox="0 0 560 160" role="img" aria-label="Mất mát và độ dài vector trọng số theo bước"></svg></div>
+    <div class="legend" style="justify-content:center"><span class="li"><span class="sw" style="background:#7c3aed;height:3px"></span>mất mát</span><span class="li"><span class="sw" style="background:#f08a24;height:3px"></span>‖w‖ / 10</span></div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, BLUE = '#2f80f5', PINK = '#e8487f';
+  var svg = V_.$('#sv'), cv = V_.$('#cv');
+  var P = MLV.Plot(svg, { W: 560, H: 440, x: [-4, 4], y: [-3.2, 3.2], m: { l: 32, r: 10, t: 10, b: 28 } });
+  var pts = [], w = [0, 0, 0], t = 0, hist = [];
+
+  function makeData() {
+    var r = MLV.rng(3), sep = V_.$('#data [aria-pressed=true]').dataset.v === 'sep', i;
+    pts = [];
+    for (i = 0; i < 40; i++) {
+      var a = [1.1 + 0.9 * MLV.randn(r), 0.6 + 0.9 * MLV.randn(r)], b = [-1.1 + 0.9 * MLV.randn(r), -0.6 + 0.9 * MLV.randn(r)];
+      if (sep) { if (a[0] + a[1] < 0.9) { a[0] += 1.4; a[1] += 0.8; } if (b[0] + b[1] > -0.9) { b[0] -= 1.4; b[1] -= 0.8; } }
+      pts.push([a[0], a[1], 1]); pts.push([b[0], b[1], 0]);
+    }
+  }
+  function sig(z) { return 1 / (1 + Math.exp(-z)); }
+  function z(p) { return w[0] * p[0] + w[1] * p[1] + w[2]; }
+  function lam() { var v = +V_.$('#lam').value; return v <= -4 ? 0 : Math.pow(10, v); }
+  function loss() {
+    var s = 0, N = pts.length;
+    pts.forEach(function (p) { var a = Math.min(1 - 1e-12, Math.max(1e-12, sig(z(p)))); s -= p[2] * Math.log(a) + (1 - p[2]) * Math.log(1 - a); });
+    return s / N + 0.5 * lam() / N * (w[0] * w[0] + w[1] * w[1] + w[2] * w[2]);
+  }
+  function gdStep() {
+    var N = pts.length, g = [0, 0, 0], e = Math.pow(10, +V_.$('#eta').value), L = lam();
+    pts.forEach(function (p) { var d = sig(z(p)) - p[2]; g[0] += d * p[0]; g[1] += d * p[1]; g[2] += d; });
+    for (var k = 0; k < 3; k++) w[k] -= e * (g[k] / N + L / N * w[k]);       // gradient của (14.13), cả w0 cũng bị phạt như sách
+    t++;
+    hist.push([t, loss(), Math.sqrt(w[0] * w[0] + w[1] * w[1] + w[2] * w[2])]);
+  }
+  function step() { for (var i = 0; i < 10; i++) gdStep(); render(); return t < 20000; }
+  function reset() { w = [0, 0, 0]; t = 0; hist = [[0, loss(), 0]]; }
+
+  function render() {
+    var th = +V_.$('#th').value, b = MLV.hexRgb(BLUE), pk = MLV.hexRgb(PINK);
+    V_.$('#lam-v').textContent = lam() === 0 ? '0' : V_.fmt(lam(), lam() < 0.01 ? 4 : 2);
+    V_.$('#eta-v').textContent = V_.fmt(Math.pow(10, +V_.$('#eta').value), 2);
+    V_.$('#th-v').textContent = V_.fmt(th, 2);
+    MLV.paint(cv, P, function (x, y) {
+      var q = sig(w[0] * x + w[1] * y + w[2]), c = q >= 0.5 ? b : pk, a = Math.abs(q - 0.5) * 2;
+      var band = Math.floor(q * 10) % 2 ? 0.88 : 1;                         // dải đồng mức 0.1
+      return [c[0], c[1], c[2], Math.round((25 + 150 * a) * band)];
+    }, 4);
+    P.clear(); P.axes();
+    var g = P.layer(true), acc = 0;
+    // đường quyết định ở ngưỡng đã chọn: w·x = logit(th)
+    if (Math.abs(w[1]) > 1e-9) {
+      var lt = Math.log(th / (1 - th));
+      P.curve(function (x) { return (lt - w[2] - w[0] * x) / w[1]; }, { stroke: 'var(--text)', 'stroke-width': 2.5 }, g);
+    }
+    pts.forEach(function (p) {
+      var x = P.sx(p[0]), y = P.sy(p[1]), ok = (sig(z(p)) >= th ? 1 : 0) === p[2];
+      if (ok) acc++;
+      if (p[2]) P.el('rect', { x: x - 5, y: y - 5, width: 10, height: 10, fill: BLUE, class: 'pl-pt' }, g);
+      else P.el('circle', { cx: x, cy: y, r: 5.5, fill: PINK, class: 'pl-pt' }, g);
+      if (!ok) P.el('circle', { cx: x, cy: y, r: 9, fill: 'none', stroke: 'var(--text)', 'stroke-width': 1, 'stroke-dasharray': '2 2' }, g);
+    });
+    MLV.chart(V_.$('#ch'), [{ pts: hist.map(function (h) { return [h[0], h[1]]; }), color: '#7c3aed' },
+                            { pts: hist.map(function (h) { return [h[0], h[2] / 10]; }), color: '#f08a24' }],
+      { xlabel: 'bước', m: { l: 52, r: 12, t: 8, b: 34 } });
+    var wn = Math.sqrt(w[0] * w[0] + w[1] * w[1] + w[2] * w[2]);
+    V_.$('#t').textContent = t;
+    V_.$('#L').textContent = V_.fmt(loss(), 4);
+    V_.$('#wn').textContent = V_.fmt(wn, 2);
+    V_.$('#acc').textContent = acc + ' / ' + pts.length;
+    var sep = V_.$('#data [aria-pressed=true]').dataset.v === 'sep', msg;
+    if (t === 0) msg = 'Với w = 0, mọi điểm có xác suất 0.5 và mất mát bằng ln 2 ≈ 0.693. Bấm "Phát" để huấn luyện.';
+    else if (sep && lam() === 0) msg = 'Dữ liệu tách biệt và λ = 0: mất mát giảm mãi về 0 bằng cách phóng to w, nên ‖w‖ tăng không ngừng và sigmoid ngày càng dốc như một bậc thang. Kéo λ lên để nghiệm dừng lại (mục 14.2.3).';
+    else if (lam() >= 1) msg = 'λ lớn kéo w về gần 0: sigmoid thoải, mọi xác suất bị kéo về gần 0.5, kể cả với những điểm rất rõ ràng.';
+    else msg = 'Kéo thanh "Ngưỡng" để thấy đường quyết định dịch song song. Ngưỡng nhỏ thì bắt được nhiều điểm y = 1 hơn, nhưng cũng nhận nhầm nhiều điểm y = 0 hơn (xem trang Ví dụ áp dụng).';
+    V_.$('#insight').textContent = msg;
+  }
+
+  var player = V_.Player({ btn: V_.$('#play'), speed: V_.$('#speed'), step: step });
+  V_.$('#step').addEventListener('click', function () { player.stop(); step(); });
+  V_.$('#reset').addEventListener('click', function () { player.stop(); reset(); render(); });
+  V_.$('#th').addEventListener('input', render);
+  ['#lam', '#eta'].forEach(function (s) { V_.$(s).addEventListener('input', function () { hist.push([t, loss(), hist.length ? hist[hist.length - 1][2] : 0]); render(); }); });
+  ['#data', '#cls'].forEach(function (sel) {
+    V_.$$(sel + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$(sel + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        if (sel === '#data') { player.stop(); makeData(); reset(); render(); }
+      });
+    });
+  });
+  svg.addEventListener('click', function (e) {
+    var a = P.at(e);
+    if (!P.inside(a.px, a.py)) return;
+    pts.push([a.x, a.y, +V_.$('#cls [aria-pressed=true]').dataset.v]); render();
+  });
+  V_.texAll(document.body);
+  makeData(); reset(); render();
+})();
+</script>
+</body>
+</html>

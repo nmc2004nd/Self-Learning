@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K lân cận · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .vote { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 8px; font-size: .9rem; }
+  .vote span { padding: 3px 10px; border-radius: 999px; background: var(--surface-2); font-variant-numeric: tabular-nums; }
+  .vote span b { margin-left: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>K lân cận</h1>
+      <div class="crumbs"><a href="../#/ml/ch09_vi">← Chương 9 K lân cận</a></div>
+    </div>
+    <p class="lead">Màu nền là lớp mà KNN sẽ dự đoán tại mỗi vị trí. Đặt điểm cần đoán (ngôi sao) để xem $K$ lân cận gần nhất và cách chúng bỏ phiếu. $K$ nhỏ cho ranh giới lởm chởm, bám theo từng điểm. $K$ lớn cho ranh giới mượt hơn.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-knn.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <label for="k">$K$</label><input id="k" type="range" min="1" max="31" step="1" value="1"><span class="val" id="k-v"></span>
+      <span class="lb">Bỏ phiếu</span>
+      <div class="seg" id="wt"><button type="button" data-v="u" aria-pressed="true">Đa số</button><button type="button" data-v="d" aria-pressed="false">Theo 1/khoảng cách</button></div>
+      <span class="lb">Khoảng cách</span>
+      <div class="seg" id="met"><button type="button" data-v="2" aria-pressed="true">$\ell_2$</button><button type="button" data-v="1" aria-pressed="false">$\ell_1$</button></div>
+    </div>
+    <div class="ctrl">
+      <span class="lb">Bấm để</span>
+      <div class="seg" id="mode"><button type="button" data-v="q" aria-pressed="true">Đặt điểm cần đoán ★</button><button type="button" data-v="0" aria-pressed="false">Thêm lớp 1</button><button type="button" data-v="1" aria-pressed="false">Thêm lớp 2</button><button type="button" data-v="2" aria-pressed="false">Thêm lớp 3</button></div>
+    </div>
+    <div class="ctrl">
+      <button type="button" class="btn" id="reset">Dữ liệu mẫu</button>
+      <button type="button" class="btn" id="noise">Thêm 5 điểm nhiễu</button>
+      <button type="button" class="btn" id="clear">Xoá hết</button>
+    </div>
+    <div class="plotbox click"><canvas id="cv" width="560" height="460"></canvas><svg id="sv" viewBox="0 0 560 460" role="img" aria-label="Dữ liệu ba lớp, vùng quyết định và các lân cận của điểm cần đoán"></svg></div>
+    <div class="vote" id="vote"></div>
+    <div class="stats"><span>Số điểm <b id="n"></b></span><span>Độ chính xác bỏ-một-ra (LOO) <b id="loo"></b></span></div>
+    <p class="note" style="text-align:center">Độ chính xác bỏ-một-ra: lần lượt bỏ từng điểm ra, dự đoán nó bằng các điểm còn lại. Đây là xác thực chéo với số phần bằng đúng số điểm.</p>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, C = MLV.CLASS;
+  var svg = V_.$('#sv'), cv = V_.$('#cv');
+  var P = MLV.Plot(svg, { W: 560, H: 460, x: [-4, 4], y: [-3.3, 3.3], m: { l: 36, r: 10, t: 10, b: 30 } });
+  var pts = [], query = [0.4, 0.6], seed = 5;
+
+  function sampleData() {
+    var r = MLV.rng(seed), centers = [[-1.6, 1], [1.4, 1.2], [0, -1.5]];
+    pts = [];
+    centers.forEach(function (c, k) {
+      for (var i = 0; i < 25; i++) pts.push([c[0] + 1.0 * MLV.randn(r), c[1] + 0.85 * MLV.randn(r), k]);
+    });
+  }
+  function K() { return +V_.$('#k').value; }
+  function weighted() { return V_.$('#wt [aria-pressed=true]').dataset.v === 'd'; }
+  function pnorm() { return +V_.$('#met [aria-pressed=true]').dataset.v; }
+  function dist(a, b) {
+    var dx = a[0] - b[0], dy = a[1] - b[1];
+    return pnorm() === 1 ? Math.abs(dx) + Math.abs(dy) : Math.sqrt(dx * dx + dy * dy);
+  }
+  // trả về { votes[3], nb: [chỉ số lân cận], pred }
+  function classify(x, skip) {
+    var k = Math.min(K(), pts.length - (skip >= 0 ? 1 : 0));
+    var ds = [];
+    for (var i = 0; i < pts.length; i++) if (i !== skip) ds.push([dist(x, pts[i]), i]);
+    ds.sort(function (a, b) { return a[0] - b[0]; });
+    var votes = [0, 0, 0], nb = [];
+    for (i = 0; i < k; i++) {
+      var d = ds[i][0], j = ds[i][1];
+      votes[pts[j][2]] += weighted() ? (d < 1e-9 ? 1e9 : 1 / d) : 1;
+      nb.push(j);
+    }
+    var pred = 0;
+    for (i = 1; i < 3; i++) if (votes[i] > votes[pred]) pred = i;
+    return { votes: votes, nb: nb, pred: pred, radius: k ? ds[k - 1][0] : 0 };
+  }
+
+  function render() {
+    V_.$('#k-v').textContent = K();
+    var rgb = C.slice(0, 3).map(MLV.hexRgb);
+    if (pts.length) {
+      MLV.paint(cv, P, function (x, y) {
+        var r = classify([x, y], -1), tot = r.votes[0] + r.votes[1] + r.votes[2], c = rgb[r.pred];
+        var conf = tot > 0 ? r.votes[r.pred] / tot : 0;
+        return [c[0], c[1], c[2], Math.round(40 + 60 * conf)];
+      }, 5);
+    } else cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+    P.clear(); P.axes({ noFrame: false });
+    var g = P.layer(true);
+    var q = pts.length ? classify(query, -1) : null;
+    if (q) {
+      // vùng lân cận: đường tròn (ℓ2) hoặc hình thoi (ℓ1) bán kính = khoảng cách tới lân cận thứ K
+      var rx = q.radius / (P.x[1] - P.x[0]) * P.pw, ry = q.radius / (P.y[1] - P.y[0]) * P.ph, cx = P.sx(query[0]), cy = P.sy(query[1]);
+      if (pnorm() === 2) P.el('ellipse', { cx: cx, cy: cy, rx: rx, ry: ry, fill: 'none', stroke: 'var(--text)', 'stroke-dasharray': '4 3', 'stroke-width': 1.5 }, g);
+      else P.el('path', { d: 'M' + (cx - rx) + ' ' + cy + 'L' + cx + ' ' + (cy - ry) + 'L' + (cx + rx) + ' ' + cy + 'L' + cx + ' ' + (cy + ry) + 'Z', fill: 'none', stroke: 'var(--text)', 'stroke-dasharray': '4 3', 'stroke-width': 1.5 }, g);
+      q.nb.forEach(function (j) { P.el('line', { x1: cx, y1: cy, x2: P.sx(pts[j][0]), y2: P.sy(pts[j][1]), stroke: C[pts[j][2]], 'stroke-width': 1.5, opacity: 0.8 }, g); });
+    }
+    pts.forEach(function (p, i) {
+      var isNb = q && q.nb.indexOf(i) >= 0;
+      P.el('circle', { cx: P.sx(p[0]), cy: P.sy(p[1]), r: isNb ? 6.5 : 5, fill: C[p[2]], class: 'pl-pt', 'stroke-width': isNb ? 2.5 : 1.5, stroke: isNb ? 'var(--text)' : null }, g);
+    });
+    if (q) {
+      var star = P.el('text', { x: P.sx(query[0]), y: P.sy(query[1]) + 8, 'text-anchor': 'middle', 'font-size': 26, fill: C[q.pred], stroke: 'var(--text)', 'stroke-width': 1 }, g);
+      star.textContent = '★';
+    }
+
+    var vote = V_.$('#vote');
+    vote.innerHTML = q ? q.votes.map(function (v, i) {
+      return '<span style="border:2px solid ' + C[i] + '">lớp ' + (i + 1) + '<b>' + (weighted() ? V_.fmt(v > 1e8 ? Infinity : v, 2) : v) + '</b></span>';
+    }).join('') + '<span>dự đoán: <b style="color:' + C[q.pred] + '">lớp ' + (q.pred + 1) + '</b></span>' : '';
+
+    var ok = 0;
+    if (pts.length > 1) for (var i = 0; i < pts.length; i++) if (classify(pts[i], i).pred === pts[i][2]) ok++;
+    V_.$('#n').textContent = pts.length;
+    V_.$('#loo').textContent = pts.length > 1 ? V_.fmt(100 * ok / pts.length, 1) + '%' : '—';
+
+    var msg;
+    if (!pts.length) msg = 'Chưa có dữ liệu. Chọn "Thêm lớp 1/2/3" rồi bấm lên đồ thị.';
+    else if (K() === 1) msg = 'K = 1: mỗi điểm huấn luyện tạo một "ốc đảo" quanh nó. Điểm nhiễu nằm lọt trong lớp khác cũng có vùng riêng. Ranh giới là các đường trung trực (sơ đồ Voronoi). Tăng K để làm mượt.';
+    else if (K() > 20) msg = 'K lớn: ranh giới rất mượt nhưng các lớp nhỏ bị lớp lớn "nuốt". Màu nền nhạt hơn ở những nơi phiếu bầu chia đều.';
+    else msg = 'Màu nền càng đậm thì phiếu bầu càng tập trung vào một lớp. Thử thêm điểm nhiễu: với K nhỏ chúng tạo ra các đảo lạ, với K vừa phải chúng bị bỏ phiếu áp đảo.';
+    V_.$('#insight').textContent = msg;
+  }
+
+  svg.addEventListener('click', function (e) {
+    var a = P.at(e);
+    if (!P.inside(a.px, a.py)) return;
+    var mode = V_.$('#mode [aria-pressed=true]').dataset.v;
+    if (mode === 'q') query = [a.x, a.y];
+    else pts.push([a.x, a.y, +mode]);
+    render();
+  });
+  ['#wt', '#met', '#mode'].forEach(function (sel) {
+    V_.$$(sel + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$(sel + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        if (sel !== '#mode') render();
+      });
+    });
+  });
+  V_.$('#k').addEventListener('input', render);
+  V_.$('#reset').addEventListener('click', function () { seed++; sampleData(); render(); });
+  V_.$('#clear').addEventListener('click', function () { pts = []; render(); });
+  V_.$('#noise').addEventListener('click', function () {
+    var r = MLV.rng(Date.now() % 100000);
+    for (var i = 0; i < 5; i++) pts.push([-3.5 + 7 * r(), -2.8 + 5.6 * r(), Math.floor(3 * r())]);
+    render();
+  });
+  V_.texAll(document.body);
+  sampleData(); render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thuật toán học perceptron · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Thuật toán học perceptron</h1>
+      <div class="crumbs"><a href="../#/ml/ch13_vi">← Chương 13 Thuật toán học perceptron</a></div>
+    </div>
+    <p class="lead">Mỗi bước, PLA chọn ngẫu nhiên một điểm bị phân loại lỗi (vòng cam) và cập nhật $\mathbf{w} \leftarrow \mathbf{w} + y_i\bar{\mathbf{x}}_i$: đường phân chia xoay về phía điểm đó. Mũi tên là hướng của $\mathbf{w}$, chỉ về phía lớp $+1$.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-pla.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Dữ liệu</span>
+      <div class="seg" id="data"><button type="button" data-v="sep" aria-pressed="true">Tách biệt</button><button type="button" data-v="close" aria-pressed="false">Sát nhau</button><button type="button" data-v="overlap" aria-pressed="false">Chồng lấn</button><button type="button" data-v="xor" aria-pressed="false">XOR</button></div>
+      <span class="lb">Bấm để thêm</span>
+      <div class="seg" id="cls"><button type="button" data-v="1" aria-pressed="true">lớp +1 ■</button><button type="button" data-v="-1" aria-pressed="false">lớp −1 ●</button></div>
+    </div>
+    <div class="ctrl">
+      <button type="button" class="btn pri" id="play"></button>
+      <button type="button" class="btn" id="step">1 lần cập nhật</button>
+      <button type="button" class="btn" id="reset">Khởi tạo lại $\mathbf{w}$</button>
+      <label><input type="checkbox" id="pocket"> Hiện pocket</label>
+      <label for="speed">Tốc độ</label><input id="speed" type="range" min="1" max="5" step="1" value="3">
+    </div>
+    <div class="stats"><span>Số lần cập nhật <b id="t"></b></span><span>Số điểm sai <b id="err"></b></span><span>$\mathbf{w}$ = <b id="w"></b></span><span id="pk-s">Pocket: sai <b id="pk"></b></span></div>
+    <div class="plotbox click"><canvas id="cv" width="560" height="440"></canvas><svg id="sv" viewBox="0 0 560 440" role="img" aria-label="Dữ liệu hai lớp, đường phân chia và điểm được chọn"></svg></div>
+    <div class="plotbox"><svg id="ch" viewBox="0 0 560 160" role="img" aria-label="Số điểm sai theo số lần cập nhật"></svg></div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, BLUE = '#2f80f5', PINK = '#e8487f';
+  var svg = V_.$('#sv'), cv = V_.$('#cv');
+  var P = MLV.Plot(svg, { W: 560, H: 440, x: [-3, 3], y: [-2.4, 2.4], m: { l: 32, r: 10, t: 10, b: 28 } });
+  var pts = [], w, t, errHist, picked = null, pocketW, pocketErr, seedW = 1, rnd = MLV.rng(42);
+
+  function makeData() {
+    var r = MLV.rng(7), d = V_.$('#data [aria-pressed=true]').dataset.v, i;
+    pts = [];
+    if (d === 'xor') {
+      [[-1, -1, 1], [1, 1, 1], [-1, 1, -1], [1, -1, -1]].forEach(function (c) { for (i = 0; i < 12; i++) pts.push([c[0] + 0.35 * MLV.randn(r), c[1] + 0.35 * MLV.randn(r), c[2]]); });
+      return;
+    }
+    var gap = { sep: 1.2, close: 0.25, overlap: -0.6 }[d];
+    for (i = 0; i < 25; i++) {
+      var a = MLV.randn(r) * 0.55, b = MLV.randn(r) * 0.9, c = MLV.randn(r) * 0.55, e = MLV.randn(r) * 0.9;
+      if (d !== 'overlap') { a = Math.abs(a); c = Math.abs(c); }
+      // hai lớp đối xứng qua một đường chéo
+      pts.push([(gap / 2 + a) * 0.8 + b * 0.6, -(gap / 2 + a) * 0.6 + b * 0.8 + 0.2, 1]);
+      pts.push([-(gap / 2 + c) * 0.8 + e * 0.6, (gap / 2 + c) * 0.6 + e * 0.8 + 0.2, -1]);
+    }
+  }
+  function score(wv, p) { return wv[0] + wv[1] * p[0] + wv[2] * p[1]; }
+  function sign(v) { return v > 0 ? 1 : -1; }          // np.sign(0) = 0 tính là sai; ở đây coi 0 là −1 cho đơn giản
+  function wrong(wv) { var m = []; pts.forEach(function (p, i) { if (sign(score(wv, p)) !== p[2]) m.push(i); }); return m; }
+  function reset() {
+    var r = MLV.rng(seedW++ * 131);
+    w = [MLV.randn(r) * 0.5, MLV.randn(r), MLV.randn(r)];
+    t = 0; picked = null; errHist = [[0, wrong(w).length]];
+    pocketW = w.slice(); pocketErr = errHist[0][1];
+  }
+  function step() {
+    var mis = wrong(w);
+    if (!mis.length) { picked = null; render(); return false; }
+    var i = mis[Math.floor(rnd() * mis.length)], p = pts[i];
+    picked = { i: i, before: w.slice() };
+    w = [w[0] + p[2], w[1] + p[2] * p[0], w[2] + p[2] * p[1]];
+    t++;
+    var e = wrong(w).length;
+    errHist.push([t, e]);
+    if (e < pocketErr) { pocketErr = e; pocketW = w.slice(); }
+    render();
+    return t < 3000;
+  }
+  function line(wv, attrs, g) {
+    // giao của w0 + w1 x + w2 y = 0 với khung nhìn
+    if (Math.abs(wv[2]) > 1e-9) P.curve(function (x) { return -(wv[0] + wv[1] * x) / wv[2]; }, attrs, g);
+    else if (Math.abs(wv[1]) > 1e-9) { var x0 = -wv[0] / wv[1]; P.el('line', Object.assign({ x1: P.sx(x0), x2: P.sx(x0), y1: P.m.t, y2: P.H - P.m.b, 'clip-path': P.clip }, attrs), g); }
+  }
+
+  function render() {
+    var b = MLV.hexRgb(BLUE), pk = MLV.hexRgb(PINK);
+    MLV.paint(cv, P, function (x, y) { var c = score(w, [x, y]) > 0 ? b : pk; return [c[0], c[1], c[2], 40]; }, 4);
+    P.clear(); P.axes();
+    var g = P.layer(true), mis = wrong(w);
+    if (V_.$('#pocket').checked) line(pocketW, { stroke: 'var(--text)', 'stroke-width': 2, 'stroke-dasharray': '6 4', opacity: 0.7 }, g);
+    if (picked) line(picked.before, { stroke: 'var(--muted)', 'stroke-width': 1.5, 'stroke-dasharray': '3 3' }, g);
+    line(w, { stroke: 'var(--text)', 'stroke-width': 2.5 }, g);
+    // mũi tên pháp tuyến: từ điểm trên đường gần gốc nhất, theo hướng (w1, w2)
+    var n2 = w[1] * w[1] + w[2] * w[2];
+    if (n2 > 1e-9) {
+      var foot = [-w[0] * w[1] / n2, -w[0] * w[2] / n2], nn = Math.sqrt(n2), tip = [foot[0] + 0.8 * w[1] / nn, foot[1] + 0.8 * w[2] / nn];
+      P.el('line', { x1: P.sx(foot[0]), y1: P.sy(foot[1]), x2: P.sx(tip[0]), y2: P.sy(tip[1]), stroke: '#f08a24', 'stroke-width': 3, 'marker-end': 'url(#arr)' }, g);
+      var defs = P.el('defs', {}), mk = P.el('marker', { id: 'arr', viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, defs);
+      P.el('path', { d: 'M0 0L10 5L0 10z', fill: '#f08a24' }, mk);
+    }
+    pts.forEach(function (p, i) {
+      var x = P.sx(p[0]), y = P.sy(p[1]), isMis = mis.indexOf(i) >= 0;
+      if (p[2] > 0) P.el('rect', { x: x - 5, y: y - 5, width: 10, height: 10, fill: BLUE, class: 'pl-pt' }, g);
+      else P.el('circle', { cx: x, cy: y, r: 5.5, fill: PINK, class: 'pl-pt' }, g);
+      if (isMis) P.el('circle', { cx: x, cy: y, r: 9, fill: 'none', stroke: 'var(--text)', 'stroke-width': 1, 'stroke-dasharray': '2 2' }, g);
+    });
+    if (picked) { var q = pts[picked.i]; P.el('circle', { cx: P.sx(q[0]), cy: P.sy(q[1]), r: 12, fill: 'none', stroke: '#f08a24', 'stroke-width': 3 }, g); }
+
+    MLV.chart(V_.$('#ch'), [{ pts: errHist, color: '#7c3aed', width: 1.5 }].concat(V_.$('#pocket').checked ? [{ pts: errHist.map(function (e, k) { return [e[0], Math.min.apply(null, errHist.slice(0, k + 1).map(function (z) { return z[1]; }))]; }), color: 'var(--text)', dash: '5 4', width: 1.5 }] : []),
+      { xlabel: 'số lần cập nhật', ylabel: 'số điểm sai', m: { l: 52, r: 12, t: 8, b: 34 } });
+    V_.$('#t').textContent = t;
+    V_.$('#err').textContent = mis.length + ' / ' + pts.length;
+    V_.$('#w').textContent = '(' + w.map(function (v) { return V_.fmt(v, 2); }).join(', ') + ')';
+    V_.$('#pk-s').hidden = !V_.$('#pocket').checked;
+    V_.$('#pk').textContent = pocketErr;
+    var d = V_.$('#data [aria-pressed=true]').dataset.v, msg;
+    if (!mis.length) msg = 'Không còn điểm nào bị phân loại sai: PLA dừng sau ' + t + ' lần cập nhật. Bấm "Khởi tạo lại" để thấy mỗi lần chạy cho một đường phân chia khác.';
+    else if (t === 0) msg = 'Đường phân chia ban đầu là ngẫu nhiên. Các điểm có vòng đứt nét đang bị phân loại sai.';
+    else if (d === 'xor' || d === 'overlap') msg = 'Dữ liệu không tách biệt tuyến tính: PLA sẽ không bao giờ dừng, số điểm sai nhảy lên xuống mãi. Bật "Hiện pocket" để giữ lại đường tốt nhất từng gặp.';
+    else msg = 'Đường mới (liền) xoay từ đường cũ (chấm) về phía điểm được chọn. Đôi khi số điểm sai tạm thời tăng lên, nhưng với dữ liệu tách biệt thì PLA chắc chắn dừng (mục 13.2.4).';
+    V_.$('#insight').textContent = msg;
+  }
+
+  var player = V_.Player({ btn: V_.$('#play'), speed: V_.$('#speed'), step: step });
+  V_.$('#step').addEventListener('click', function () { player.stop(); step(); });
+  V_.$('#reset').addEventListener('click', function () { player.stop(); reset(); render(); });
+  V_.$('#pocket').addEventListener('change', render);
+  ['#data', '#cls'].forEach(function (sel) {
+    V_.$$(sel + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$(sel + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        if (sel === '#data') { player.stop(); makeData(); reset(); render(); }
+      });
+    });
+  });
+  svg.addEventListener('click', function (e) {
+    var a = P.at(e);
+    if (!P.inside(a.px, a.py)) return;
+    pts.push([a.x, a.y, +V_.$('#cls [aria-pressed=true]').dataset.v]);
+    errHist.push([t, wrong(w).length]); render();
+  });
+  V_.texAll(document.body);
+  makeData(); reset(); render();
+})();
+</script>
+</body>
+</html>

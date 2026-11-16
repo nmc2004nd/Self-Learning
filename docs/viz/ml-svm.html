@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lề lớn nhất · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Lề lớn nhất</h1>
+      <div class="crumbs"><a href="../#/ml/ch26_vi">← Chương 26 Máy vector hỗ trợ</a></div>
+    </div>
+    <p class="lead">Đường đậm là nghiệm SVM lề cứng: trong mọi đường phân chia đúng hai lớp, nó là đường có khoảng cách tới điểm gần nhất lớn nhất. Hai đường nét đứt là $\mathbf{w}^T\mathbf{x} + b = \pm 1$; các điểm nằm trên chúng (khoanh tròn) là vector hỗ trợ. Bấm vào chỗ trống để thêm điểm, bấm vào một điểm để xoá nó.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-svm.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Dữ liệu</span>
+      <div class="seg" id="data"><button type="button" data-v="book" aria-pressed="true">Ví dụ của sách</button><button type="button" data-v="wide" aria-pressed="false">Cách xa</button><button type="button" data-v="near" aria-pressed="false">Sát nhau</button></div>
+      <span class="lb">Bấm để thêm</span>
+      <div class="seg" id="cls"><button type="button" data-v="1" aria-pressed="true">lớp +1 ■</button><button type="button" data-v="-1" aria-pressed="false">lớp −1 ●</button></div>
+    </div>
+    <div class="ctrl">
+      <label><input type="checkbox" id="pla"> Hiện một nghiệm của PLA</label>
+      <button type="button" class="btn" id="pla-new">Nghiệm PLA khác</button>
+    </div>
+    <div class="stats"><span>Số điểm <b id="n"></b></span><span>Vector hỗ trợ <b id="nsv"></b></span><span>Lề $1/\|\mathbf{w}\|_2$ <b id="mg"></b></span><span>$\mathbf{w}$ = <b id="w"></b></span><span>$b$ = <b id="b"></b></span><span id="pla-s">Lề của PLA <b id="pmg"></b></span></div>
+    <div class="plotbox click"><canvas id="cv" width="600" height="450"></canvas><svg id="sv" viewBox="0 0 600 450" role="img" aria-label="Dữ liệu hai lớp, đường phân chia của SVM và các vector hỗ trợ"></svg></div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, BLUE = '#2f80f5', PINK = '#e8487f', ORANGE = '#f08a24';
+  var svg = V_.$('#sv'), cv = V_.$('#cv');
+  var P = MLV.Plot(svg, { W: 600, H: 450, x: [0, 6], y: [0, 4.43], m: { l: 32, r: 10, t: 10, b: 28 } });
+  // 20 điểm của mục 26.4 (np.random.seed(22))
+  var BOOK = [[2.3732, 1.7188, 1], [1.5126, 1.4056, 1], [2.4697, 2.0214, 1], [1.7874, 1.2938, 1], [1.8123, 1.5612, 1], [2.0372, 1.9340, 1], [1.5379, 1.8743, 1], [2.2931, 2.7654, 1], [1.3881, 1.8642, 1], [1.5728, 0.9071, 1],
+    [3.4275, 0.7125, -1], [4.2476, 2.3985, -1], [3.3360, 1.6173, -1], [3.6942, 1.9427, -1], [4.5390, 2.5496, -1], [3.3072, 0.1936, -1], [4.1392, 2.0956, -1], [4.4738, 2.4127, -1], [4.0051, 1.8929, -1], [4.2821, 1.7968, -1]];
+  var pts = [], sol = null, plaW = null, plaSeed = 1;
+
+  function makeData() {
+    var d = V_.$('#data [aria-pressed=true]').dataset.v, r = MLV.rng(5), i;
+    if (d === 'book') { pts = BOOK.map(function (p) { return p.slice(); }); return; }
+    var gap = d === 'wide' ? 1.1 : 0.15;
+    pts = [];
+    for (i = 0; i < 14; i++) {
+      var u = Math.abs(MLV.randn(r)) * 0.45 + gap / 2, v = MLV.randn(r) * 0.8;
+      pts.push([3 - u * 0.9 + v * 0.44, 2.25 - u * 0.44 - v * 0.9, 1]);
+      u = Math.abs(MLV.randn(r)) * 0.45 + gap / 2; v = MLV.randn(r) * 0.8;
+      pts.push([3 + u * 0.9 + v * 0.44, 2.25 + u * 0.44 - v * 0.9, -1]);
+    }
+  }
+  function fit() {
+    var has = { 1: 0, '-1': 0 }; pts.forEach(function (p) { has[p[2]]++; });
+    if (!has[1] || !has[-1]) { sol = null; return; }
+    var X = pts.map(function (p) { return [p[0], p[1]]; }), y = pts.map(function (p) { return p[2]; });
+    var s = MLV.svm(X, y, { C: 1e4, tol: 1e-6, maxIter: 30000 });
+    var w = [0, 0]; s.sv.forEach(function (k) { w[0] += s.alpha[k] * y[k] * X[k][0]; w[1] += s.alpha[k] * y[k] * X[k][1]; });
+    var minM = Infinity; pts.forEach(function (p) { minM = Math.min(minM, p[2] * (w[0] * p[0] + w[1] * p[1] + s.b)); });
+    sol = { w: w, b: s.b, sv: s.sv, sep: s.converged && minM > 1 - 1e-3 };
+  }
+  function runPLA() {
+    plaW = null;
+    if (!sol || !sol.sep) return;
+    var r = MLV.rng(plaSeed * 977), w = [MLV.randn(r), MLV.randn(r), MLV.randn(r)], sc = 1 / 3;   // dùng x/3 để PLA hội tụ nhanh hơn
+    for (var ep = 0; ep < 5000; ep++) {
+      var order = pts.map(function (_, i) { return i; }).sort(function () { return r() - 0.5; }), mis = 0;
+      order.forEach(function (i) { var p = pts[i]; if (p[2] * (w[0] + w[1] * p[0] * sc + w[2] * p[1] * sc) <= 0) { w[0] += p[2]; w[1] += p[2] * p[0] * sc; w[2] += p[2] * p[1] * sc; mis++; } });
+      if (!mis) { plaW = [w[0], w[1] * sc, w[2] * sc]; return; }
+    }
+  }
+  function lineOf(w0, w1, w2, attrs, g) {
+    if (Math.abs(w2) > 1e-9) P.curve(function (x) { return -(w0 + w1 * x) / w2; }, attrs, g);
+    else if (Math.abs(w1) > 1e-9) { var x0 = -w0 / w1; P.el('line', Object.assign({ x1: P.sx(x0), x2: P.sx(x0), y1: P.m.t, y2: P.H - P.m.b, 'clip-path': P.clip }, attrs), g); }
+  }
+  function render() {
+    var bl = MLV.hexRgb(BLUE), pk = MLV.hexRgb(PINK);
+    if (sol && sol.sep) MLV.paint(cv, P, function (x, y) { var f = sol.w[0] * x + sol.w[1] * y + sol.b, c = f > 0 ? bl : pk; return [c[0], c[1], c[2], Math.abs(f) < 1 ? 18 : 42]; }, 4);
+    else cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+    P.clear(); P.axes();
+    var g = P.layer(true), ok = sol && sol.sep, show = V_.$('#pla').checked && plaW;
+    if (ok) {
+      lineOf(sol.b - 1, sol.w[0], sol.w[1], { stroke: 'var(--text)', 'stroke-width': 1.2, 'stroke-dasharray': '6 4' }, g);
+      lineOf(sol.b + 1, sol.w[0], sol.w[1], { stroke: 'var(--text)', 'stroke-width': 1.2, 'stroke-dasharray': '6 4' }, g);
+      lineOf(sol.b, sol.w[0], sol.w[1], { stroke: 'var(--text)', 'stroke-width': 2.6 }, g);
+    }
+    if (show) lineOf(plaW[0], plaW[1], plaW[2], { stroke: ORANGE, 'stroke-width': 2.2, 'stroke-dasharray': '3 3' }, g);
+    var svSet = ok ? sol.sv : [];
+    pts.forEach(function (p, i) {
+      var x = P.sx(p[0]), y = P.sy(p[1]);
+      if (p[2] > 0) P.el('rect', { x: x - 5.5, y: y - 5.5, width: 11, height: 11, fill: BLUE, class: 'pl-pt' }, g);
+      else P.el('circle', { cx: x, cy: y, r: 6, fill: PINK, class: 'pl-pt' }, g);
+      if (svSet.indexOf(i) >= 0) P.el('circle', { cx: x, cy: y, r: 12, fill: 'none', stroke: 'var(--text)', 'stroke-width': 1.6 }, g);
+    });
+    // điểm gần nhất với đường PLA
+    var pmg = null;
+    if (show) {
+      var nn = Math.hypot(plaW[1], plaW[2]), best = Infinity, bi = -1;
+      pts.forEach(function (p, i) { var d = p[2] * (plaW[0] + plaW[1] * p[0] + plaW[2] * p[1]) / nn; if (d < best) { best = d; bi = i; } });
+      pmg = best;
+      var q = pts[bi], f = plaW[0] + plaW[1] * q[0] + plaW[2] * q[1];
+      var foot = [q[0] - f * plaW[1] / (nn * nn), q[1] - f * plaW[2] / (nn * nn)];
+      P.el('line', { x1: P.sx(q[0]), y1: P.sy(q[1]), x2: P.sx(foot[0]), y2: P.sy(foot[1]), stroke: ORANGE, 'stroke-width': 2 }, g);
+    }
+    V_.$('#n').textContent = pts.length;
+    V_.$('#nsv').textContent = ok ? sol.sv.length : '–';
+    var mg = ok ? 1 / Math.hypot(sol.w[0], sol.w[1]) : null;
+    V_.$('#mg').textContent = ok ? V_.fmt(mg, 3) : '–';
+    V_.$('#w').textContent = ok ? '(' + V_.fmt(sol.w[0], 3) + ', ' + V_.fmt(sol.w[1], 3) + ')' : '–';
+    V_.$('#b').textContent = ok ? V_.fmt(sol.b, 3) : '–';
+    V_.$('#pla-s').style.display = show ? '' : 'none';
+    V_.$('#pmg').textContent = pmg !== null ? V_.fmt(pmg, 3) : '';
+    var msg;
+    if (!sol) msg = 'Cần ít nhất một điểm của mỗi lớp.';
+    else if (!ok) msg = '<b>Hai lớp không còn tách biệt tuyến tính</b>: không có đường thẳng nào thoả mãn mọi ràng buộc $y_n(\\mathbf{w}^T\\mathbf{x}_n + b) \\geq 1$, nên bài toán (26.3) vô nghiệm. Chỉ một điểm nằm lẫn sang phía bên kia cũng đủ. Xoá điểm đó, hoặc xem SVM lề mềm ở chương 27.';
+    else if (show) msg = 'Đường cam là một nghiệm của PLA: nó cũng phân loại đúng mọi điểm, nhưng điểm gần nó nhất (đoạn cam) chỉ cách ' + V_.fmt(pmg, 3) + ', so với lề ' + V_.fmt(mg, 3) + ' của SVM. Bấm "Nghiệm PLA khác": mỗi lần một đường khác, và không đường nào có lề lớn hơn SVM.';
+    else if (V_.$('#data [aria-pressed=true]').dataset.v === 'book' && pts.length === 20) msg = 'Đây là 20 điểm của mục 26.4: SVM cho $\\mathbf{w} \\approx (-2.010, 0.641)$, $b \\approx 4.67$ và đúng 3 vector hỗ trợ như sách. Thử bấm xoá một điểm không có vòng tròn: đường phân chia không đổi. Xoá một vector hỗ trợ: đường xoay đi.';
+    else msg = 'Có ' + sol.sv.length + ' vector hỗ trợ. Chỉ các điểm này quyết định đường phân chia; thêm điểm ở phía ngoài hai đường nét đứt sẽ không làm gì thay đổi. Thêm một điểm vào giữa hai đường nét đứt (đúng phía) thì lề hẹp lại.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  function refresh() { fit(); runPLA(); render(); }
+
+  V_.$('#pla').addEventListener('change', render);
+  V_.$('#pla-new').addEventListener('click', function () { plaSeed++; if (!V_.$('#pla').checked) V_.$('#pla').checked = true; runPLA(); render(); });
+  ['#data', '#cls'].forEach(function (sel) {
+    V_.$$(sel + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$(sel + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        if (sel === '#data') { makeData(); refresh(); }
+      });
+    });
+  });
+  svg.addEventListener('click', function (e) {
+    var a = P.at(e);
+    if (!P.inside(a.px, a.py)) return;
+    var hit = -1;
+    pts.forEach(function (p, i) { if (Math.hypot(P.sx(p[0]) - a.px, P.sy(p[1]) - a.py) < 9) hit = i; });
+    if (hit >= 0) pts.splice(hit, 1);
+    else pts.push([a.x, a.y, +V_.$('#cls [aria-pressed=true]').dataset.v]);
+    refresh();
+  });
+  V_.texAll(document.body);
+  makeData(); refresh();
+  window.__svmCheck = function () { return sol; };
+})();
+</script>
+</body>
+</html>

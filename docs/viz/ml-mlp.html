@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mạng neuron đa tầng · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Mạng neuron đa tầng</h1>
+      <div class="crumbs"><a href="../#/ml/ch16_vi">← Chương 16 Mạng neuron đa tầng và lan truyền ngược</a></div>
+    </div>
+    <p class="lead">Một mạng nhỏ học trực tiếp trên trình duyệt: đầu vào 2 chiều, một hoặc hai tầng ẩn, softmax ở đầu ra, tối ưu entropy chéo bằng lan truyền ngược. Đổi số neuron, hàm kích hoạt và suy giảm trọng số để xem ranh giới quyết định thay đổi ra sao.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-mlp.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Dữ liệu</span>
+      <div class="seg" id="data"><button type="button" data-v="xor" aria-pressed="false">XOR</button><button type="button" data-v="circle" aria-pressed="false">Vòng tròn</button><button type="button" data-v="spiral" aria-pressed="true">Xoắn ốc</button><button type="button" data-v="blobs" aria-pressed="false">3 cụm</button></div>
+    </div>
+    <div class="ctrl">
+      <span class="lb">Tầng ẩn</span>
+      <div class="seg" id="depth"><button type="button" data-v="0" aria-pressed="false">0 (softmax)</button><button type="button" data-v="1" aria-pressed="true">1</button><button type="button" data-v="2" aria-pressed="false">2</button></div>
+      <label for="h">Neuron mỗi tầng</label><input id="h" type="range" min="1" max="32" step="1" value="16"><span class="val" id="h-v"></span>
+      <span class="lb">Kích hoạt</span>
+      <div class="seg" id="act"><button type="button" data-v="relu" aria-pressed="true">ReLU</button><button type="button" data-v="tanh" aria-pressed="false">tanh</button><button type="button" data-v="sigmoid" aria-pressed="false">sigmoid</button></div>
+    </div>
+    <div class="ctrl">
+      <label for="lr">Bước học (Adam)</label><input id="lr" type="range" min="-3" max="-0.7" step="0.1" value="-1.7"><span class="val" id="lr-v"></span>
+      <label for="lam">$\lambda$</label><input id="lam" type="range" min="-5" max="-0.5" step="0.25" value="-5"><span class="val" id="lam-v"></span>
+    </div>
+    <div class="ctrl">
+      <button type="button" class="btn pri" id="play"></button>
+      <button type="button" class="btn" id="step">20 epoch</button>
+      <button type="button" class="btn" id="reset">Khởi tạo lại</button>
+      <label for="speed">Tốc độ</label><input id="speed" type="range" min="1" max="5" step="1" value="5">
+    </div>
+    <div class="stats"><span>Epoch <b id="t"></b></span><span>Số tham số <b id="np"></b></span><span>Mất mát <b id="L"></b></span><span>Độ chính xác <b id="acc"></b></span></div>
+    <div class="plotbox"><canvas id="cv" width="520" height="520"></canvas><svg id="sv" viewBox="0 0 520 520" role="img" aria-label="Dữ liệu và ranh giới quyết định của mạng"></svg></div>
+    <div class="plotbox"><svg id="ch" viewBox="0 0 560 150" role="img" aria-label="Mất mát theo epoch"></svg></div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, COL = MLV.CLASS;
+  var svg = V_.$('#sv'), cv = V_.$('#cv');
+  var P = MLV.Plot(svg, { W: 520, H: 520, x: [-1.2, 1.2], y: [-1.2, 1.2], m: { l: 30, r: 10, t: 10, b: 26 } });
+  var X = [], Y = [], C = 3, net, t, hist, initSeed = 1;
+
+  function dataset() { return V_.$('#data [aria-pressed=true]').dataset.v; }
+  function makeData() {
+    var r = MLV.rng(4), d = dataset(), i;
+    X = []; Y = [];
+    if (d === 'spiral') {
+      C = 3;
+      for (var c = 0; c < 3; c++) for (i = 0; i < 70; i++) {
+        var rad = i / 70, th = c * 4 + 4 * i / 70 + 0.2 * MLV.randn(r);
+        X.push([rad * Math.sin(th), rad * Math.cos(th)]); Y.push(c);
+      }
+    } else if (d === 'xor') {
+      C = 2;
+      for (i = 0; i < 200; i++) { var a = 2 * r() - 1, b = 2 * r() - 1; if (Math.abs(a) < 0.08 || Math.abs(b) < 0.08) continue; X.push([a, b]); Y.push(a * b > 0 ? 0 : 1); }
+    } else if (d === 'circle') {
+      C = 2;
+      for (i = 0; i < 200; i++) { var rr = i % 2 ? 0.25 + 0.2 * r() : 0.65 + 0.3 * r(), ang = 2 * Math.PI * r(); X.push([rr * Math.cos(ang), rr * Math.sin(ang)]); Y.push(i % 2); }
+    } else {
+      C = 3;
+      [[-0.5, 0.45], [0.5, 0.45], [0, -0.5]].forEach(function (m, k) { for (i = 0; i < 60; i++) { X.push([m[0] + 0.25 * MLV.randn(r), m[1] + 0.25 * MLV.randn(r)]); Y.push(k); } });
+    }
+  }
+  var ACT = {
+    relu: [function (z) { return z > 0 ? z : 0; }, function (z, a) { return z > 0 ? 1 : 0; }],
+    tanh: [Math.tanh, function (z, a) { return 1 - a * a; }],
+    sigmoid: [function (z) { return 1 / (1 + Math.exp(-z)); }, function (z, a) { return a * (1 - a); }]
+  };
+  function act() { return ACT[V_.$('#act [aria-pressed=true]').dataset.v]; }
+  function sizes() {
+    var depth = +V_.$('#depth [aria-pressed=true]').dataset.v, h = +V_.$('#h').value, s = [2];
+    for (var i = 0; i < depth; i++) s.push(h);
+    s.push(C); return s;
+  }
+  function init() {
+    var r = MLV.rng(initSeed * 7177), s = sizes();
+    net = { s: s, W: [], b: [], m: [], v: [], mb: [], vb: [], k: 0 };
+    for (var l = 0; l < s.length - 1; l++) {
+      var sc = Math.sqrt(2 / s[l]), W = new Float64Array(s[l] * s[l + 1]);
+      for (var i = 0; i < W.length; i++) W[i] = sc * MLV.randn(r);
+      net.W.push(W); net.b.push(new Float64Array(s[l + 1]));
+      net.m.push(new Float64Array(W.length)); net.v.push(new Float64Array(W.length));
+      net.mb.push(new Float64Array(s[l + 1])); net.vb.push(new Float64Array(s[l + 1]));
+    }
+    t = 0; hist = [[0, lossAcc()[0]]];
+  }
+  // Lan truyền thuận cho một điểm: trả về các z và a của từng tầng (tầng cuối là xác suất softmax)
+  function forward(x) {
+    var f = act()[0], zs = [], as = [x], L = net.W.length;
+    for (var l = 0; l < L; l++) {
+      var nin = net.s[l], nout = net.s[l + 1], a = as[l], z = new Float64Array(nout);
+      for (var j = 0; j < nout; j++) { var s = net.b[l][j]; for (var i = 0; i < nin; i++) s += a[i] * net.W[l][i * nout + j]; z[j] = s; }
+      zs.push(z);
+      if (l < L - 1) { var h = new Float64Array(nout); for (j = 0; j < nout; j++) h[j] = f(z[j]); as.push(h); }
+      else { var mx = -Infinity; for (j = 0; j < nout; j++) mx = Math.max(mx, z[j]); var e = new Float64Array(nout), se = 0; for (j = 0; j < nout; j++) { e[j] = Math.exp(z[j] - mx); se += e[j]; } for (j = 0; j < nout; j++) e[j] /= se; as.push(e); }
+    }
+    return { z: zs, a: as };
+  }
+  function lam() { var v = +V_.$('#lam').value; return v <= -5 ? 0 : Math.pow(10, v); }
+  function lossAcc() {
+    var s = 0, ok = 0;
+    X.forEach(function (x, n) { var p = forward(x).a; p = p[p.length - 1]; s -= Math.log(Math.max(1e-15, p[Y[n]])); var k = 0; for (var j = 1; j < p.length; j++) if (p[j] > p[k]) k = j; if (k === Y[n]) ok++; });
+    var reg = 0; net.W.forEach(function (W) { for (var i = 0; i < W.length; i++) reg += W[i] * W[i]; });
+    return [s / X.length + 0.5 * lam() * reg, ok / X.length];
+  }
+  // Một epoch: gradient trên toàn bộ dữ liệu bằng lan truyền ngược, rồi một bước Adam
+  function epoch() {
+    var df = act()[1], L = net.W.length, N = X.length;
+    var gW = net.W.map(function (W) { return new Float64Array(W.length); }), gb = net.b.map(function (b) { return new Float64Array(b.length); });
+    X.forEach(function (x, n) {
+      var fw = forward(x), e = Float64Array.from(fw.a[L]);
+      e[Y[n]] -= 1;                                                  // ∂J/∂z ở tầng ra = ŷ − y
+      for (var l = L - 1; l >= 0; l--) {
+        var nin = net.s[l], nout = net.s[l + 1], a = fw.a[l];
+        for (var i = 0; i < nin; i++) for (var j = 0; j < nout; j++) gW[l][i * nout + j] += a[i] * e[j] / N;
+        for (j = 0; j < nout; j++) gb[l][j] += e[j] / N;
+        if (l > 0) {
+          var ep = new Float64Array(nin);
+          for (i = 0; i < nin; i++) { var s = 0; for (j = 0; j < nout; j++) s += net.W[l][i * nout + j] * e[j]; ep[i] = s * df(fw.z[l - 1][i], fw.a[l][i]); }
+          e = ep;
+        }
+      }
+    });
+    var lr = Math.pow(10, +V_.$('#lr').value), b1 = 0.9, b2 = 0.999, lm = lam();
+    net.k++;
+    var c1 = 1 - Math.pow(b1, net.k), c2 = 1 - Math.pow(b2, net.k);
+    for (var l = 0; l < L; l++) {
+      for (var i = 0; i < net.W[l].length; i++) {
+        var g = gW[l][i] + lm * net.W[l][i];
+        net.m[l][i] = b1 * net.m[l][i] + (1 - b1) * g; net.v[l][i] = b2 * net.v[l][i] + (1 - b2) * g * g;
+        net.W[l][i] -= lr * (net.m[l][i] / c1) / (Math.sqrt(net.v[l][i] / c2) + 1e-8);
+      }
+      for (i = 0; i < net.b[l].length; i++) {
+        g = gb[l][i];
+        net.mb[l][i] = b1 * net.mb[l][i] + (1 - b1) * g; net.vb[l][i] = b2 * net.vb[l][i] + (1 - b2) * g * g;
+        net.b[l][i] -= lr * (net.mb[l][i] / c1) / (Math.sqrt(net.vb[l][i] / c2) + 1e-8);
+      }
+    }
+    t++;
+  }
+  function step() { for (var i = 0; i < 20; i++) epoch(); hist.push([t, lossAcc()[0]]); render(); return t < 5000; }
+
+  function render() {
+    V_.$('#h-v').textContent = V_.$('#h').value;
+    V_.$('#lr-v').textContent = V_.fmt(Math.pow(10, +V_.$('#lr').value), 3);
+    V_.$('#lam-v').textContent = lam() === 0 ? '0' : V_.fmt(lam(), lam() < 0.01 ? 4 : 3);
+    var rgb = COL.map(MLV.hexRgb);
+    MLV.paint(cv, P, function (x, y) {
+      var p = forward([x, y]).a; p = p[p.length - 1]; var k = 0;
+      for (var j = 1; j < p.length; j++) if (p[j] > p[k]) k = j;
+      var c = rgb[k]; return [c[0], c[1], c[2], Math.round(30 + 130 * (p[k] - 1 / p.length) / (1 - 1 / p.length))];
+    }, 5);
+    P.clear(); P.axes();
+    var g = P.layer(true);
+    X.forEach(function (x, n) { P.el('circle', { cx: P.sx(x[0]), cy: P.sy(x[1]), r: 4, fill: COL[Y[n]], class: 'pl-pt', 'stroke-width': 1 }, g); });
+    MLV.chart(V_.$('#ch'), [{ pts: hist, color: '#7c3aed' }], { logY: true, xlabel: 'epoch', ylabel: 'mất mát', m: { l: 52, r: 12, t: 8, b: 34 } });
+    var la = lossAcc(), np = 0;
+    net.W.forEach(function (W, l) { np += W.length + net.b[l].length; });
+    V_.$('#t').textContent = t; V_.$('#np').textContent = np;
+    V_.$('#L').textContent = V_.fmt(la[0], 4); V_.$('#acc').textContent = V_.fmt(100 * la[1], 1) + '%';
+    var depth = net.s.length - 2, h = +V_.$('#h').value, d = dataset(), msg;
+    if (depth === 0 && d !== 'blobs') msg = 'Không có tầng ẩn, mạng chỉ là hồi quy softmax: mọi ranh giới đều là đường thẳng nên không thể giải bài toán này. Thêm một tầng ẩn.';
+    else if (depth === 0) msg = 'Với ba cụm tách biệt, hồi quy softmax (không tầng ẩn) là đủ: ranh giới thẳng đã chia đúng.';
+    else if (h <= 2 && d !== 'blobs') msg = 'Quá ít neuron ẩn: mỗi neuron ReLU chỉ thêm một "nếp gấp" thẳng vào ranh giới. Tăng số neuron để mạng uốn được ranh giới theo dữ liệu.';
+    else if (lam() >= 0.03) msg = 'λ lớn ép trọng số về gần 0: ranh giới bị làm mượt quá mức, mạng không còn đủ linh hoạt cho dữ liệu này (giống hình 16.11 với alpha lớn).';
+    else if (act() === ACT.sigmoid && t < 400) msg = 'Với sigmoid, mạng học chậm hơn hẳn ReLU ở những epoch đầu: đạo hàm của sigmoid tối đa chỉ 0.25 (mục 16.3).';
+    else msg = 'Với ReLU, ranh giới là các đoạn thẳng nối với nhau (hàm tuyến tính từng khúc). Với tanh và sigmoid, ranh giới cong mượt. Thử giảm số neuron để thấy mạng cần bao nhiêu neuron cho mỗi bộ dữ liệu.';
+    V_.$('#insight').textContent = msg;
+  }
+
+  var player = V_.Player({ btn: V_.$('#play'), speed: V_.$('#speed'), step: step });
+  V_.$('#step').addEventListener('click', function () { player.stop(); step(); });
+  V_.$('#reset').addEventListener('click', function () { player.stop(); initSeed++; init(); render(); });
+  ['#lr', '#lam'].forEach(function (s) { V_.$(s).addEventListener('input', render); });
+  V_.$('#h').addEventListener('input', function () { player.stop(); init(); render(); });
+  ['#data', '#depth', '#act'].forEach(function (sel) {
+    V_.$$(sel + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$(sel + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        player.stop(); if (sel === '#data') makeData(); init(); render();
+      });
+    });
+  });
+  V_.texAll(document.body);
+  makeData(); init(); render();
+})();
+</script>
+</body>
+</html>

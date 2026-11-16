@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gaussian naive Bayes · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Gaussian naive Bayes</h1>
+      <div class="crumbs"><a href="../#/ml/ch11_vi">← Chương 11 Bộ phân loại naive Bayes</a></div>
+    </div>
+    <p class="lead">Mỗi lớp được mô hình hoá bằng một phân phối chuẩn. Naive Bayes giả sử hai đặc trưng độc lập khi biết lớp, nên các elip của nó luôn song song với hai trục. Mô hình đầy đủ ước lượng cả hiệp phương sai. Kéo $\rho$ để làm hai đặc trưng tương quan và xem giả thiết "ngây thơ" sai tới mức nào.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-naivebayes.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Mô hình</span>
+      <div class="seg" id="model"><button type="button" data-v="nb" aria-pressed="true">Naive Bayes</button><button type="button" data-v="full" aria-pressed="false">Gaussian đầy đủ</button></div>
+    </div>
+    <div class="ctrl">
+      <label for="rho">$\rho$ (tương quan trong mỗi lớp)</label><input id="rho" type="range" min="-0.95" max="0.95" step="0.05" value="0.8"><span class="val" id="rho-v"></span>
+      <label for="n">Số điểm mỗi lớp</label><input id="n" type="range" min="5" max="200" step="5" value="60"><span class="val" id="n-v"></span>
+      <button type="button" class="btn" id="new">Dữ liệu mới</button>
+    </div>
+    <div class="plotbox"><canvas id="cv" width="560" height="440"></canvas><svg id="sv" viewBox="0 0 560 440" role="img" aria-label="Dữ liệu hai lớp, elip của mô hình và vùng quyết định"></svg></div>
+    <table class="mtab" id="tab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, COL = [MLV.CLASS[0], MLV.CLASS[1]], RGB = COL.map(MLV.hexRgb);
+  var seed = 3, data = [], test = [];
+  var MU = [[-1.0, 0.6], [1.0, -0.6]], SX = 1.2, SY = 1.0;
+  var svg = V_.$('#sv'), cv = V_.$('#cv'), P = MLV.Plot(svg, { W: 560, H: 440, x: [-5, 5], y: [-4, 4], m: { l: 34, r: 10, t: 10, b: 28 } });
+  function model() { return V_.$('#model [aria-pressed=true]').dataset.v; }
+  function sample(n, rho, r) {
+    var out = [];
+    for (var c = 0; c < 2; c++) for (var i = 0; i < n; i++) {
+      var z1 = MLV.randn(r), z2 = MLV.randn(r);
+      out.push([MU[c][0] + SX * z1, MU[c][1] + SY * (rho * z1 + Math.sqrt(1 - rho * rho) * z2), c]);
+    }
+    return out;
+  }
+  function regen() {
+    var rho = +V_.$('#rho').value, n = +V_.$('#n').value;
+    data = sample(n, rho, MLV.rng(seed)); test = sample(2000, rho, MLV.rng(seed + 1000));
+  }
+  function fit(full) {
+    return [0, 1].map(function (c) {
+      var pts = data.filter(function (p) { return p[2] === c; }), n = pts.length;
+      var mx = 0, my = 0; pts.forEach(function (p) { mx += p[0]; my += p[1]; }); mx /= n; my /= n;
+      var sxx = 0, syy = 0, sxy = 0; pts.forEach(function (p) { var a = p[0] - mx, b = p[1] - my; sxx += a * a; syy += b * b; sxy += a * b; });
+      sxx = sxx / n + 1e-3; syy = syy / n + 1e-3; sxy = full ? sxy / n : 0;
+      var det = sxx * syy - sxy * sxy;
+      return { mx: mx, my: my, sxx: sxx, syy: syy, sxy: sxy, det: det, prior: n / data.length };
+    });
+  }
+  function logp(g, x, y) {
+    var a = x - g.mx, b = y - g.my;
+    var q = (g.syy * a * a - 2 * g.sxy * a * b + g.sxx * b * b) / g.det;
+    return Math.log(g.prior) - 0.5 * (Math.log(4 * Math.PI * Math.PI * g.det) + q);
+  }
+  function post1(G, x, y) { var l0 = logp(G[0], x, y), l1 = logp(G[1], x, y), m = Math.max(l0, l1); return Math.exp(l1 - m) / (Math.exp(l0 - m) + Math.exp(l1 - m)); }
+  function acc(G, set) { var k = 0; set.forEach(function (p) { if ((post1(G, p[0], p[1]) > 0.5 ? 1 : 0) === p[2]) k++; }); return k / set.length; }
+  function ellipse(g, color, layer) {
+    // elip 2 độ lệch chuẩn: vector riêng của ma trận hiệp phương sai
+    var tr = g.sxx + g.syy, d = Math.sqrt((g.sxx - g.syy) * (g.sxx - g.syy) / 4 + g.sxy * g.sxy);
+    var l1 = tr / 2 + d, l2 = tr / 2 - d, ang = Math.abs(g.sxy) > 1e-12 ? Math.atan2(l1 - g.sxx, g.sxy) : (g.sxx >= g.syy ? 0 : Math.PI / 2);
+    var pts = [];
+    for (var i = 0; i <= 80; i++) {
+      var t = 2 * Math.PI * i / 80, u = 2 * Math.sqrt(l1) * Math.cos(t), v = 2 * Math.sqrt(Math.max(l2, 0)) * Math.sin(t);
+      pts.push([g.mx + u * Math.cos(ang) - v * Math.sin(ang), g.my + u * Math.sin(ang) + v * Math.cos(ang)]);
+    }
+    P.poly(pts, { stroke: color, 'stroke-width': 2.5 }, layer);
+  }
+  function render() {
+    var rho = +V_.$('#rho').value, full = model() === 'full';
+    V_.$('#rho-v').textContent = V_.fmt(rho, 2); V_.$('#n-v').textContent = V_.$('#n').value;
+    var G = fit(full);
+    MLV.paint(cv, P, function (x, y) {
+      var p = post1(G, x, y), c = p > 0.5 ? RGB[1] : RGB[0], s = Math.abs(p - 0.5) * 2;
+      return [c[0], c[1], c[2], 25 + 55 * s];
+    }, 4);
+    P.clear(); P.axes();
+    var g = P.layer(true);
+    data.forEach(function (p) { P.el('circle', { cx: P.sx(p[0]), cy: P.sy(p[1]), r: 3.6, fill: COL[p[2]], class: 'pl-pt' }, g); });
+    G.forEach(function (gg, c) { ellipse(gg, COL[c], g); P.el('circle', { cx: P.sx(gg.mx), cy: P.sy(gg.my), r: 5, fill: '#fff', stroke: COL[c], 'stroke-width': 2.5 }, g); });
+    var Gnb = fit(false), Gfull = fit(true);
+    var rows = '<tr><th>Mô hình</th><th>Độ chính xác huấn luyện</th><th>Độ chính xác trên 4000 điểm mới</th></tr>';
+    [['Naive Bayes', Gnb], ['Gaussian đầy đủ', Gfull]].forEach(function (r) {
+      rows += '<tr' + ((r[0] === 'Naive Bayes') !== full ? ' style="font-weight:700"' : '') + '><td>' + r[0] + '</td><td>' + V_.fmt(100 * acc(r[1], data), 1) + '%</td><td>' + V_.fmt(100 * acc(r[1], test), 1) + '%</td></tr>';
+    });
+    V_.$('#tab').innerHTML = rows;
+    var gap = acc(Gfull, test) - acc(Gnb, test), msg;
+    if (Math.abs(rho) < 0.15) msg = 'Hai đặc trưng gần như độc lập trong mỗi lớp: giả thiết của naive Bayes gần đúng, hai mô hình cho kết quả gần như nhau.';
+    else if (gap > 0.02) msg = 'Hai đặc trưng tương quan mạnh ($\\rho = ' + V_.fmt(rho, 2) + '$): dữ liệu mỗi lớp nằm trong một elip nghiêng, nhưng naive Bayes chỉ vẽ được elip thẳng trục. Ranh giới của nó sai lệch, và độ chính xác trên dữ liệu mới thấp hơn mô hình đầy đủ ' + V_.fmt(100 * gap, 1) + ' điểm phần trăm.';
+    else msg = 'Dù giả thiết độc lập sai, naive Bayes vẫn phân loại gần như tốt bằng mô hình đầy đủ: điều quan trọng là phía nào của ranh giới, không phải xác suất có chính xác hay không. Thử giảm số điểm xuống 5–10: naive Bayes có ít tham số hơn (4 thay vì 5 mỗi lớp) nên đôi khi còn tốt hơn.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  V_.$$('#model button').forEach(function (b) {
+    b.addEventListener('click', function () { V_.$$('#model button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); }); render(); });
+  });
+  ['#rho', '#n'].forEach(function (s) { V_.$(s).addEventListener('input', function () { regen(); render(); }); });
+  V_.$('#new').addEventListener('click', function () { seed++; regen(); render(); });
+  V_.texAll(document.body);
+  regen(); render();
+})();
+</script>
+</body>
+</html>

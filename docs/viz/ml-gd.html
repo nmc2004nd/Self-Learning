@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gradient descent · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Gradient descent, momentum và NAG</h1>
+      <div class="crumbs"><a href="../#/ml/ch12_vi">← Chương 12 Gradient descent</a></div>
+    </div>
+    <p class="lead">Màu nền là giá trị của hàm (đậm là thấp). Ba thuật toán xuất phát từ cùng một điểm. Bấm lên bản đồ để chọn điểm xuất phát, kéo $\eta$ và $\gamma$ để xem khi nào chúng hội tụ, dao động, phân kỳ, hay vượt qua được cực tiểu địa phương.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-gd.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Hàm</span>
+      <div class="seg" id="fn"><button type="button" data-v="bowl" aria-pressed="false">Bát tròn</button><button type="button" data-v="narrow" aria-pressed="true">Bát dẹt</button><button type="button" data-v="rosen" aria-pressed="false">Rosenbrock</button><button type="button" data-v="holes" aria-pressed="false">Hai hố</button></div>
+    </div>
+    <div class="ctrl">
+      <label for="eta">$\eta$</label><input id="eta" type="range" min="-3" max="0.3" step="0.05" value="-1.3"><span class="val" id="eta-v"></span>
+      <label for="gamma">$\gamma$</label><input id="gamma" type="range" min="0" max="0.99" step="0.01" value="0.9"><span class="val" id="gamma-v"></span>
+    </div>
+    <div class="ctrl">
+      <label><input type="checkbox" class="alg" value="gd" checked> <span style="color:#2f80f5;font-weight:700">GD</span></label>
+      <label><input type="checkbox" class="alg" value="mom" checked> <span style="color:#e8487f;font-weight:700">Momentum</span></label>
+      <label><input type="checkbox" class="alg" value="nag" checked> <span style="color:#0ea5a4;font-weight:700">NAG</span></label>
+      <button type="button" class="btn pri" id="play"></button>
+      <button type="button" class="btn" id="step">1 bước</button>
+      <button type="button" class="btn" id="reset">Về điểm xuất phát</button>
+      <label for="speed">Tốc độ</label><input id="speed" type="range" min="1" max="5" step="1" value="4">
+    </div>
+    <div class="plotbox click"><canvas id="cv" width="560" height="440"></canvas><svg id="sv" viewBox="0 0 560 440" role="img" aria-label="Bản đồ giá trị hàm và đường đi của các thuật toán"></svg></div>
+    <div class="plotbox"><svg id="ch" viewBox="0 0 560 170" role="img" aria-label="Giá trị hàm theo bước"></svg></div>
+    <table class="mtab" id="tab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz;
+  // Mỗi hàm: f, gradient, khung nhìn, điểm xuất phát mặc định, giá trị nhỏ nhất (để vẽ thang log)
+  var FN = {
+    bowl:   { f: function (x, y) { return x * x + y * y; }, g: function (x, y) { return [2 * x, 2 * y]; }, x: [-3, 3], y: [-2.3, 2.3], s: [-2.5, 1.8], fmin: 0, eta: -1.3, gamma: 0.5,
+              note: 'Hàm $x^2 + y^2$: gradient luôn chỉ thẳng về đáy. GD đi thẳng tới cực tiểu; với $\\eta \\ge 1$ nó nhảy qua lại hoặc phân kỳ.' },
+    narrow: { f: function (x, y) { return 0.5 * (x * x + 25 * y * y); }, g: function (x, y) { return [x, 25 * y]; }, x: [-3, 3], y: [-2.3, 2.3], s: [-2.6, 1.5], fmin: 0, eta: -1.35, gamma: 0.6,
+              note: 'Bát dẹt $\\frac12(x^2 + 25y^2)$: độ cong theo $y$ gấp 25 lần theo $x$. $\\eta$ phải nhỏ hơn $2/25$ để GD không phân kỳ theo $y$, nên GD đi rất chậm theo $x$. Momentum tích luỹ đà theo $x$ (bước hiệu dụng gần $\\eta/(1-\\gamma)$) nên tới đáy nhanh hơn. Nhưng thử kéo $\\gamma$ lên 0.9: đà quá lớn làm nó dao động mạnh theo $y$.' },
+    rosen:  { f: function (x, y) { var a = 1 - x, b = y - x * x; return a * a + 10 * b * b; }, g: function (x, y) { var b = y - x * x; return [-2 * (1 - x) - 40 * x * b, 20 * b]; },
+              x: [-2, 2], y: [-1, 3], s: [-1.6, 2.4], fmin: 0, eta: -1.7, gamma: 0.9,
+              note: 'Rosenbrock (thu nhỏ) $(1-x)^2 + 10(y - x^2)^2$: cực tiểu $(1, 1)$ ở đáy một thung lũng cong. GD nhanh chóng xuống đáy thung lũng nhưng sau đó bò rất chậm dọc theo đáy.' },
+    holes:  { f: function (x, y) { return 0.1 * (x * x + 10 * Math.sin(x)) + y * y; }, g: function (x, y) { return [0.1 * (2 * x + 10 * Math.cos(x)), 2 * y]; },
+              x: [-6, 6], y: [-3, 3], s: [5.2, 2.2], fmin: -0.7946, eta: -0.3, gamma: 0.9,
+              note: 'Hai hố: phần theo $x$ là hàm $x^2 + 10\\sin x$ của hình 12.9 (thu nhỏ 10 lần). Bắt đầu bên phải, GD rơi vào hố nông. Với $\\gamma$ đủ lớn, momentum vượt qua được đồi để tới hố sâu. NAG "phanh" sớm hơn nên ở đây cũng bị kẹt: nhìn trước giúp tránh vượt quá đích, nhưng cũng làm mất bớt đà.' }
+  };
+  var ALG = { gd: { name: 'GD', color: '#2f80f5' }, mom: { name: 'Momentum', color: '#e8487f' }, nag: { name: 'NAG', color: '#0ea5a4' } };
+  var svg = V_.$('#sv'), cv = V_.$('#cv'), start, runs, t;
+
+  function F() { return FN[V_.$('#fn [aria-pressed=true]').dataset.v]; }
+  function eta() { return Math.pow(10, +V_.$('#eta').value); }
+  function gamma() { return +V_.$('#gamma').value; }
+  function on(a) { return V_.$('.alg[value=' + a + ']').checked; }
+  function reset() {
+    runs = {}; t = 0;
+    Object.keys(ALG).forEach(function (a) { runs[a] = { p: [start.slice()], v: [0, 0], div: false }; });
+  }
+  function step() {
+    var fn = F(), e = eta(), gm = gamma(), alive = false;
+    Object.keys(runs).forEach(function (a) {
+      var r = runs[a]; if (r.div) return;
+      var p = r.p[r.p.length - 1], g;
+      if (a === 'gd') { g = fn.g(p[0], p[1]); r.p.push([p[0] - e * g[0], p[1] - e * g[1]]); }
+      else {
+        var look = a === 'nag' ? [p[0] - gm * r.v[0], p[1] - gm * r.v[1]] : p;   // NAG: gradient tại điểm nhìn trước
+        g = fn.g(look[0], look[1]);
+        r.v = [gm * r.v[0] + e * g[0], gm * r.v[1] + e * g[1]];
+        r.p.push([p[0] - r.v[0], p[1] - r.v[1]]);
+      }
+      var q = r.p[r.p.length - 1];
+      if (!isFinite(q[0]) || Math.abs(q[0]) > 1e4 || Math.abs(q[1]) > 1e4) r.div = true;
+      else alive = true;
+    });
+    t++;
+    render();
+    return alive && t < 400;
+  }
+
+  function render() {
+    var fn = F();
+    V_.$('#eta-v').textContent = V_.fmt(eta(), eta() < 0.01 ? 4 : 3);
+    V_.$('#gamma-v').textContent = V_.fmt(gamma(), 2);
+    var P = MLV.Plot(svg, { W: 560, H: 440, x: fn.x, y: fn.y, m: { l: 34, r: 10, t: 10, b: 28 } });
+    var hi = Math.log(1 + fn.f(fn.x[0], fn.y[0]) - fn.fmin);
+    MLV.paint(cv, P, function (x, y) {
+      var v = Math.log(1 + Math.max(0, fn.f(x, y) - fn.fmin)) / hi, s = Math.max(0, Math.min(1, v));
+      var band = (Math.floor(s * 18) % 2) ? 10 : 0;                      // dải đồng mức
+      return [70 + 170 * s, 60 + 160 * s + band, 150 + 90 * s, 255];
+    }, 3);
+    P.clear(); P.axes();
+    var g = P.layer(true), series = [], rows = '<tr><th>Thuật toán</th><th>Số bước</th><th>Vị trí</th><th>$f$</th></tr>';
+    Object.keys(ALG).forEach(function (a) {
+      if (!on(a)) return;
+      var r = runs[a], pts = r.p.filter(function (p) { return isFinite(p[0]); });
+      P.poly(pts, { stroke: ALG[a].color, 'stroke-width': 2, 'stroke-linejoin': 'round' }, g);
+      var last = pts[pts.length - 1];
+      P.el('circle', { cx: P.sx(last[0]), cy: P.sy(last[1]), r: 5, fill: ALG[a].color, class: 'pl-pt' }, g);
+      series.push({ pts: pts.map(function (p, i) { return [i, Math.max(1e-8, fn.f(p[0], p[1]) - fn.fmin + 1e-8)]; }), color: ALG[a].color });
+      rows += '<tr><td style="color:' + ALG[a].color + ';font-weight:700">' + ALG[a].name + '</td><td>' + (pts.length - 1) + '</td><td>' +
+        (r.div ? 'phân kỳ' : '(' + V_.fmt(last[0], 3) + ', ' + V_.fmt(last[1], 3) + ')') + '</td><td>' + (r.div ? '—' : V_.fmt(fn.f(last[0], last[1]), 4)) + '</td></tr>';
+    });
+    P.el('circle', { cx: P.sx(start[0]), cy: P.sy(start[1]), r: 6, fill: 'none', stroke: '#fff', 'stroke-width': 2.5 }, g);
+    MLV.chart(V_.$('#ch'), series, { logY: true, xlabel: 'bước', ylabel: 'f − f*', m: { l: 52, r: 12, t: 8, b: 34 } });
+    V_.$('#tab').innerHTML = rows; V_.texAll(V_.$('#tab'));
+    var ins = V_.$('#insight'); ins.innerHTML = fn.note; V_.texAll(ins);
+  }
+
+  var player = V_.Player({ btn: V_.$('#play'), speed: V_.$('#speed'), step: step });
+  V_.$('#step').addEventListener('click', function () { player.stop(); step(); });
+  V_.$('#reset').addEventListener('click', function () { player.stop(); reset(); render(); });
+  ['#eta', '#gamma'].forEach(function (s) { V_.$(s).addEventListener('input', function () { player.stop(); reset(); render(); }); });
+  V_.$$('.alg').forEach(function (c) { c.addEventListener('change', render); });
+  V_.$$('#fn button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      V_.$$('#fn button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      player.stop(); start = F().s.slice(); V_.$('#eta').value = F().eta; V_.$('#gamma').value = F().gamma; reset(); render();
+    });
+  });
+  svg.addEventListener('click', function (e) {
+    var fn = F(), P = MLV.Plot(svg, { W: 560, H: 440, x: fn.x, y: fn.y, m: { l: 34, r: 10, t: 10, b: 28 } }), a = P.at(e);
+    if (!P.inside(a.px, a.py)) return;
+    player.stop(); start = [a.x, a.y]; reset(); render();
+  });
+  V_.texAll(document.body);
+  start = F().s.slice(); V_.$('#gamma').value = F().gamma; reset(); render();
+})();
+</script>
+</body>
+</html>

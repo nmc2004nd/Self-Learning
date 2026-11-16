@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Học bán giám sát · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Học có giám sát và bán giám sát</h1>
+      <div class="crumbs"><a href="../#/ml/ch05_vi">← Chương 5 Các khái niệm cơ bản</a></div>
+    </div>
+    <p class="lead">300 điểm, nhưng chỉ vài điểm có nhãn (chấm to, viền đen). Học có giám sát chỉ dùng những điểm đó. Học bán giám sát dùng thêm vị trí của các điểm chưa có nhãn: nhãn được lan dọc theo các láng giềng gần nhau. Bấm vào một điểm để gán hoặc đổi nhãn của nó.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-semisup.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Cách học</span>
+      <div class="seg" id="method"><button type="button" data-v="sup" aria-pressed="false">Có giám sát (1-NN)</button><button type="button" data-v="semi" aria-pressed="true">Bán giám sát (lan nhãn)</button></div>
+    </div>
+    <div class="ctrl">
+      <span class="lb">Dữ liệu</span>
+      <div class="seg" id="shape"><button type="button" data-v="moons" aria-pressed="true">Hai vầng trăng</button><button type="button" data-v="circles" aria-pressed="false">Hai vòng tròn</button><button type="button" data-v="blobs" aria-pressed="false">Hai đám chồng nhau</button></div>
+      <label for="noise">Nhiễu</label><input id="noise" type="range" min="0.02" max="0.35" step="0.01" value="0.1"><span class="val" id="noise-v"></span>
+      <button type="button" class="btn" id="reset">Chỉ giữ 1 nhãn mỗi lớp</button>
+    </div>
+    <div class="plotbox click"><canvas id="cv" width="560" height="420"></canvas><svg id="sv" viewBox="0 0 560 420" role="img" aria-label="Dữ liệu và vùng quyết định"></svg></div>
+    <table class="mtab" id="tab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, COL = MLV.CLASS, RGB = COL.map(MLV.hexRgb), N = 300, KNN = 8;
+  var pts = [], labels = {}, prop = [];
+  var svg = V_.$('#sv'), cv = V_.$('#cv'), P = MLV.Plot(svg, { W: 560, H: 420, x: [-1.7, 2.7], y: [-1.3, 1.6], m: { l: 30, r: 10, t: 10, b: 26 } });
+  function sel(id) { return V_.$(id + ' [aria-pressed=true]').dataset.v; }
+  function gen() {
+    var r = MLV.rng(11), nz = +V_.$('#noise').value, sh = sel('#shape'); pts = [];
+    for (var i = 0; i < N; i++) {
+      var c = i % 2, t = Math.PI * r(), x, y;
+      if (sh === 'moons') { x = c ? 1 - Math.cos(t) : Math.cos(t); y = c ? 0.5 - Math.sin(t) : Math.sin(t); }
+      else if (sh === 'circles') { var a = 2 * Math.PI * r(), rad = c ? 0.45 : 1.1; x = 0.5 + rad * Math.cos(a); y = 0.15 + rad * Math.sin(a); }
+      else { x = c ? 1.0 : 0.0; y = c ? 0.1 : 0.3; nz = Math.max(nz, 0.02) * 3.5; }
+      pts.push([x + nz * MLV.randn(r), y + nz * MLV.randn(r), c]);
+      if (sh === 'blobs') nz = +V_.$('#noise').value;
+    }
+    resetLabels();
+  }
+  function resetLabels() {
+    labels = {};
+    // một điểm có nhãn mỗi lớp: điểm đầu tiên của lớp đó
+    for (var c = 0; c < 2; c++) for (var i = 0; i < N; i++) if (pts[i][2] === c) { labels[i] = c; break; }
+  }
+  function neighbors() {
+    var nb = [];
+    for (var i = 0; i < N; i++) {
+      var d = [];
+      for (var j = 0; j < N; j++) if (j !== i) { var a = pts[i][0] - pts[j][0], b = pts[i][1] - pts[j][1]; d.push([a * a + b * b, j]); }
+      d.sort(function (u, v) { return u[0] - v[0]; });
+      nb.push(d.slice(0, KNN).map(function (e) { return e[1]; }));
+    }
+    return nb;
+  }
+  var NB = null;
+  function propagate() {
+    // lan nhãn: F <- alpha * trung bình F của láng giềng + (1 - alpha) * Y, lặp tới khi ổn định
+    var alpha = 0.99, F = [], Y = [];
+    for (var i = 0; i < N; i++) { var y = labels[i] === undefined ? [0, 0] : (labels[i] ? [0, 1] : [1, 0]); Y.push(y); F.push(y.slice()); }
+    var sym = []; for (i = 0; i < N; i++) sym.push({});
+    NB.forEach(function (row, i) { row.forEach(function (j) { sym[i][j] = 1; sym[j][i] = 1; }); });
+    var adj = sym.map(function (o) { return Object.keys(o).map(Number); });
+    for (var it = 0; it < 300; it++) {
+      var G = [];
+      for (i = 0; i < N; i++) {
+        var s = [0, 0]; adj[i].forEach(function (j) { s[0] += F[j][0]; s[1] += F[j][1]; });
+        var k = adj[i].length;
+        G.push([alpha * s[0] / k + (1 - alpha) * Y[i][0], alpha * s[1] / k + (1 - alpha) * Y[i][1]]);
+      }
+      F = G;
+    }
+    prop = F.map(function (f) { return f[0] + f[1] < 1e-12 ? -1 : (f[1] > f[0] ? 1 : 0); });
+  }
+  function predictPoint(x, y, sup) {
+    var best = Infinity, lab = -1;
+    if (sup) { for (var i in labels) { var a = pts[i][0] - x, b = pts[i][1] - y, d = a * a + b * b; if (d < best) { best = d; lab = labels[i]; } } }
+    else { for (var j = 0; j < N; j++) { if (prop[j] < 0) continue; var c = pts[j][0] - x, e = pts[j][1] - y, dd = c * c + e * e; if (dd < best) { best = dd; lab = prop[j]; } } }
+    return lab;
+  }
+  function render() {
+    V_.$('#noise-v').textContent = V_.fmt(+V_.$('#noise').value, 2);
+    var sup = sel('#method') === 'sup';
+    if (!sup) propagate();
+    MLV.paint(cv, P, function (x, y) { var l = predictPoint(x, y, sup); if (l < 0) return [0, 0, 0, 0]; var c = RGB[l]; return [c[0], c[1], c[2], 50]; }, 5);
+    P.clear(); P.axes();
+    var g = P.layer(true), ok = 0, ok2 = 0;
+    for (var i = 0; i < N; i++) {
+      var predS = predictPoint(pts[i][0], pts[i][1], true), predU = sup ? predS : prop[i];
+      if (predS === pts[i][2]) ok++;
+      if ((sup ? predS : predU) === pts[i][2]) ok2++;
+      var lab = labels[i];
+      if (lab !== undefined) P.el('circle', { cx: P.sx(pts[i][0]), cy: P.sy(pts[i][1]), r: 7.5, fill: COL[lab], stroke: '#1d2430', 'stroke-width': 2.5 }, g);
+      else P.el('circle', { cx: P.sx(pts[i][0]), cy: P.sy(pts[i][1]), r: 3.4, fill: sup ? '#9aa0c8' : (predU < 0 ? '#9aa0c8' : COL[predU]), 'fill-opacity': 0.85, class: 'pl-pt' }, g);
+    }
+    var nl = Object.keys(labels).length;
+    // so sánh hai cách trên cùng tập nhãn
+    if (sup) propagate();
+    var okSemi = 0; for (i = 0; i < N; i++) if (prop[i] === pts[i][2]) okSemi++;
+    V_.$('#tab').innerHTML = '<tr><th>Số điểm có nhãn</th><th>Có giám sát (1-NN)</th><th>Bán giám sát (lan nhãn)</th></tr><tr><td>' + nl + ' / ' + N + '</td><td>' + V_.fmt(100 * ok / N, 1) + '%</td><td>' + V_.fmt(100 * okSemi / N, 1) + '%</td></tr>';
+    var sh = sel('#shape'), msg;
+    if (sh === 'blobs') msg = 'Hai đám chồng lên nhau: không có "khoảng trống" nào giữa hai lớp, nên các điểm chưa nhãn không cho biết ranh giới nằm ở đâu. Lan nhãn không còn lợi thế so với học có giám sát.';
+    else if (okSemi - ok > 0.1 * N) msg = 'Chỉ với ' + nl + ' nhãn, lan nhãn đã tô đúng gần hết mỗi vầng: nhãn chảy dọc theo chuỗi các điểm gần nhau, và dừng ở khoảng trống giữa hai lớp. Học có giám sát chỉ thấy ' + nl + ' điểm nên vẽ một ranh giới thẳng ở giữa, cắt ngang cả hai vầng.';
+    else msg = 'Kéo thanh nhiễu lên: khi khoảng trống giữa hai lớp biến mất, nhãn bắt đầu "tràn" sang lớp bên kia qua những điểm nằm sát nhau. Thêm nhãn (bấm vào điểm) ở những chỗ đó để sửa.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  svg.addEventListener('click', function (e) {
+    var a = P.at(e), best = Infinity, bi = -1;
+    for (var i = 0; i < N; i++) { var dx = P.sx(pts[i][0]) - a.px, dy = P.sy(pts[i][1]) - a.py, d = dx * dx + dy * dy; if (d < best) { best = d; bi = i; } }
+    if (best > 200) return;
+    if (labels[bi] === undefined) labels[bi] = 0; else if (labels[bi] === 0) labels[bi] = 1; else delete labels[bi];
+    render();
+  });
+  V_.$$('#method button').forEach(function (b) { b.addEventListener('click', function () { V_.$$('#method button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); }); render(); }); });
+  V_.$$('#shape button').forEach(function (b) { b.addEventListener('click', function () { V_.$$('#shape button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); }); gen(); NB = neighbors(); render(); }); });
+  V_.$('#noise').addEventListener('input', function () { gen(); NB = neighbors(); render(); });
+  V_.$('#reset').addEventListener('click', function () { resetLabels(); render(); });
+  V_.texAll(document.body);
+  gen(); NB = neighbors(); render();
+})();
+</script>
+</body>
+</html>

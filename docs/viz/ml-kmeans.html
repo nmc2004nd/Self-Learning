@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phân cụm K-means · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Phân cụm K-means</h1>
+      <div class="crumbs"><a href="../#/ml/ch10_vi">← Chương 10 Phân cụm K-means</a></div>
+    </div>
+    <p class="lead">Thuật toán 10.1 xen kẽ hai bước: <b>gán nhãn</b> (mỗi điểm về tâm gần nhất, màu nền là vùng của mỗi tâm) và <b>cập nhật tâm</b> (mỗi tâm về trung bình các điểm của nó). Mỗi bước đều làm mất mát giảm hoặc giữ nguyên. Thử nhiều cách khởi tạo để thấy cực tiểu địa phương.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-kmeans.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Dữ liệu</span>
+      <div class="seg" id="data"><button type="button" data-v="blobs" aria-pressed="true">5 cụm tròn</button><button type="button" data-v="unequal" aria-pressed="false">Cụm lớn nhỏ</button><button type="button" data-v="moons" aria-pressed="false">Trăng khuyết</button></div>
+      <label for="k">$K$</label><input id="k" type="range" min="1" max="8" step="1" value="5"><span class="val" id="k-v"></span>
+    </div>
+    <div class="ctrl">
+      <span class="lb">Khởi tạo</span>
+      <button type="button" class="btn" id="init-rand">Ngẫu nhiên</button>
+      <button type="button" class="btn" id="init-pp">K-means++</button>
+      <span class="note" style="margin:0">hoặc bấm lên đồ thị để tự đặt từng tâm</span>
+    </div>
+    <div class="ctrl">
+      <button type="button" class="btn pri" id="play"></button>
+      <button type="button" class="btn" id="step">1 bước</button>
+      <label for="speed">Tốc độ</label><input id="speed" type="range" min="1" max="5" step="1" value="3">
+    </div>
+    <div class="stats"><span>Vòng <b id="it"></b></span><span>Bước tiếp theo <b id="next"></b></span><span>Mất mát $\mathcal{L}$ <b id="L"></b></span><span>Tốt nhất đã thấy <b id="best"></b></span></div>
+    <div class="plotbox click"><canvas id="cv" width="560" height="440"></canvas><svg id="sv" viewBox="0 0 560 440" role="img" aria-label="Dữ liệu, các tâm cụm và vùng của mỗi tâm"></svg></div>
+    <div class="plotbox"><svg id="ch" viewBox="0 0 560 170" role="img" aria-label="Mất mát theo từng bước"></svg></div>
+    <p class="note" style="text-align:center">Mất mát $\mathcal{L} = \frac{1}{N}\sum_i \|\mathbf{x}_i - \mathbf{m}_{y_i}\|_2^2$ sau mỗi bước. Mỗi vòng gồm hai bước.</p>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, C = MLV.CLASS.concat(['#b45309', '#64748b']);
+  var svg = V_.$('#sv'), cv = V_.$('#cv');
+  var P = MLV.Plot(svg, { W: 560, H: 440, x: [-6, 6], y: [-4.6, 4.6], m: { l: 32, r: 10, t: 10, b: 28 } });
+  var X = [], M = [], lab = null, phase = 'assign', iter = 0, hist = [], best = Infinity, manual = false, seedInit = 1;
+
+  function dataset() { return V_.$('#data [aria-pressed=true]').dataset.v; }
+  function K() { return +V_.$('#k').value; }
+  function makeData() {
+    var r = MLV.rng(11), d = dataset(), i;
+    X = [];
+    if (d === 'blobs') {
+      [[-3.5, 2.5], [0, 3], [3.5, 2], [-2, -2.5], [2.5, -2.5]].forEach(function (c) { for (i = 0; i < 60; i++) X.push([c[0] + 0.7 * MLV.randn(r), c[1] + 0.7 * MLV.randn(r)]); });
+    } else if (d === 'unequal') {
+      for (i = 0; i < 400; i++) X.push([-1.2 + 1.8 * MLV.randn(r), 1.5 * MLV.randn(r)]);
+      for (i = 0; i < 30; i++) X.push([4 + 0.35 * MLV.randn(r), 0.35 * MLV.randn(r)]);
+    } else {
+      for (i = 0; i < 160; i++) { var t = Math.PI * r(); X.push([-1.5 + 3 * Math.cos(t), -0.5 + 3 * Math.sin(t)]); X.push([1.5 - 3 * Math.cos(t), 1 - 3 * Math.sin(t)]); }
+      X = X.map(function (p) { return [p[0] + 0.2 * MLV.randn(r), p[1] + 0.2 * MLV.randn(r) - 0.3]; });
+    }
+  }
+  function d2(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return dx * dx + dy * dy; }
+  function nearest(x) { var b = 0; for (var k = 1; k < M.length; k++) if (d2(x, M[k]) < d2(x, M[b])) b = k; return b; }
+  function loss() {
+    if (!M.length) return NaN;
+    var s = 0; X.forEach(function (x, i) { s += d2(x, M[lab ? lab[i] : nearest(x)]); }); return s / X.length;
+  }
+  function resetRun() { iter = 0; phase = 'assign'; lab = null; hist = M.length === K() ? [[0, loss()]] : []; }
+  function initRandom() {
+    var r = MLV.rng(seedInit++ * 9973), idx = [];
+    while (idx.length < K()) { var j = Math.floor(r() * X.length); if (idx.indexOf(j) < 0) idx.push(j); }
+    M = idx.map(function (j) { return X[j].slice(); }); manual = false; resetRun();
+  }
+  function initPP() {
+    var r = MLV.rng(seedInit++ * 7919);
+    M = [X[Math.floor(r() * X.length)].slice()];
+    while (M.length < K()) {
+      var w = X.map(function (x) { return Math.min.apply(null, M.map(function (m) { return d2(x, m); })); });
+      var tot = w.reduce(function (a, b) { return a + b; }, 0), u = r() * tot, j = 0;
+      while (u > w[j] && j < X.length - 1) { u -= w[j]; j++; }
+      M.push(X[j].slice());
+    }
+    manual = false; resetRun();
+  }
+  // một bước của thuật toán 10.1; trả về false khi đã hội tụ
+  function step() {
+    if (M.length !== K()) return false;
+    if (phase === 'assign') {
+      var nl = X.map(nearest), changed = !lab || nl.some(function (v, i) { return v !== lab[i]; });
+      lab = nl; phase = 'update';
+      hist.push([hist.length ? hist[hist.length - 1][0] + 0.5 : 0.5, loss()]);
+      if (!changed && iter > 0) { phase = 'done'; return false; }
+    } else if (phase === 'update') {
+      M = M.map(function (m, k) {
+        var sx = 0, sy = 0, n = 0;
+        X.forEach(function (x, i) { if (lab[i] === k) { sx += x[0]; sy += x[1]; n++; } });
+        return n ? [sx / n, sy / n] : m;
+      });
+      iter++; phase = 'assign';
+      hist.push([hist[hist.length - 1][0] + 0.5, loss()]);
+    } else return false;
+    var L = loss(); if (phase !== 'done' && L < best) best = L;
+    render();
+    return true;
+  }
+
+  function render() {
+    V_.$('#k-v').textContent = K();
+    var rgb = C.map(MLV.hexRgb);
+    if (M.length) MLV.paint(cv, P, function (x, y) { var c = rgb[nearest([x, y])]; return [c[0], c[1], c[2], 55]; }, 4);
+    else cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+    P.clear(); P.axes();
+    var g = P.layer(true);
+    X.forEach(function (x, i) {
+      P.el('circle', { cx: P.sx(x[0]), cy: P.sy(x[1]), r: 3.4, fill: lab ? C[lab[i]] : 'var(--muted)', class: 'pl-pt', 'stroke-width': 0.8 }, g);
+    });
+    M.forEach(function (m, k) {
+      var t = P.el('text', { x: P.sx(m[0]), y: P.sy(m[1]) + 9, 'text-anchor': 'middle', 'font-size': 28, fill: C[k], stroke: 'var(--text)', 'stroke-width': 1.2 }, g);
+      t.textContent = '★';
+    });
+    MLV.chart(V_.$('#ch'), [{ pts: hist, color: '#7c3aed', marker: true }], { xlabel: 'vòng lặp', ylabel: 'mất mát', m: { l: 52, r: 12, t: 8, b: 34 } });
+    var L = loss();
+    V_.$('#it').textContent = iter;
+    V_.$('#next').textContent = M.length < K() ? 'đặt thêm ' + (K() - M.length) + ' tâm' : phase === 'assign' ? 'gán nhãn' : phase === 'update' ? 'cập nhật tâm' : 'đã hội tụ';
+    V_.$('#L').textContent = isFinite(L) ? V_.fmt(L, 3) : '—';
+    V_.$('#best').textContent = isFinite(best) ? V_.fmt(best, 3) : '—';
+    var msg;
+    if (M.length < K()) msg = 'Bấm lên đồ thị để đặt tâm thứ ' + (M.length + 1) + ', hoặc chọn một cách khởi tạo.';
+    else if (phase !== 'done') msg = 'Bấm "1 bước" để xem từng bước, hoặc "Phát" để chạy đến khi hội tụ.';
+    else if (L > best * 1.05) msg = 'Đã hội tụ, nhưng mất mát (' + V_.fmt(L, 3) + ') lớn hơn nghiệm tốt nhất đã thấy (' + V_.fmt(best, 3) + '): đây là một cực tiểu địa phương. Thử khởi tạo lại.';
+    else if (dataset() === 'blobs') msg = 'Đã hội tụ sau ' + iter + ' vòng. Thử khởi tạo ngẫu nhiên nhiều lần: thỉnh thoảng hai tâm sẽ chia nhau một cụm trong khi một tâm khác phải ôm hai cụm.';
+    else if (dataset() === 'unequal') msg = 'Đã hội tụ, nhưng ranh giới nằm ở trung trực giữa hai tâm: cụm lớn bị cắt làm đôi để "san sẻ" điểm cho cụm nhỏ. K-means ngầm giả sử các cụm có kích thước tương đương (mục 10.7.1).';
+    else msg = 'Đã hội tụ, nhưng các vùng của K-means luôn là đa giác lồi nên không thể tách hai hình trăng khuyết lồng nhau.';
+    V_.$('#insight').textContent = msg;
+  }
+
+  var player = V_.Player({ btn: V_.$('#play'), speed: V_.$('#speed'), step: step });
+  V_.$('#step').addEventListener('click', function () { player.stop(); step(); render(); });
+  V_.$('#init-rand').addEventListener('click', function () { player.stop(); initRandom(); render(); });
+  V_.$('#init-pp').addEventListener('click', function () { player.stop(); initPP(); render(); });
+  V_.$('#k').addEventListener('input', function () { player.stop(); best = Infinity; initPP(); render(); });
+  V_.$$('#data button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      V_.$$('#data button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      player.stop(); var kk = { blobs: 5, unequal: 2, moons: 2 }[b.dataset.v]; V_.$('#k').value = kk;
+      makeData(); best = Infinity; initRandom(); render();
+    });
+  });
+  svg.addEventListener('click', function (e) {
+    var a = P.at(e);
+    if (!P.inside(a.px, a.py)) return;
+    player.stop();
+    if (!manual || M.length >= K()) { M = []; manual = true; }
+    M.push([a.x, a.y]); resetRun(); render();
+  });
+  V_.texAll(document.body);
+  makeData(); initRandom(); render();
+})();
+</script>
+</body>
+</html>

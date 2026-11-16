@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lọc cộng tác lân cận · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+  .um { border-collapse: collapse; margin: 6px auto; font-variant-numeric: tabular-nums; font-size: .88rem; }
+  .um th, .um td { border: 1px solid var(--border); padding: 5px 8px; text-align: center; min-width: 2.6em; }
+  .um td.r { cursor: pointer; font-weight: 700; }
+  .um td.p { color: var(--muted); font-style: italic; background: var(--surface-2); }
+  .um td.sel { outline: 3px solid #e8487f; outline-offset: -3px; }
+  .um td.nb { box-shadow: inset 0 0 0 3px #0ea5a4; }
+  .um th.nb { background: #0ea5a433; }
+  #sim td, #sim th { padding: 4px 5px; min-width: 2.4em; font-size: .8rem; }
+  .grid2 > div { overflow-x: auto; }
+  .cap { text-align: center; font-size: .85rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Lọc cộng tác lân cận</h1>
+      <div class="crumbs"><a href="../#/ml/ch18_vi">← Chương 18 Lọc cộng tác lân cận</a></div>
+    </div>
+    <p class="lead">Ma trận tiện ích của Hình 18.2. Ô in nghiêng là điểm dự đoán. Bấm vào một ô in nghiêng để xem nó được tính từ những láng giềng nào; bật "Sửa điểm" để thay đổi dữ liệu.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-nbcf.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Phương pháp</span>
+      <div class="seg" id="mode"><button type="button" data-v="uu" aria-pressed="true">Người dùng (user-user)</button><button type="button" data-v="ii" aria-pressed="false">Sản phẩm (item-item)</button></div>
+      <label for="k">$k$</label><input id="k" type="range" min="1" max="5" step="1" value="2"><span class="val" id="k-v"></span>
+      <label><input type="checkbox" id="edit"> Sửa điểm</label>
+      <button type="button" class="btn" id="reset">Về dữ liệu của sách</button>
+    </div>
+    <div class="grid2">
+      <div><table class="um" id="um"></table><div class="cap">ma trận tiện ích sau hoàn thiện (hàng: sản phẩm, cột: người dùng)</div></div>
+      <div><table class="um" id="sim"></table><div class="cap" id="simcap"></div></div>
+    </div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, N = null;
+  var BOOK = [[5, 5, 2, 0, 1, N, N], [4, N, N, 0, N, 2, N], [N, 4, 1, N, N, 1, 1], [2, 2, 3, 4, 4, N, 4], [2, 0, 4, N, N, N, 5]];
+  var Y, cur = [1, 1];
+  function reset() { Y = BOOK.map(function (r) { return r.slice(); }); }
+  function mode() { return V_.$('#mode [aria-pressed=true]').dataset.v; }
+  // Làm việc trên ma trận M có cột = "đối tượng được so sánh" (người dùng với uu; sản phẩm với ii)
+  function model() {
+    var uu = mode() === 'uu', M = uu ? Y : Y[0].map(function (_, j) { return Y.map(function (r) { return r[j]; }); });
+    var R = M.length, C = M[0].length, mean = [], Mb = [];
+    for (var c = 0; c < C; c++) { var s = 0, n = 0; for (var r = 0; r < R; r++) if (M[r][c] !== N) { s += M[r][c]; n++; } mean.push(n ? s / n : 0); }
+    for (r = 0; r < R; r++) { Mb.push([]); for (c = 0; c < C; c++) Mb[r].push(M[r][c] === N ? 0 : M[r][c] - mean[c]); }
+    var S = [];
+    for (var a = 0; a < C; a++) { S.push([]); for (var b = 0; b < C; b++) { var d = 0, na = 0, nb = 0; for (r = 0; r < R; r++) { d += Mb[r][a] * Mb[r][b]; na += Mb[r][a] * Mb[r][a]; nb += Mb[r][b] * Mb[r][b]; } S[a].push(na && nb ? d / Math.sqrt(na * nb) : 0); } }
+    return { uu: uu, M: M, Mb: Mb, S: S, mean: mean, R: R, C: C };
+  }
+  // dự đoán ô (r, c) của M; trả về giá trị và láng giềng đã dùng
+  function predict(m, r, c, k) {
+    var raters = []; for (var j = 0; j < m.C; j++) if (j !== c && m.M[r][j] !== N) raters.push(j);
+    raters.sort(function (a, b) { return m.S[c][b] - m.S[c][a]; });
+    var nn = raters.slice(0, k), num = 0, den = 0;
+    nn.forEach(function (j) { num += m.Mb[r][j] * m.S[c][j]; den += Math.abs(m.S[c][j]); });
+    return { v: (den ? num / den : 0) + m.mean[c], nn: nn, norm: den ? num / den : 0 };
+  }
+  function render() {
+    var k = +V_.$('#k').value; V_.$('#k-v').textContent = k;
+    var m = model(), uu = m.uu;
+    // ô đang chọn trong toạ độ (sản phẩm i, người dùng u) -> toạ độ của M
+    var ci = cur[0], cu = cur[1], r = uu ? ci : cu, c = uu ? cu : ci, info = Y[ci][cu] === N ? predict(m, r, c, k) : null;
+    var labelsC = uu ? ['u0', 'u1', 'u2', 'u3', 'u4', 'u5', 'u6'] : ['i0', 'i1', 'i2', 'i3', 'i4'];
+    var h = '<tr><th></th>' + [0, 1, 2, 3, 4, 5, 6].map(function (u) { return '<th class="' + (uu && info && info.nn.indexOf(u) >= 0 ? 'nb' : '') + '">u' + u + '</th>'; }).join('') + '</tr>';
+    for (var i = 0; i < 5; i++) {
+      h += '<tr><th class="' + (!uu && info && info.nn.indexOf(i) >= 0 ? 'nb' : '') + '">i' + i + '</th>';
+      for (var u = 0; u < 7; u++) {
+        var y = Y[i][u], isNb = info && (uu ? (i === ci && info.nn.indexOf(u) >= 0) : (u === cu && info.nn.indexOf(i) >= 0));
+        var cls = 'r' + (y === N ? ' p' : '') + (i === ci && u === cu ? ' sel' : '') + (isNb ? ' nb' : '');
+        var txt = y !== N ? y : V_.fmt(predict(m, uu ? i : u, uu ? u : i, k).v, 2);
+        h += '<td class="' + cls + '" data-i="' + i + '" data-u="' + u + '">' + txt + '</td>';
+      }
+      h += '</tr>';
+    }
+    V_.$('#um').innerHTML = h;
+    var sh = '<tr><th></th>' + labelsC.map(function (l) { return '<th>' + l + '</th>'; }).join('') + '</tr>';
+    m.S.forEach(function (row, a) {
+      sh += '<tr><th>' + labelsC[a] + '</th>' + row.map(function (v, b) {
+        var t = Math.max(-1, Math.min(1, v)), col = t >= 0 ? 'rgba(47,128,245,' + (0.6 * t) + ')' : 'rgba(232,72,127,' + (-0.6 * t) + ')';
+        var mark = info && a === c && info.nn.indexOf(b) >= 0 ? ';box-shadow:inset 0 0 0 3px #0ea5a4' : '';
+        return '<td style="background:' + col + mark + '">' + V_.fmt(v, 2) + '</td>';
+      }).join('') + '</tr>';
+    });
+    V_.$('#sim').innerHTML = sh;
+    V_.$('#simcap').textContent = uu ? 'ma trận tương tự giữa người dùng (Hình 18.2c)' : 'ma trận tương tự giữa sản phẩm (Hình 18.3)';
+    V_.$$('#um td.r').forEach(function (td) { td.addEventListener('click', function () {
+      var i = +td.dataset.i, u = +td.dataset.u;
+      if (V_.$('#edit').checked) { var v = Y[i][u]; Y[i][u] = v === N ? 0 : v === 5 ? N : v + 1; }
+      cur = [i, u]; render(); }); });
+    var msg;
+    if (!info) msg = 'Ô đang chọn đã có điểm. Bấm vào một ô in nghiêng để xem cách dự đoán.';
+    else if (!info.nn.length) msg = 'Không ai (không sản phẩm nào) có dữ liệu để dự đoán ô này: dự đoán bằng trung bình.';
+    else {
+      var who = info.nn.map(function (j) { return labelsC[j] + ' (độ tương tự ' + V_.fmt(m.S[c][j], 2) + ', điểm chuẩn hoá ' + V_.fmt(m.Mb[r][j], 2) + ')'; }).join(', ');
+      msg = 'Dự đoán ô (i' + ci + ', u' + cu + ') bằng ' + (uu ? 'user-user' : 'item-item') + ' với $k = ' + k + '$: ' + (uu ? 'trong những người dùng đã đánh giá i' + ci + ', ' : 'trong những sản phẩm u' + cu + ' đã đánh giá, ') + 'chọn ' + info.nn.length + ' ' + (uu ? 'người' : 'sản phẩm') + ' giống ' + (uu ? 'u' + cu : 'i' + ci) + ' nhất: ' + who +
+        '. Trung bình có trọng số các điểm chuẩn hoá là ' + V_.fmt(info.norm, 2) + '; cộng với trung bình ' + V_.fmt(m.mean[c], 2) + ' của ' + (uu ? 'u' + cu : 'i' + ci) + ' được ' + V_.fmt(info.v, 2) + '.' +
+        (info.v < 0 || info.v > 5 ? ' Dự đoán nằm ngoài thang điểm 0–5: khi dùng thực tế cần cắt về khoảng hợp lệ.' : '');
+    }
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  V_.$$('#mode button').forEach(function (b) { b.addEventListener('click', function () { V_.$$('#mode button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); }); render(); }); });
+  V_.$('#k').addEventListener('input', render);
+  V_.$('#reset').addEventListener('click', function () { reset(); render(); });
+  V_.texAll(document.body);
+  reset(); render();
+})();
+</script>
+</body>
+</html>

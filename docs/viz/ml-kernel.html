@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SVM hạt nhân · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>SVM hạt nhân</h1>
+      <div class="crumbs"><a href="../#/ml/ch28_vi">← Chương 28 Máy vector hỗ trợ hạt nhân</a></div>
+    </div>
+    <p class="lead">Thay tích vô hướng $\mathbf{x}_n^T\mathbf{x}_m$ trong bài toán đối ngẫu bằng một hàm hạt nhân $k(\mathbf{x}_n, \mathbf{x}_m)$, SVM vẽ được những đường phân chia cong. Đường đậm là $f(\mathbf{x}) = 0$ theo (28.6); hai đường mảnh là $f(\mathbf{x}) = \pm 1$; điểm khoanh tròn là vector hỗ trợ. Bấm vào chỗ trống để thêm điểm, bấm vào một điểm để xoá.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-kernel.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Dữ liệu</span>
+      <div class="seg" id="data"><button type="button" data-v="xor" aria-pressed="true">XOR</button><button type="button" data-v="circle" aria-pressed="false">Hình tròn</button><button type="button" data-v="moons" aria-pressed="false">Trăng khuyết</button><button type="button" data-v="near" aria-pressed="false">Gần tuyến tính</button></div>
+      <span class="lb">Bấm để thêm</span>
+      <div class="seg" id="cls"><button type="button" data-v="1" aria-pressed="true">lớp +1 ■</button><button type="button" data-v="-1" aria-pressed="false">lớp −1 ●</button></div>
+    </div>
+    <div class="ctrl">
+      <span class="lb">Hạt nhân</span>
+      <div class="seg" id="kern"><button type="button" data-v="linear" aria-pressed="false">tuyến tính</button><button type="button" data-v="poly" aria-pressed="false">đa thức</button><button type="button" data-v="rbf" aria-pressed="true">RBF</button><button type="button" data-v="sigmoid" aria-pressed="false">sigmoid</button></div>
+    </div>
+    <div class="ctrl">
+      <label for="g">$\gamma$</label><input id="g" type="range" min="-2" max="2" step="0.05" value="0"><span class="val" id="g-v"></span>
+      <label for="c">$C$</label><input id="c" type="range" min="-2" max="3" step="0.05" value="1"><span class="val" id="c-v"></span>
+      <span id="deg-w"><label for="deg">bậc $d$</label><input id="deg" type="range" min="1" max="6" step="1" value="3"><span class="val" id="deg-v"></span></span>
+      <span id="r-w"><label for="r">$r$</label><input id="r" type="range" min="-2" max="2" step="0.1" value="1"><span class="val" id="r-v"></span></span>
+    </div>
+    <div class="stats"><span>Công thức <b id="kf"></b></span><span>Vector hỗ trợ <b id="nsv"></b></span><span>Đúng trên tập huấn luyện <b id="acc"></b></span><span id="psd-s">Mercer <b id="psd"></b></span></div>
+    <div class="plotbox click"><canvas id="cv" width="600" height="460"></canvas><svg id="sv" viewBox="0 0 600 460" role="img" aria-label="Vùng quyết định của SVM hạt nhân và các vector hỗ trợ"></svg></div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, BLUE = '#2f80f5', PINK = '#e8487f';
+  var svg = V_.$('#sv'), cv = V_.$('#cv');
+  var P = MLV.Plot(svg, { W: 600, H: 460, x: [-2.6, 2.6], y: [-1.97, 1.97], m: { l: 32, r: 10, t: 10, b: 28 } });
+  var pts = [], sol = null, NX = 131, NY = 99;
+
+  function sel(id) { return V_.$(id + ' [aria-pressed=true]').dataset.v; }
+  function makeData() {
+    var d = sel('#data'), r = MLV.rng(4), i, a, t;
+    pts = [];
+    if (d === 'xor') {
+      [[-1, -1, 1], [1, 1, 1], [-1, 1, -1], [1, -1, -1]].forEach(function (c) { for (i = 0; i < 10; i++) pts.push([c[0] * 0.95 + 0.38 * MLV.randn(r), c[1] * 0.8 + 0.3 * MLV.randn(r), c[2]]); });
+    } else if (d === 'circle') {
+      for (i = 0; i < 26; i++) { a = r() * 6.283; t = 0.55 * Math.sqrt(r()); pts.push([t * Math.cos(a) * 1.3, t * Math.sin(a) * 1.3, 1]); }
+      for (i = 0; i < 34; i++) { a = r() * 6.283; t = 1.25 + 0.3 * r(); pts.push([t * Math.cos(a) * 1.15, t * Math.sin(a), -1]); }
+    } else if (d === 'moons') {
+      for (i = 0; i < 30; i++) {
+        a = Math.PI * r(); pts.push([Math.cos(a) * 1.2 - 0.6 + 0.15 * MLV.randn(r), Math.sin(a) * 1.2 - 0.45 + 0.15 * MLV.randn(r), 1]);
+        a = Math.PI * r(); pts.push([0.6 - Math.cos(a) * 1.2 + 0.15 * MLV.randn(r), 0.45 - Math.sin(a) * 1.2 + 0.15 * MLV.randn(r), -1]);
+      }
+    } else {
+      for (i = 0; i < 25; i++) {
+        pts.push([-0.8 + 0.6 * MLV.randn(r), -0.3 + 0.6 * MLV.randn(r), 1]);
+        pts.push([0.8 + 0.6 * MLV.randn(r), 0.3 + 0.6 * MLV.randn(r), -1]);
+      }
+    }
+  }
+  function par() { return { k: sel('#kern'), g: Math.pow(10, +V_.$('#g').value), C: Math.pow(10, +V_.$('#c').value), d: +V_.$('#deg').value, r: +V_.$('#r').value }; }
+  function kernelOf(p) {
+    if (p.k === 'linear') return MLV.kernels.linear();
+    if (p.k === 'poly') return MLV.kernels.poly(p.g, p.r, p.d);
+    if (p.k === 'rbf') return MLV.kernels.rbf(p.g);
+    return MLV.kernels.sigmoid(p.g, p.r);
+  }
+  function minEig(K) {   // trị riêng nhỏ nhất (Jacobi vài vòng là đủ cho vài chục điểm)
+    var n = K.length, A = K.map(function (r) { return r.slice(); }), sweep, p, q, i;
+    for (sweep = 0; sweep < 12; sweep++) {
+      var off = 0;
+      for (p = 0; p < n; p++) for (q = p + 1; q < n; q++) off += A[p][q] * A[p][q];
+      if (off < 1e-18) break;
+      for (p = 0; p < n; p++) for (q = p + 1; q < n; q++) {
+        if (Math.abs(A[p][q]) < 1e-14) continue;
+        var th = (A[q][q] - A[p][p]) / (2 * A[p][q]), t = (th >= 0 ? 1 : -1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), s = t * c;
+        for (i = 0; i < n; i++) { var ap = A[i][p], aq = A[i][q]; A[i][p] = c * ap - s * aq; A[i][q] = s * ap + c * aq; }
+        for (i = 0; i < n; i++) { var pa = A[p][i], qa = A[q][i]; A[p][i] = c * pa - s * qa; A[q][i] = s * pa + c * qa; }
+      }
+    }
+    var m = Infinity; for (i = 0; i < n; i++) m = Math.min(m, A[i][i]); return m;
+  }
+  function fit() {
+    var has = { 1: 0, '-1': 0 }; pts.forEach(function (p) { has[p[2]]++; });
+    if (!has[1] || !has[-1]) { sol = null; return; }
+    var p = par(), K = kernelOf(p);
+    var X = pts.map(function (q) { return [q[0], q[1]]; }), y = pts.map(function (q) { return q[2]; });
+    var s = MLV.svm(X, y, { C: p.C, kernel: K, tol: 1e-4, maxIter: 40000 });
+    var F = new Float64Array(NX * NY), i, j;
+    for (j = 0; j < NY; j++) for (i = 0; i < NX; i++) F[j * NX + i] = s.f([P.x[0] + (P.x[1] - P.x[0]) * i / (NX - 1), P.y[0] + (P.y[1] - P.y[0]) * j / (NY - 1)]);
+    var ok = 0; X.forEach(function (x, k) { if (s.f(x) * y[k] > 0) ok++; });
+    var me = null;
+    if (p.k === 'sigmoid' && X.length <= 90) me = minEig(X.map(function (a) { return X.map(function (b) { return K(a, b); }); }));
+    sol = { s: s, F: F, acc: ok / X.length, p: p, minEig: me, atC: X.map(function (_, k) { return s.alpha[k] >= p.C * (1 - 1e-6); }) };
+  }
+  function render() {
+    var p = par();
+    V_.$('#g-v').textContent = V_.fmt(p.g, p.g < 1 ? 2 : 1);
+    V_.$('#c-v').textContent = V_.fmt(p.C, p.C < 1 ? 2 : 0);
+    V_.$('#deg-v').textContent = p.d;
+    V_.$('#r-v').textContent = V_.fmt(p.r, 1);
+    V_.$('#deg-w').style.display = p.k === 'poly' ? '' : 'none';
+    V_.$('#r-w').style.display = (p.k === 'poly' || p.k === 'sigmoid') ? '' : 'none';
+    V_.$('#g').disabled = p.k === 'linear';
+    var KF = { linear: '\\mathbf{x}^T\\mathbf{z}', poly: '(r + \\gamma\\mathbf{x}^T\\mathbf{z})^d', rbf: '\\exp(-\\gamma\\|\\mathbf{x} - \\mathbf{z}\\|_2^2)', sigmoid: '\\tanh(\\gamma\\mathbf{x}^T\\mathbf{z} + r)' };
+    var kf = V_.$('#kf'); kf.textContent = '$' + KF[p.k] + '$'; V_.texAll(kf);
+    var bl = MLV.hexRgb(BLUE), pk = MLV.hexRgb(PINK);
+    if (sol) MLV.paint(cv, P, function (x, y) { var f = sol.s.f([x, y]), c = f > 0 ? bl : pk; return [c[0], c[1], c[2], Math.round(18 + 34 * Math.min(1, Math.abs(f)))]; }, 5);
+    else cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+    P.clear(); P.axes();
+    var g = P.layer(true);
+    if (sol) {
+      [-1, 1].forEach(function (lv) { P.el('path', { d: MLV.contour(P, sol.F, NX, NY, lv), stroke: 'var(--text)', 'stroke-width': 1, opacity: 0.75, fill: 'none' }, g); });
+      P.el('path', { d: MLV.contour(P, sol.F, NX, NY, 0), stroke: 'var(--text)', 'stroke-width': 2.4, fill: 'none' }, g);
+    }
+    pts.forEach(function (q, k) {
+      var x = P.sx(q[0]), y = P.sy(q[1]);
+      if (q[2] > 0) P.el('rect', { x: x - 5, y: y - 5, width: 10, height: 10, fill: BLUE, class: 'pl-pt' }, g);
+      else P.el('circle', { cx: x, cy: y, r: 5.5, fill: PINK, class: 'pl-pt' }, g);
+      if (sol && sol.s.alpha[k] > 1e-8) P.el('circle', { cx: x, cy: y, r: 10, fill: 'none', stroke: 'var(--text)', 'stroke-width': sol.atC[k] ? 1 : 1.6, 'stroke-dasharray': sol.atC[k] ? '2 2' : null }, g);
+    });
+    var nsv = sol ? sol.s.sv.length : 0;
+    V_.$('#nsv').textContent = sol ? nsv + ' / ' + pts.length : '–';
+    V_.$('#acc').textContent = sol ? Math.round(100 * sol.acc) + '%' : '–';
+    V_.$('#psd-s').style.display = p.k === 'sigmoid' ? '' : 'none';
+    V_.$('#psd').textContent = sol && sol.minEig !== null ? (sol.minEig < -1e-8 ? 'vi phạm (trị riêng nhỏ nhất ' + V_.fmt(sol.minEig, 2) + ')' : 'thoả trên tập điểm này') : '';
+    var d = sel('#data'), msg;
+    if (!sol) msg = 'Cần ít nhất một điểm của mỗi lớp.';
+    else if (p.k === 'linear') msg = d === 'near' ? 'Dữ liệu gần tách biệt tuyến tính: hạt nhân tuyến tính (SVM lề mềm của chương 27) là đủ, và đơn giản nhất.' : 'Hạt nhân tuyến tính chỉ cho đường thẳng. Với dữ liệu này, nó không tách được hai lớp: đúng ' + Math.round(100 * sol.acc) + '% trên tập huấn luyện. Chọn RBF hoặc đa thức.';
+    else if (p.k === 'rbf' && p.g >= 20) msg = '$\\gamma$ rất lớn: mỗi điểm chỉ ảnh hưởng tới một vùng nhỏ quanh nó, ranh giới bao quanh từng điểm, gần như mọi điểm là vector hỗ trợ (' + nsv + '/' + pts.length + '). Đây là quá khớp, giống $\\gamma = 0.1$ trên MNIST ở trang Ví dụ áp dụng.';
+    else if (p.k === 'rbf' && p.g <= 0.05) msg = '$\\gamma$ rất nhỏ: hạt nhân gần như hằng số trên cả vùng dữ liệu, mô hình gần như tuyến tính. Tăng $\\gamma$ (hoặc tăng mạnh $C$) để ranh giới cong được.';
+    else if (p.k === 'sigmoid') msg = 'Hạt nhân sigmoid thường không thoả điều kiện Mercer (28.7): ma trận hạt nhân có trị riêng âm, nên bài toán đối ngẫu không còn lồi và SMO chỉ dừng ở một điểm thoả KKT. Kết quả hay kém ổn định khi đổi $\\gamma$ hoặc $r$, như sách nhận xét ở mục 28.4.';
+    else if (p.k === 'poly' && p.r <= 0 && p.d % 2 === 1) msg = 'Với $r \\le 0$ và bậc lẻ, $k(\\mathbf{x}, \\mathbf{z})$ chỉ chứa các số hạng bậc $d$ (khi $r = 0$) hoặc đổi dấu bất thường: ranh giới thường đi qua gốc toạ độ. Thử $r = 1$.';
+    else if (d === 'xor') msg = 'Với XOR, RBF cho bốn vùng đối xứng (Hình 28.2c). Đường mảnh là $f(\\mathbf{x}) = \\pm 1$; các điểm vòng nét đứt có $\\lambda_n = C$ và nằm trong lề. Thử kéo $\\gamma$ lên cao rồi xuống thấp.';
+    else msg = 'Có ' + nsv + ' vector hỗ trợ; chỉ chúng xuất hiện trong (28.6). Vòng nét liền: $0 < \\lambda_n < C$, nằm đúng trên đường mảnh; vòng nét đứt: $\\lambda_n = C$, nằm trong lề hoặc sai phía. Tăng $C$ thì ít điểm vi phạm lề hơn nhưng ranh giới uốn lượn hơn.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  function refresh() { fit(); render(); }
+
+  ['#g', '#c', '#deg', '#r'].forEach(function (id) { V_.$(id).addEventListener('input', refresh); });
+  ['#data', '#cls', '#kern'].forEach(function (s) {
+    V_.$$(s + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$(s + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        if (s === '#data') makeData();
+        if (s === '#kern') { if (b.dataset.v === 'poly') { V_.$('#r').value = 1; V_.$('#g').value = 0; } if (b.dataset.v === 'sigmoid') { V_.$('#r').value = 0; V_.$('#g').value = -0.3; } }
+        if (s !== '#cls') refresh();
+      });
+    });
+  });
+  svg.addEventListener('click', function (e) {
+    var a = P.at(e);
+    if (!P.inside(a.px, a.py)) return;
+    var hit = -1;
+    pts.forEach(function (q, i) { if (Math.hypot(P.sx(q[0]) - a.px, P.sy(q[1]) - a.py) < 9) hit = i; });
+    if (hit >= 0) pts.splice(hit, 1);
+    else pts.push([a.x, a.y, +sel('#cls')]);
+    refresh();
+  });
+  V_.texAll(document.body);
+  makeData(); refresh();
+  window.__kernCheck = function () { return { nsv: sol.s.sv.length, acc: sol.acc, it: sol.s.iters, conv: sol.s.converged }; };
+})();
+</script>
+</body>
+</html>

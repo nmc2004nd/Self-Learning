@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phân tích ma trận · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+  .um { border-collapse: collapse; margin: 6px auto; font-variant-numeric: tabular-nums; font-size: .88rem; }
+  .um th, .um td { border: 1px solid var(--border); padding: 5px 8px; text-align: center; min-width: 2.6em; }
+  .um td.k { font-weight: 700; }
+  .um td.p { color: var(--muted); font-style: italic; background: var(--surface-2); }
+  .cap { text-align: center; font-size: .85rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Phân tích ma trận</h1>
+      <div class="crumbs"><a href="../#/ml/ch19_vi">← Chương 19 Lọc cộng tác phân tích ma trận</a></div>
+    </div>
+    <p class="lead">Ma trận tiện ích của Hình 18.2 được xấp xỉ bởi $\hat{y}_{mn} = \mu + b_m + d_n + \mathbf{x}_m^T\mathbf{w}_n$ với các vector ẩn 2 chiều. Gradient descent chỉ dùng các ô đã biết (in đậm); các ô in nghiêng là dự đoán. Bên phải: sản phẩm (vuông) và người dùng (tròn) trong không gian ẩn.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-mf.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <label for="lam">$\lambda$</label><input id="lam" type="range" min="-3" max="1" step="0.05" value="-1.3"><span class="val" id="lam-v"></span>
+      <label for="eta">tốc độ học</label><input id="eta" type="range" min="-2" max="-0.3" step="0.05" value="-1"><span class="val" id="eta-v"></span>
+    </div>
+    <div class="ctrl">
+      <button type="button" class="btn pri" id="play"></button>
+      <button type="button" class="btn" id="step">50 bước</button>
+      <button type="button" class="btn" id="reset">Khởi tạo lại</button>
+      <label for="speed">Tốc độ</label><input id="speed" type="range" min="1" max="5" step="1" value="4">
+    </div>
+    <div class="grid2">
+      <div>
+        <table class="um" id="um"></table>
+        <div class="cap">hàng: sản phẩm $i_0$–$i_4$; cột: người dùng $u_0$–$u_6$</div>
+        <div class="plotbox"><svg id="ch" viewBox="0 0 400 190" role="img" aria-label="Hàm mất mát theo số bước"></svg></div>
+      </div>
+      <div class="plotbox"><svg id="sv" viewBox="0 0 380 380" role="img" aria-label="Vector ẩn của sản phẩm và người dùng"></svg></div>
+    </div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, N = null, CI = '#e8487f', CU = '#2f80f5';
+  var Y = [[5, 5, 2, 0, 1, N, N], [4, N, N, 0, N, 2, N], [N, 4, 1, N, N, 1, 1], [2, 2, 3, 4, 4, N, 4], [2, 0, 4, N, N, N, 5]];
+  var known = []; Y.forEach(function (r, m) { r.forEach(function (v, n) { if (v !== N) known.push([m, n, v]); }); });
+  var mu = known.reduce(function (s, e) { return s + e[2]; }, 0) / known.length;
+  var X, W, b, d, t, hist, seed = 3;
+  function init() {
+    var r = MLV.rng(seed); X = []; W = []; b = [0, 0, 0, 0, 0]; d = [0, 0, 0, 0, 0, 0, 0]; t = 0; hist = [];
+    for (var m = 0; m < 5; m++) X.push([0.3 * MLV.randn(r), 0.3 * MLV.randn(r)]);
+    for (var n = 0; n < 7; n++) W.push([0.3 * MLV.randn(r), 0.3 * MLV.randn(r)]);
+    hist.push([0, loss()]);
+  }
+  function pred(m, n) { return mu + b[m] + d[n] + X[m][0] * W[n][0] + X[m][1] * W[n][1]; }
+  function lam() { return Math.pow(10, +V_.$('#lam').value); }
+  function eta() { return Math.pow(10, +V_.$('#eta').value); }
+  function loss() {
+    var L = 0; known.forEach(function (e) { var r = pred(e[0], e[1]) - e[2]; L += 0.5 * r * r; });
+    var reg = 0; X.concat(W).forEach(function (v) { reg += v[0] * v[0] + v[1] * v[1]; });
+    return L / known.length + 0.5 * lam() * reg;
+  }
+  function gdStep() {   // gradient descent đầy đủ trên mọi ô đã biết
+    var gX = X.map(function () { return [0, 0]; }), gW = W.map(function () { return [0, 0]; }), gb = [0, 0, 0, 0, 0], gd = [0, 0, 0, 0, 0, 0, 0], s = known.length, l = lam(), e = eta();
+    known.forEach(function (k) { var m = k[0], n = k[1], r = (pred(m, n) - k[2]) / s;
+      gX[m][0] += r * W[n][0]; gX[m][1] += r * W[n][1]; gW[n][0] += r * X[m][0]; gW[n][1] += r * X[m][1]; gb[m] += r; gd[n] += r; });
+    for (var m = 0; m < 5; m++) { X[m][0] -= e * (gX[m][0] + l * X[m][0]); X[m][1] -= e * (gX[m][1] + l * X[m][1]); b[m] -= e * gb[m]; }
+    for (var n = 0; n < 7; n++) { W[n][0] -= e * (gW[n][0] + l * W[n][0]); W[n][1] -= e * (gW[n][1] + l * W[n][1]); d[n] -= e * gd[n]; }
+    t++;
+  }
+  function run(k) { for (var i = 0; i < k; i++) gdStep(); hist.push([t, loss()]); if (hist.length > 400) hist = hist.filter(function (_, i) { return i % 2 === 0; }); }
+  function render() {
+    V_.$('#lam-v').textContent = V_.fmt(lam(), lam() < 0.1 ? 3 : 2); V_.$('#eta-v').textContent = V_.fmt(eta(), 2);
+    var h = '<tr><th></th>' + [0, 1, 2, 3, 4, 5, 6].map(function (n) { return '<th>u' + n + '</th>'; }).join('') + '</tr>', se = 0;
+    for (var m = 0; m < 5; m++) {
+      h += '<tr><th>i' + m + '</th>';
+      for (var n = 0; n < 7; n++) {
+        var p = pred(m, n);
+        if (Y[m][n] !== N) { se += (p - Y[m][n]) * (p - Y[m][n]); h += '<td class="k" title="dự đoán ' + V_.fmt(p, 2) + '">' + Y[m][n] + '<br><small style="font-weight:400;color:var(--muted)">' + V_.fmt(p, 1) + '</small></td>'; }
+        else h += '<td class="p">' + V_.fmt(Math.max(0, Math.min(5, p)), 2) + '</td>';
+      }
+      h += '</tr>';
+    }
+    V_.$('#um').innerHTML = h;
+    var P = MLV.Plot(V_.$('#sv'), { W: 380, H: 380, x: [-2.6, 2.6], y: [-2.6, 2.6], m: { l: 30, r: 10, t: 10, b: 26 }, xlabel: 'chiều ẩn 1', ylabel: 'chiều ẩn 2' });
+    P.clear(); P.axes();
+    var g = P.layer(true);
+    X.forEach(function (v, m) { P.el('rect', { x: P.sx(v[0]) - 6, y: P.sy(v[1]) - 6, width: 12, height: 12, fill: CI }, g); P.el('text', { x: P.sx(v[0]) + 8, y: P.sy(v[1]) + 4, class: 'pl-tick', style: 'fill:' + CI }, g).textContent = 'i' + m; });
+    W.forEach(function (v, n) { P.el('circle', { cx: P.sx(v[0]), cy: P.sy(v[1]), r: 6, fill: CU }, g); P.el('text', { x: P.sx(v[0]) + 8, y: P.sy(v[1]) + 4, class: 'pl-tick', style: 'fill:' + CU }, g).textContent = 'u' + n; });
+    MLV.chart(V_.$('#ch'), [{ pts: hist, color: '#0ea5a4' }], { logY: true, xlabel: 'số bước GD', ylabel: 'hàm mất mát', m: { l: 52, r: 10, t: 8, b: 34 } });
+    var rmse = Math.sqrt(se / known.length), norm = 0; X.concat(W).forEach(function (v) { norm = Math.max(norm, Math.hypot(v[0], v[1])); });
+    var msg = 'Sau ' + t + ' bước: RMSE trên các ô đã biết ' + V_.fmt(rmse, 3) + '. ';
+    if (norm < 0.05) msg += '<b>Các vector ẩn đã co về gốc toạ độ</b>: $\\lambda$ quá lớn so với phần sai số, và mô hình chỉ còn là $\\mu + b_m + d_n$. Mọi người dùng nhận cùng một "thứ hạng" sản phẩm. Đây đúng là điều xảy ra với tham số của sách trên MovieLens.' + (lam() < 0.05 ? ' Giảm $\\lambda$ cũng không cứu được: tại $\\mathbf{X} = \\mathbf{W} = \\mathbf{0}$, gradient theo $\\mathbf{X}$ tỉ lệ với $\\mathbf{W}$ và ngược lại, nên cả hai bằng 0 và GD đứng yên (một điểm yên ngựa). Bấm "Khởi tạo lại".' : '');
+    else if (rmse < 0.05) msg += 'Mô hình gần như khớp hoàn toàn 20 ô đã biết với 33 tham số: dự đoán cho các ô trống có thể rất cực đoan. Tăng $\\lambda$ để xem chúng ôn hoà hơn.';
+    else msg += 'Người dùng có vector cùng hướng với một sản phẩm thì được dự đoán thích sản phẩm đó hơn mức $\\mu + b_m + d_n$; ngược hướng thì thích kém hơn. Những người dùng có gu giống nhau (như $u_0$ và $u_1$, cùng thích $i_0$, $i_1$) nằm gần nhau, dù mô hình không hề được cho biết điều đó.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  var player = V_.Player({ btn: V_.$('#play'), speed: V_.$('#speed'), step: function () { run(20); render(); return t < 20000; } });
+  V_.$('#step').addEventListener('click', function () { player.stop(); run(50); render(); });
+  V_.$('#reset').addEventListener('click', function () { player.stop(); seed++; init(); render(); });
+  ['#lam', '#eta'].forEach(function (s) { V_.$(s).addEventListener('input', function () { hist.push([t, loss()]); render(); }); });
+  V_.texAll(document.body);
+  init(); for (var k = 0; k < 100; k++) run(20); render();
+})();
+</script>
+</body>
+</html>

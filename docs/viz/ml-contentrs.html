@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gợi ý dựa trên nội dung · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .um { border-collapse: collapse; margin: 10px auto; font-variant-numeric: tabular-nums; font-size: .92rem; }
+  .um th, .um td { border: 1px solid var(--border); padding: 6px 10px; text-align: center; }
+  .um td.r { cursor: pointer; font-weight: 700; }
+  .um td.r:hover { outline: 2px solid var(--s1); outline-offset: -2px; }
+  .um td.p { color: var(--muted); font-style: italic; background: var(--surface-2); }
+  .um th.sel { background: var(--accent-soft); }
+  .um td.feat { color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Gợi ý dựa trên nội dung</h1>
+      <div class="crumbs"><a href="../#/ml/ch17_vi">← Chương 17 Hệ thống gợi ý dựa trên nội dung</a></div>
+    </div>
+    <p class="lead">Ma trận tiện ích của Hình 17.2: mỗi bài hát có vector đặc trưng (mức độ Bolero, mức độ Thiếu nhi). Mỗi người dùng có một mô hình hồi quy ridge riêng, học từ những bài họ đã chấm. Ô in nghiêng là điểm dự đoán. Bấm vào một ô để đổi điểm (?, 0, 1, …, 5); bấm tên người dùng để xem mô hình của họ.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-contentrs.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl"><label for="lam">$\lambda$</label><input id="lam" type="range" min="-3" max="1.5" step="0.05" value="-1"><span class="val" id="lam-v"></span><button type="button" class="btn" id="reset">Về dữ liệu của sách</button></div>
+    <table class="um" id="um"></table>
+    <div class="plotbox"><svg id="sv" viewBox="0 0 520 300" role="img" aria-label="Mô hình tuyến tính của người dùng được chọn"></svg></div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz;
+  var SONGS = ['Mưa nửa đêm', 'Cỏ úa', 'Vùng lá me bay', 'Con cò bé bé', 'Em yêu trường em'];
+  var X = [[0.99, 0.02], [0.91, 0.11], [0.95, 0.05], [0.01, 0.99], [0.03, 0.98]];
+  var USERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+  var BOOK = [[5, 5, 0, 0, 1, null], [5, null, null, 0, null, null], [null, 4, 1, null, null, 1], [1, 1, 4, 4, 4, null], [1, 0, 5, null, null, null]];
+  var Y, sel = 4;
+  function reset() { Y = BOOK.map(function (r) { return r.slice(); }); }
+  // ridge cho một người dùng: tham số (w1, w2, b), phạt chỉ w; L = 1/(2s)||Xw + b - y||^2 + lam/(2s)||w||^2
+  function fit(u, lam) {
+    var A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], r = [0, 0, 0], s = 0;
+    for (var i = 0; i < 5; i++) { var y = Y[i][u]; if (y === null) continue; s++; var f = [X[i][0], X[i][1], 1];
+      for (var a = 0; a < 3; a++) { r[a] += f[a] * y; for (var c = 0; c < 3; c++) A[a][c] += f[a] * f[c]; } }
+    if (!s) return null;
+    A[0][0] += lam; A[1][1] += lam; A[2][2] += 1e-9;
+    var th = MLV.solve(A, r);
+    return th ? { w: [th[0], th[1]], b: th[2], s: s } : null;
+  }
+  function pred(m, i) { return m.w[0] * X[i][0] + m.w[1] * X[i][1] + m.b; }
+  function render() {
+    var lam = Math.pow(10, +V_.$('#lam').value); V_.$('#lam-v').textContent = V_.fmt(lam, lam < 0.1 ? 3 : 2);
+    var models = USERS.map(function (_, u) { return fit(u, lam); });
+    var h = '<tr><th></th>' + USERS.map(function (n, u) { return '<th class="' + (u === sel ? 'sel' : '') + '" data-u="' + u + '" style="cursor:pointer">' + n + '</th>'; }).join('') + '<th>đặc trưng $\\mathbf{x}$</th></tr>';
+    for (var i = 0; i < 5; i++) {
+      h += '<tr><th style="text-align:left">' + SONGS[i] + '</th>';
+      for (var u = 0; u < 6; u++) {
+        var y = Y[i][u];
+        if (y !== null) h += '<td class="r" data-i="' + i + '" data-u="' + u + '">' + y + '</td>';
+        else h += '<td class="r p" data-i="' + i + '" data-u="' + u + '">' + (models[u] ? V_.fmt(pred(models[u], i), 2) : '?') + '</td>';
+      }
+      h += '<td class="feat">[' + X[i][0] + ', ' + X[i][1] + ']</td></tr>';
+    }
+    h += '<tr><th style="text-align:left">$\\mathbf{w}, b$</th>' + models.map(function (m) { return '<td class="feat">' + (m ? '[' + V_.fmt(m.w[0], 1) + ', ' + V_.fmt(m.w[1], 1) + '], ' + V_.fmt(m.b, 1) : '—') + '</td>'; }).join('') + '<td></td></tr>';
+    V_.$('#um').innerHTML = h; V_.texAll(V_.$('#um'));
+    V_.$$('#um td.r').forEach(function (td) { td.addEventListener('click', function () {
+      var i = +td.dataset.i, u = +td.dataset.u, v = Y[i][u];
+      Y[i][u] = v === null ? 0 : v === 5 ? null : v + 1; sel = u; render(); }); });
+    V_.$$('#um th[data-u]').forEach(function (th) { th.addEventListener('click', function () { sel = +th.dataset.u; render(); }); });
+    // biểu đồ: điểm theo mức độ Bolero (x1) của bài hát, với mô hình của người dùng đang chọn
+    var svg = V_.$('#sv'), P = MLV.Plot(svg, { W: 520, H: 300, x: [-0.05, 1.05], y: [-1, 6.5], m: { l: 40, r: 12, t: 10, b: 36 }, xlabel: 'mức độ Bolero (x₁); mức độ Thiếu nhi x₂ ≈ 1 − x₁', ylabel: 'điểm' });
+    P.clear(); P.axes();
+    var m = models[sel], g = P.layer(true);
+    if (m) P.curve(function (t) { return m.w[0] * t + m.w[1] * (1 - t) + m.b; }, { stroke: '#2f80f5', 'stroke-width': 2.5 }, g);
+    for (i = 0; i < 5; i++) {
+      var yy = Y[i][sel];
+      if (yy !== null) P.el('circle', { cx: P.sx(X[i][0]), cy: P.sy(yy), r: 6, fill: '#e8487f', class: 'pl-pt' }, g);
+      else if (m) P.el('circle', { cx: P.sx(X[i][0]), cy: P.sy(pred(m, i)), r: 6, fill: 'none', stroke: '#2f80f5', 'stroke-width': 2 }, g);
+    }
+    var msg;
+    if (!m) msg = 'Người dùng ' + USERS[sel] + ' chưa chấm bài nào: không có dữ liệu để học mô hình. Đây là bài toán khởi đầu lạnh với người dùng mới; mô hình dựa trên nội dung không giải quyết được trường hợp này.';
+    else msg = 'Người dùng ' + USERS[sel] + ' đã chấm ' + m.s + ' bài (chấm hồng). Đường xanh là mô hình tuyến tính học từ những bài đó; vòng tròn xanh là điểm dự đoán cho các bài chưa chấm. ' +
+      (m.s <= 2 ? 'Chỉ với ' + m.s + ' điểm dữ liệu, mô hình phụ thuộc rất nhiều vào $\\lambda$: tăng $\\lambda$ để thấy dự đoán bị kéo về điểm trung bình của người này. ' : '') +
+      'Hệ số $w_1$ ' + (m.w[0] > m.w[1] ? 'lớn hơn' : 'nhỏ hơn') + ' $w_2$: người này thích Bolero ' + (m.w[0] > m.w[1] ? 'hơn' : 'kém hơn') + ' nhạc Thiếu nhi.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  V_.$('#lam').addEventListener('input', render);
+  V_.$('#reset').addEventListener('click', function () { reset(); render(); });
+  V_.texAll(document.body);
+  reset(); render();
+})();
+</script>
+</body>
+</html>

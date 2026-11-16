@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SVM lề mềm · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .grid2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; align-items: start; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  .legend { font-size: .82rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 4px 2px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>SVM lề mềm</h1>
+      <div class="crumbs"><a href="../#/ml/ch27_vi">← Chương 27 Máy vector hỗ trợ lề mềm</a></div>
+    </div>
+    <p class="lead">SVM lề mềm cho phép một số điểm vi phạm lề, đổi lại phải trả giá $C\xi_n$ cho mỗi điểm. Đoạn màu cam từ một điểm tới đường hỗ trợ của lớp nó có độ dài tỉ lệ với $\xi_n$. Bên phải: mỗi điểm đặt trên đồ thị mất mát bản lề tại hoành độ $y_nz_n$. Bấm vào chỗ trống để thêm điểm, bấm vào một điểm để xoá.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-softsvm.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Dữ liệu</span>
+      <div class="seg" id="data"><button type="button" data-v="book" aria-pressed="true">Ví dụ của sách</button><button type="button" data-v="noise" aria-pressed="false">Một điểm nhiễu</button></div>
+      <span class="lb">Bấm để thêm</span>
+      <div class="seg" id="cls"><button type="button" data-v="1" aria-pressed="true">lớp +1 ■</button><button type="button" data-v="-1" aria-pressed="false">lớp −1 ●</button></div>
+    </div>
+    <div class="ctrl">
+      <label for="c">$C$</label><input id="c" type="range" min="-2" max="3" step="0.05" value="2"><span class="val" id="c-v"></span>
+    </div>
+    <div class="stats"><span>Lề $1/\|\mathbf{w}\|_2$ <b id="mg"></b></span><span>Vector hỗ trợ <b id="nsv"></b></span><span>$\lambda_n = C$ <b id="nc"></b></span><span>Phân loại sai <b id="nerr"></b></span><span>$\sum_n \xi_n$ <b id="sxi"></b></span></div>
+    <div class="grid2">
+      <div>
+        <div class="plotbox click"><canvas id="cv" width="520" height="430"></canvas><svg id="sv" viewBox="0 0 520 430" role="img" aria-label="Dữ liệu, đường phân chia, lề và biến lỏng lẻo"></svg></div>
+        <div class="legend"><span>đặc: $\lambda_n = 0$</span><span>rỗng: $0 < \lambda_n < C$ (trên lề)</span><span>có dấu ×: $\lambda_n = C$ (vi phạm lề)</span></div>
+      </div>
+      <div class="plotbox"><svg id="hl" viewBox="0 0 360 300" role="img" aria-label="Mất mát bản lề và vị trí của từng điểm"></svg></div>
+    </div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, BLUE = '#2f80f5', PINK = '#e8487f', ORANGE = '#f08a24';
+  var svg = V_.$('#sv'), cv = V_.$('#cv');
+  var P = MLV.Plot(svg, { W: 520, H: 430, x: [0, 6], y: [-0.6, 4.32], m: { l: 32, r: 10, t: 10, b: 28 } });
+  // 40 điểm của mục 27.5 (np.random.seed(22), cov = 0.7 I)
+  var BOOK = [[1.923, 0.776, 1], [2.905, 1.800, 1], [1.589, 1.161, 1], [2.769, 1.077, 1], [2.524, 1.530, 1], [2.024, 1.807, 1], [2.492, 2.629, 1], [1.114, 2.883, 1], [2.626, 2.891, 1], [3.272, 0.755, 1], [3.556, 0.663, 1], [1.459, 2.282, 1], [2.876, 2.526, 1], [2.304, 2.465, 1], [1.089, 2.020, 1], [4.091, -0.083, 1], [1.804, 1.918, 1], [1.258, 1.886, 1], [2.085, 1.790, 1], [1.934, 1.092, 1],
+    [4.498, 1.465, -1], [3.073, 3.762, -1], [3.525, 1.598, -1], [2.391, 2.334, -1], [3.123, 1.419, -1], [4.624, 2.449, -1], [3.387, 2.465, -1], [4.362, 1.886, -1], [3.213, 2.406, -1], [2.718, 2.339, -1], [4.011, 0.969, -1], [3.119, 4.105, -1], [2.294, 2.079, -1], [3.737, 2.410, -1], [4.297, 2.795, -1], [4.636, 2.010, -1], [2.849, 1.773, -1], [4.454, 2.448, -1], [4.971, 1.862, -1], [3.013, 1.544, -1]];
+  var pts = [], sol = null;
+
+  function makeData() {
+    var d = V_.$('#data [aria-pressed=true]').dataset.v;
+    if (d === 'book') { pts = BOOK.map(function (p) { return p.slice(); }); return; }
+    // Hình 27.1a: hai lớp tách biệt rõ, thêm một điểm lớp +1 nằm sát lớp kia
+    var r = MLV.rng(11); pts = [];
+    for (var i = 0; i < 15; i++) {
+      pts.push([1.6 + 0.45 * MLV.randn(r), 1.8 + 0.6 * MLV.randn(r), 1]);
+      pts.push([4.4 + 0.45 * MLV.randn(r), 2.0 + 0.6 * MLV.randn(r), -1]);
+    }
+    pts.push([3.65, 1.9, 1]);
+  }
+  function C() { return Math.pow(10, +V_.$('#c').value); }
+  function fit() {
+    var has = { 1: 0, '-1': 0 }; pts.forEach(function (p) { has[p[2]]++; });
+    if (!has[1] || !has[-1]) { sol = null; return; }
+    var X = pts.map(function (p) { return [p[0], p[1]]; }), y = pts.map(function (p) { return p[2]; }), c = C();
+    var s = MLV.svm(X, y, { C: c, tol: 1e-5, maxIter: 100000 });
+    var w = [0, 0]; s.sv.forEach(function (k) { w[0] += s.alpha[k] * y[k] * X[k][0]; w[1] += s.alpha[k] * y[k] * X[k][1]; });
+    var grp = pts.map(function (_, k) { var a = s.alpha[k]; return a <= 1e-8 ? 0 : (a >= c * (1 - 1e-6) ? 2 : 1); });
+    var yz = pts.map(function (p) { return p[2] * (w[0] * p[0] + w[1] * p[1] + s.b); });
+    sol = { w: w, b: s.b, grp: grp, yz: yz, C: c };
+  }
+  function lineOf(w0, w1, w2, attrs, g) {
+    if (Math.abs(w2) > 1e-9) P.curve(function (x) { return -(w0 + w1 * x) / w2; }, attrs, g);
+    else if (Math.abs(w1) > 1e-9) { var x0 = -w0 / w1; P.el('line', Object.assign({ x1: P.sx(x0), x2: P.sx(x0), y1: P.m.t, y2: P.H - P.m.b, 'clip-path': P.clip }, attrs), g); }
+  }
+  function render() {
+    V_.$('#c-v').textContent = V_.fmt(C(), C() < 1 ? 2 : 0);
+    var bl = MLV.hexRgb(BLUE), pk = MLV.hexRgb(PINK);
+    if (sol) MLV.paint(cv, P, function (x, y) { var f = sol.w[0] * x + sol.w[1] * y + sol.b, c = f > 0 ? bl : pk; return [c[0], c[1], c[2], Math.abs(f) < 1 ? 16 : 40]; }, 4);
+    P.clear(); P.axes();
+    var g = P.layer(true);
+    if (sol) {
+      lineOf(sol.b - 1, sol.w[0], sol.w[1], { stroke: 'var(--text)', 'stroke-width': 1.2, 'stroke-dasharray': '6 4' }, g);
+      lineOf(sol.b + 1, sol.w[0], sol.w[1], { stroke: 'var(--text)', 'stroke-width': 1.2, 'stroke-dasharray': '6 4' }, g);
+      lineOf(sol.b, sol.w[0], sol.w[1], { stroke: 'var(--text)', 'stroke-width': 2.6 }, g);
+      // biến lỏng lẻo: đoạn vuông góc từ điểm tới đường hỗ trợ của lớp nó, dài xi/||w||
+      var n2 = sol.w[0] * sol.w[0] + sol.w[1] * sol.w[1];
+      pts.forEach(function (p, k) {
+        var xi = Math.max(0, 1 - sol.yz[k]); if (xi < 1e-6) return;
+        var t = p[2] * xi / n2, q = [p[0] + t * sol.w[0], p[1] + t * sol.w[1]];
+        P.el('line', { x1: P.sx(p[0]), y1: P.sy(p[1]), x2: P.sx(q[0]), y2: P.sy(q[1]), stroke: ORANGE, 'stroke-width': 2.4 }, g);
+      });
+    }
+    pts.forEach(function (p, k) {
+      var x = P.sx(p[0]), y = P.sy(p[1]), col = p[2] > 0 ? BLUE : PINK, gr = sol ? sol.grp[k] : 0;
+      var fill = gr === 1 ? 'var(--surface)' : col;
+      if (p[2] > 0) P.el('rect', { x: x - 5.5, y: y - 5.5, width: 11, height: 11, fill: fill, stroke: col, 'stroke-width': 2.2 }, g);
+      else P.el('circle', { cx: x, cy: y, r: 6, fill: fill, stroke: col, 'stroke-width': 2.2 }, g);
+      if (gr === 2) P.el('path', { d: 'M' + (x - 3.5) + ' ' + (y - 3.5) + 'L' + (x + 3.5) + ' ' + (y + 3.5) + 'M' + (x - 3.5) + ' ' + (y + 3.5) + 'L' + (x + 3.5) + ' ' + (y - 3.5), stroke: '#fff', 'stroke-width': 1.8 }, g);
+    });
+    // đồ thị mất mát bản lề
+    var H = MLV.Plot(V_.$('#hl'), { W: 360, H: 300, x: [-3, 4], y: [-0.3, 4], m: { l: 36, r: 10, t: 12, b: 36 }, xlabel: 'y z', ylabel: 'mất mát' });
+    H.clear(); H.axes();
+    var hg = H.layer(true);
+    H.curve(function (z) { return z < 0 ? 1 : 0; }, { stroke: 'var(--muted)', 'stroke-width': 1.4, 'stroke-dasharray': '5 4' }, hg);
+    H.curve(function (z) { return Math.max(0, 1 - z); }, { stroke: 'var(--text)', 'stroke-width': 2.2 }, hg);
+    if (sol) {
+      pts.forEach(function (p, k) {
+        var z = Math.max(-3, Math.min(4, sol.yz[k])), l = Math.max(0, 1 - sol.yz[k]);
+        var cx = H.sx(z), cy = H.sy(Math.min(l, 4));
+        if (p[2] > 0) H.el('rect', { x: cx - 4, y: cy - 4, width: 8, height: 8, fill: BLUE, opacity: 0.8 }, hg);
+        else H.el('circle', { cx: cx, cy: cy, r: 4.2, fill: PINK, opacity: 0.8 }, hg);
+      });
+    }
+    var nsv = 0, nc = 0, nerr = 0, sxi = 0;
+    if (sol) sol.grp.forEach(function (gr, k) { if (gr) nsv++; if (gr === 2) nc++; if (sol.yz[k] < 0) nerr++; sxi += Math.max(0, 1 - sol.yz[k]); });
+    var mg = sol ? 1 / Math.hypot(sol.w[0], sol.w[1]) : null;
+    V_.$('#mg').textContent = sol ? V_.fmt(mg, 3) : '–';
+    V_.$('#nsv').textContent = sol ? nsv + ' / ' + pts.length : '–';
+    V_.$('#nc').textContent = sol ? nc : '–';
+    V_.$('#nerr').textContent = sol ? nerr : '–';
+    V_.$('#sxi').textContent = sol ? V_.fmt(sxi, 2) : '–';
+    var c = C(), d = V_.$('#data [aria-pressed=true]').dataset.v, msg;
+    if (!sol) msg = 'Cần ít nhất một điểm của mỗi lớp.';
+    else if (d === 'noise' && pts.length === 31) msg = c >= 50 ? 'Với $C$ lớn, SVM lề mềm gần như SVM lề cứng: nó cố phân loại đúng cả điểm vuông nằm lạc sang phía lớp tròn, nên lề rất hẹp (' + V_.fmt(mg, 2) + '). Kéo $C$ xuống dưới 1 để xem lề rộng ra và điểm này được "bỏ qua" bằng một $\\xi_n$ lớn.' : 'Với $C$ nhỏ, SVM chấp nhận để điểm vuông lạc vi phạm lề (đoạn cam), đổi lấy một lề rộng hơn (' + V_.fmt(mg, 2) + '), giống Hình 27.1a. Đây là lý do SVM lề mềm bền vững hơn với nhiễu.';
+    else if (c >= 100) msg = '$C$ lớn: vi phạm lề bị phạt nặng, lề hẹp lại. Các điểm có $\\lambda_n = C$ (dấu ×) là các điểm có $\\xi_n > 0$: nằm trong lề hoặc ở sai phía. Bên phải, chúng nằm trên phần dốc của mất mát bản lề ($y_nz_n < 1$); các điểm nằm ở phần bằng 0 có $\\lambda_n = 0$ và không ảnh hưởng gì tới nghiệm.';
+    else if (c <= 0.1) msg = '$C$ nhỏ: lề rất rộng, gần như mọi điểm đều nằm trong lề và đều là vector hỗ trợ (' + nsv + '/' + pts.length + '). Mô hình bị kiểm soát quá mạnh; $\\mathbf{w}$ nhỏ nên mọi $y_nz_n$ đều gần 0 (đồ thị bên phải).';
+    else msg = 'Kéo thanh $C$: $C$ càng lớn thì lề càng hẹp và càng ít điểm vi phạm lề (mục 27.5.4). Các điểm rỗng nằm đúng trên đường nét đứt ($y_nz_n = 1$, góc của mất mát bản lề); chỉ chúng được dùng để tính $b$ theo (27.19).';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  function refresh() { fit(); render(); }
+
+  V_.$('#c').addEventListener('input', refresh);
+  ['#data', '#cls'].forEach(function (sel) {
+    V_.$$(sel + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$(sel + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        if (sel === '#data') { V_.$('#c').value = b.dataset.v === 'noise' ? 3 : 2; makeData(); refresh(); }
+      });
+    });
+  });
+  svg.addEventListener('click', function (e) {
+    var a = P.at(e);
+    if (!P.inside(a.px, a.py)) return;
+    var hit = -1;
+    pts.forEach(function (p, i) { if (Math.hypot(P.sx(p[0]) - a.px, P.sy(p[1]) - a.py) < 9) hit = i; });
+    if (hit >= 0) pts.splice(hit, 1);
+    else pts.push([a.x, a.y, +V_.$('#cls [aria-pressed=true]').dataset.v]);
+    refresh();
+  });
+  V_.texAll(document.body);
+  makeData(); refresh();
+  window.__softCheck = function () { return { w: sol.w, b: sol.b, nsv: sol.grp.filter(function (g) { return g; }).length, nc: sol.grp.filter(function (g) { return g === 2; }).length }; };
+})();
+</script>
+</body>
+</html>

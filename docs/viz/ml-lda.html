@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phân tích biệt thức tuyến tính · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>LDA và PCA: chiếu để làm gì?</h1>
+      <div class="crumbs"><a href="../#/ml/ch22_vi">← Chương 22 Phân tích biệt thức tuyến tính</a></div>
+    </div>
+    <p class="lead">Hai lớp dữ liệu được chiếu xuống một đường thẳng. Phân phối của hai lớp sau khi chiếu được vẽ ở dưới. PCA chọn hướng có phương sai lớn nhất (không nhìn nhãn); LDA chọn hướng tối đa $J(\mathbf{w}) = \frac{(m_1 - m_2)^2}{s_1^2 + s_2^2}$ (công thức (22.5)).</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-lda.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <label for="ang">Hướng chiếu</label><input id="ang" type="range" min="0" max="180" step="0.5" value="20"><span class="val" id="ang-v"></span>
+      <button type="button" class="btn pri" id="lda">Hướng LDA</button>
+      <button type="button" class="btn" id="pca">Hướng PCA</button>
+    </div>
+    <div class="ctrl">
+      <label for="sep">Khoảng cách hai lớp</label><input id="sep" type="range" min="0.5" max="4" step="0.1" value="1.6"><span class="val" id="sep-v"></span>
+      <label for="el">Độ dẹt mỗi lớp</label><input id="el" type="range" min="1" max="6" step="0.1" value="4"><span class="val" id="el-v"></span>
+      <label for="tilt">Nghiêng</label><input id="tilt" type="range" min="-60" max="60" step="1" value="10"><span class="val" id="tilt-v"></span>
+    </div>
+    <div class="two-plots">
+      <div>
+        <div class="plotbox"><svg id="sv" viewBox="0 0 440 380" role="img" aria-label="Dữ liệu hai lớp và đường chiếu"></svg></div>
+        <div class="plotbox"><svg id="hist" viewBox="0 0 440 150" role="img" aria-label="Phân phối sau khi chiếu"></svg></div>
+      </div>
+      <div class="plotbox"><svg id="ch" viewBox="0 0 360 300" role="img" aria-label="J theo hướng chiếu"></svg></div>
+    </div>
+    <table class="mtab" id="tab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, COL = [MLV.CLASS[0], MLV.CLASS[1]], CL = '#0ea5a4', CPCA = '#7c3aed';
+  var svg = V_.$('#sv'), P = MLV.Plot(svg, { W: 440, H: 380, x: [-5, 5], y: [-4.2, 4.2], m: { l: 30, r: 10, t: 10, b: 26 } });
+  var base = (function () { var r = MLV.rng(4), a = []; for (var i = 0; i < 160; i++) a.push([MLV.randn(r), MLV.randn(r), i % 2]); return a; })();
+  function data() {
+    var sep = +V_.$('#sep').value, el = +V_.$('#el').value, t = +V_.$('#tilt').value * Math.PI / 180, c = Math.cos(t), s = Math.sin(t);
+    return base.map(function (b) {
+      var u = 0.6 * el * b[0], v = 0.45 * b[1] + (b[2] ? sep / 2 : -sep / 2);
+      return [u * c - v * s, u * s + v * c, b[2]];
+    });
+  }
+  function scatter(D) {
+    var m = [[0, 0], [0, 0]], n = [0, 0];
+    D.forEach(function (p) { m[p[2]][0] += p[0]; m[p[2]][1] += p[1]; n[p[2]]++; });
+    m = m.map(function (v, k) { return [v[0] / n[k], v[1] / n[k]]; });
+    var SW = [0, 0, 0], ST = [0, 0, 0], mt = [(m[0][0] * n[0] + m[1][0] * n[1]) / D.length, (m[0][1] * n[0] + m[1][1] * n[1]) / D.length];
+    D.forEach(function (p) {
+      var a = p[0] - m[p[2]][0], b = p[1] - m[p[2]][1]; SW[0] += a * a; SW[1] += a * b; SW[2] += b * b;
+      var c = p[0] - mt[0], d = p[1] - mt[1]; ST[0] += c * c; ST[1] += c * d; ST[2] += d * d;
+    });
+    return { m: m, SW: SW, ST: ST };
+  }
+  function Jof(S, th) {
+    var w = [Math.cos(th), Math.sin(th)], d = w[0] * (S.m[0][0] - S.m[1][0]) + w[1] * (S.m[0][1] - S.m[1][1]);
+    return d * d / (w[0] * w[0] * S.SW[0] + 2 * w[0] * w[1] * S.SW[1] + w[1] * w[1] * S.SW[2]);
+  }
+  function ldaAngle(S) {           // w ~ S_W^{-1}(m0 - m1)
+    var a = S.SW[0], b = S.SW[1], c = S.SW[2], det = a * c - b * b, dx = S.m[0][0] - S.m[1][0], dy = S.m[0][1] - S.m[1][1];
+    var w = [(c * dx - b * dy) / det, (-b * dx + a * dy) / det], t = Math.atan2(w[1], w[0]) * 180 / Math.PI;
+    return ((t % 180) + 180) % 180;
+  }
+  function pcaAngle(S) { var t = 0.5 * Math.atan2(2 * S.ST[1], S.ST[0] - S.ST[2]) * 180 / Math.PI; return ((t % 180) + 180) % 180; }
+  function render() {
+    ['sep', 'el', 'tilt'].forEach(function (k) { V_.$('#' + k + '-v').textContent = V_.fmt(+V_.$('#' + k).value, k === 'tilt' ? 0 : 1); });
+    var deg = +V_.$('#ang').value, th = deg * Math.PI / 180, u = [Math.cos(th), Math.sin(th)];
+    V_.$('#ang-v').textContent = V_.fmt(deg, 1) + '°';
+    var D = data(), S = scatter(D);
+    P.clear(); P.axes();
+    var g = P.layer(true);
+    P.el('line', { x1: P.sx(-6 * u[0]), y1: P.sy(-6 * u[1]), x2: P.sx(6 * u[0]), y2: P.sy(6 * u[1]), stroke: CL, 'stroke-width': 2.5 }, g);
+    D.forEach(function (p) { P.el('circle', { cx: P.sx(p[0]), cy: P.sy(p[1]), r: 3.4, fill: COL[p[2]], class: 'pl-pt' }, g); });
+    // biểu đồ tần suất sau khi chiếu
+    var z = D.map(function (p) { return [p[0] * u[0] + p[1] * u[1], p[2]]; }), bins = 40, lo = -6, hi = 6, h = [new Array(bins).fill(0), new Array(bins).fill(0)];
+    z.forEach(function (q) { var b = Math.floor((q[0] - lo) / (hi - lo) * bins); if (b >= 0 && b < bins) h[q[1]][b]++; });
+    var Hs = V_.$('#hist'); while (Hs.firstChild) Hs.removeChild(Hs.firstChild);
+    var Ph = MLV.Plot(Hs, { W: 440, H: 150, x: [lo, hi], y: [0, Math.max.apply(null, h[0].concat(h[1])) * 1.1 || 1], m: { l: 30, r: 10, t: 8, b: 26 }, ny: 3 });
+    Ph.axes();
+    [0, 1].forEach(function (k) { h[k].forEach(function (cnt, b) { if (!cnt) return; var x0 = lo + (hi - lo) * b / bins, x1 = lo + (hi - lo) * (b + 1) / bins; Ph.el('rect', { x: Ph.sx(x0), y: Ph.sy(cnt), width: Ph.sx(x1) - Ph.sx(x0) - 1, height: Ph.sy(0) - Ph.sy(cnt), fill: COL[k], 'fill-opacity': 0.55 }); }); });
+    // J theo góc
+    var curve = []; for (var d = 0; d <= 180; d += 1) curve.push([d, Jof(S, d * Math.PI / 180)]);
+    var la = ldaAngle(S), pa = pcaAngle(S), Jmax = Jof(S, la * Math.PI / 180);
+    var Pc = MLV.chart(V_.$('#ch'), [{ pts: curve, color: '#2f80f5' }], { x: [0, 180], y: [0, Jmax * 1.08], xlabel: 'hướng chiếu (độ)', ylabel: 'J(w)', vline: deg, m: { l: 46, r: 10, t: 8, b: 34 } });
+    [[la, '#e8487f'], [pa, CPCA]].forEach(function (e) { MLV.el('circle', { cx: Pc.sx(e[0]), cy: Pc.sy(Jof(S, e[0] * Math.PI / 180)), r: 5, fill: e[1] }, V_.$('#ch')); });
+    // tỉ lệ phân loại đúng nếu đặt ngưỡng ở giữa hai trung bình chiếu
+    var m0 = S.m[0][0] * u[0] + S.m[0][1] * u[1], m1 = S.m[1][0] * u[0] + S.m[1][1] * u[1], mid = (m0 + m1) / 2, ok = 0;
+    z.forEach(function (q) { if (((q[0] - mid) * (m1 - m0) > 0 ? 1 : 0) === q[1]) ok++; });
+    V_.$('#tab').innerHTML = '<tr><th>Hướng</th><th>Góc</th><th>$J(\\mathbf{w})$</th></tr>' +
+      '<tr><td>đang chọn</td><td>' + V_.fmt(deg, 1) + '°</td><td>' + V_.fmt(Jof(S, th), 3) + ' (đúng ' + V_.fmt(100 * ok / z.length, 1) + '% nếu cắt ở giữa)</td></tr>' +
+      '<tr><td style="color:#e8487f;font-weight:700">LDA</td><td>' + V_.fmt(la, 1) + '°</td><td>' + V_.fmt(Jmax, 3) + '</td></tr>' +
+      '<tr><td style="color:' + CPCA + ';font-weight:700">PCA</td><td>' + V_.fmt(pa, 1) + '°</td><td>' + V_.fmt(Jof(S, pa * Math.PI / 180), 3) + '</td></tr>';
+    V_.texAll(V_.$('#tab'));
+    var diff = Math.abs(((la - pa) + 90 + 180) % 180 - 90), msg;
+    if (diff > 45) msg = 'Hướng PCA gần như vuông góc với hướng LDA: dữ liệu trải dài nhất dọc theo mỗi lớp, nên PCA chọn đúng hướng làm hai lớp chồng lên nhau. Đây là tình huống ở Hình 22.1 của sách: phương sai lớn không có nghĩa là tách lớp tốt.';
+    else if (diff > 10) msg = 'PCA và LDA chọn hai hướng khác nhau ' + V_.fmt(diff, 0) + '°. Kéo "Độ dẹt" lên để thấy khoảng cách này tăng.';
+    else msg = 'Khi khoảng cách giữa hai lớp lớn so với độ trải của mỗi lớp, hướng có phương sai lớn nhất cũng chính là hướng tách hai lớp: PCA và LDA gần trùng nhau.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  ['#ang', '#sep', '#el', '#tilt'].forEach(function (s) { V_.$(s).addEventListener('input', render); });
+  V_.$('#lda').addEventListener('click', function () { V_.$('#ang').value = ldaAngle(scatter(data())).toFixed(1); render(); });
+  V_.$('#pca').addEventListener('click', function () { V_.$('#ang').value = pcaAngle(scatter(data())).toFixed(1); render(); });
+  V_.texAll(document.body);
+  render();
+})();
+</script>
+</body>
+</html>

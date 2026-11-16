@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SVM đa lớp · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .grid2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; align-items: start; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  .cap { text-align: center; font-size: .85rem; color: var(--muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>SVM đa lớp</h1>
+      <div class="crumbs"><a href="../#/ml/ch29_vi">← Chương 29 Máy vector hỗ trợ đa lớp</a></div>
+    </div>
+    <p class="lead">Mỗi lớp $j$ có một vector trọng số $\mathbf{w}_j$; điểm $\mathbf{x}$ thuộc lớp có điểm số $z_j = \mathbf{w}_j^T\mathbf{x}$ cao nhất. Gradient descent tối thiểu hàm mất mát (29.5). Bấm vào một điểm để xem vector điểm số của nó (bên phải, như Hình 29.4); bấm vào chỗ trống để thêm điểm.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-multisvm.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Dữ liệu</span>
+      <div class="seg" id="data"><button type="button" data-v="3" aria-pressed="true">3 lớp</button><button type="button" data-v="4" aria-pressed="false">4 lớp chồng lấn</button></div>
+      <span class="lb">Bấm để thêm</span>
+      <div class="seg" id="cls"><button type="button" data-v="0" aria-pressed="true">lớp 1</button><button type="button" data-v="1" aria-pressed="false">lớp 2</button><button type="button" data-v="2" aria-pressed="false">lớp 3</button><button type="button" data-v="3" aria-pressed="false">lớp 4</button></div>
+    </div>
+    <div class="ctrl">
+      <span class="lb">Mất mát</span>
+      <div class="seg" id="loss"><button type="button" data-v="ww" aria-pressed="true">SVM đa lớp (sách)</button><button type="button" data-v="cs" aria-pressed="false">Crammer–Singer</button><button type="button" data-v="ce" aria-pressed="false">entropy chéo (softmax)</button></div>
+      <label for="lam">$\lambda$</label><input id="lam" type="range" min="-4" max="0" step="0.05" value="-2"><span class="val" id="lam-v"></span>
+    </div>
+    <div class="ctrl">
+      <button type="button" class="btn pri" id="play"></button>
+      <button type="button" class="btn" id="step">100 bước</button>
+      <button type="button" class="btn" id="reset">Khởi tạo lại</button>
+      <label for="speed">Tốc độ</label><input id="speed" type="range" min="1" max="5" step="1" value="4">
+    </div>
+    <div class="stats"><span>Số bước <b id="t"></b></span><span>Mất mát <b id="L"></b></span><span>Đúng trên tập huấn luyện <b id="acc"></b></span><span>Điểm có mất mát dương <b id="nact"></b></span></div>
+    <div class="grid2">
+      <div class="plotbox click"><canvas id="cv" width="520" height="430"></canvas><svg id="sv" viewBox="0 0 520 430" role="img" aria-label="Vùng quyết định của SVM đa lớp"></svg></div>
+      <div>
+        <div class="plotbox"><svg id="bar" viewBox="0 0 360 250" role="img" aria-label="Vector điểm số của điểm được chọn"></svg></div>
+        <div class="cap" id="bar-cap"></div>
+        <div class="plotbox"><svg id="ch" viewBox="0 0 360 150" role="img" aria-label="Hàm mất mát theo số bước"></svg></div>
+      </div>
+    </div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, COL = MLV.CLASS.slice(0, 4);
+  var svg = V_.$('#sv'), cv = V_.$('#cv');
+  var P = MLV.Plot(svg, { W: 520, H: 430, x: [-3, 3], y: [-2.46, 2.46], m: { l: 32, r: 10, t: 10, b: 28 } });
+  var pts = [], W, t, hist, sel = 0, K = 3, seed = 1;
+
+  function makeData() {
+    var n = +V_.$('#data [aria-pressed=true]').dataset.v, r = MLV.rng(9), i, k;
+    var C3 = [[-1.4, -0.9], [1.4, -0.9], [0, 1.4]], C4 = [[-1.0, -0.8], [1.0, -0.8], [1.0, 0.9], [-1.0, 0.9]];
+    var cen = n === 3 ? C3 : C4, s = n === 3 ? 0.5 : 0.62;
+    K = n; pts = [];
+    for (k = 0; k < n; k++) for (i = 0; i < 16; i++) pts.push([cen[k][0] + s * MLV.randn(r), cen[k][1] + s * MLV.randn(r), k]);
+    V_.$$('#cls button').forEach(function (b) { b.style.display = +b.dataset.v < K ? '' : 'none'; });
+    if (+V_.$('#cls [aria-pressed=true]').dataset.v >= K) V_.$$('#cls button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === '0' ? 'true' : 'false'); });
+    sel = 0;
+  }
+  function lam() { return Math.pow(10, +V_.$('#lam').value); }
+  function kind() { return V_.$('#loss [aria-pressed=true]').dataset.v; }
+  function scores(x) { var z = []; for (var j = 0; j < K; j++) z.push(W[j][0] * x[0] + W[j][1] * x[1] + W[j][2]); return z; }
+  // mất mát và gradient tại một điểm; trả về [mất mát, hệ số của x cho từng lớp]
+  function pointLoss(z, y) {
+    var j, g = new Array(K).fill(0), L = 0, k = kind();
+    if (k === 'ww') {
+      for (j = 0; j < K; j++) if (j !== y) { var m = 1 - z[y] + z[j]; if (m > 0) { L += m; g[j] += 1; g[y] -= 1; } }
+    } else if (k === 'cs') {
+      var jm = -1, best = -Infinity; for (j = 0; j < K; j++) if (j !== y && z[j] > best) { best = z[j]; jm = j; }
+      var mm = 1 - z[y] + best; if (mm > 0) { L = mm; g[jm] += 1; g[y] -= 1; }
+    } else {
+      var mx = Math.max.apply(null, z), s = 0, e = z.map(function (v) { return Math.exp(v - mx); });
+      e.forEach(function (v) { s += v; });
+      L = Math.log(s) - (z[y] - mx);
+      for (j = 0; j < K; j++) g[j] = e[j] / s - (j === y ? 1 : 0);
+    }
+    return [L, g];
+  }
+  function total() {
+    var L = 0, act = 0, ok = 0;
+    pts.forEach(function (p) {
+      var z = scores(p), r = pointLoss(z, p[2]); L += r[0]; if (r[0] > 1e-9) act++;
+      var am = 0; for (var j = 1; j < K; j++) if (z[j] > z[am]) am = j; if (am === p[2]) ok++;
+    });
+    var reg = 0; W.forEach(function (w) { reg += w[0] * w[0] + w[1] * w[1]; });   // không phạt hệ số điều chỉnh
+    return { L: L / pts.length + 0.5 * lam() * reg, act: act, acc: ok / pts.length };
+  }
+  function init() {
+    var r = MLV.rng(seed * 37); W = [];
+    for (var j = 0; j < 4; j++) W.push([0.1 * MLV.randn(r), 0.1 * MLV.randn(r), 0]);
+    t = 0; hist = [[0, total().L]];
+  }
+  function gdStep() {
+    var G = W.map(function () { return [0, 0, 0]; }), N = pts.length, l = lam(), eta = 0.2;
+    pts.forEach(function (p) {
+      var g = pointLoss(scores(p), p[2])[1];
+      for (var j = 0; j < K; j++) { G[j][0] += g[j] * p[0] / N; G[j][1] += g[j] * p[1] / N; G[j][2] += g[j] / N; }
+    });
+    for (var j = 0; j < K; j++) { W[j][0] -= eta * (G[j][0] + l * W[j][0]); W[j][1] -= eta * (G[j][1] + l * W[j][1]); W[j][2] -= eta * G[j][2]; }
+    t++;
+  }
+  function run(k) { for (var i = 0; i < k; i++) gdStep(); hist.push([t, total().L]); if (hist.length > 400) hist = hist.filter(function (_, i) { return i % 2 === 0; }); }
+
+  function render() {
+    V_.$('#lam-v').textContent = V_.fmt(lam(), lam() < 0.01 ? 4 : 3);
+    var cols = COL.map(MLV.hexRgb);
+    MLV.paint(cv, P, function (x, y) {
+      var z = scores([x, y]), a = 0, b = -1; for (var j = 1; j < K; j++) if (z[j] > z[a]) a = j;
+      for (j = 0; j < K; j++) if (j !== a && (b < 0 || z[j] > z[b])) b = j;
+      var c = cols[a]; return [c[0], c[1], c[2], z[a] - z[b] < 1 ? 22 : 52];
+    }, 4);
+    P.clear(); P.axes();
+    var g = P.layer(true);
+    pts.forEach(function (p, i) {
+      var x = P.sx(p[0]), y = P.sy(p[1]), r = pointLoss(scores(p), p[2])[0];
+      P.el('circle', { cx: x, cy: y, r: 5.5, fill: COL[p[2]], stroke: r > 1e-9 ? 'var(--text)' : 'var(--surface)', 'stroke-width': r > 1e-9 ? 1.6 : 1 }, g);
+      if (i === sel) P.el('circle', { cx: x, cy: y, r: 11, fill: 'none', stroke: 'var(--text)', 'stroke-width': 2.4 }, g);
+    });
+    // vector điểm số của điểm được chọn (Hình 29.4)
+    var bsv = V_.$('#bar'); while (bsv.firstChild) bsv.removeChild(bsv.firstChild);
+    if (pts[sel]) {
+      var p = pts[sel], z = scores(p), y = p[2], lo = Math.min.apply(null, z.concat([z[y] - 1])) - 0.5, hi = Math.max.apply(null, z.concat([z[y]])) + 0.5;
+      var B = MLV.Plot(bsv, { W: 360, H: 250, x: [-0.5, K - 0.5], y: [lo, hi], m: { l: 40, r: 10, t: 12, b: 30 }, ylabel: 'điểm số' });
+      B.axes({ xticks: [], noFrame: false });
+      for (var j = 0; j < K; j++) {
+        var y0 = B.sy(Math.max(lo, Math.min(hi, 0))), y1 = B.sy(z[j]);
+        B.el('rect', { x: B.sx(j) - 22, y: Math.min(y0, y1), width: 44, height: Math.abs(y1 - y0), fill: COL[j], opacity: j === y ? 1 : 0.55 });
+        B.el('text', { x: B.sx(j), y: B.H - 10, 'text-anchor': 'middle', class: 'pl-tick' }).textContent = 'lớp ' + (j + 1) + (j === y ? ' (thật)' : '');
+        if (j !== y && z[j] > z[y] - 1) B.el('rect', { x: B.sx(j) - 22, y: B.sy(z[j]), width: 44, height: B.sy(z[y] - 1) - B.sy(z[j]), fill: 'none', stroke: 'var(--text)', 'stroke-width': 1.5, 'stroke-dasharray': '3 2' });
+      }
+      B.el('line', { x1: B.m.l, x2: B.W - B.m.r, y1: B.sy(z[y] - 1), y2: B.sy(z[y] - 1), stroke: 'var(--text)', 'stroke-dasharray': '6 4' });
+      B.el('text', { x: B.m.l + 4, y: B.sy(z[y] - 1) - 4, 'text-anchor': 'start', class: 'pl-tick' }).textContent = 'z_y − Δ';
+      var r = pointLoss(z, y);
+      V_.$('#bar-cap').textContent = 'Điểm được chọn: mất mát ' + V_.fmt(r[0], 3) + (kind() === 'ce' ? ' (entropy chéo luôn dương)' : '. Khung nét đứt: phần điểm số vượt quá z_y − Δ, bị phạt.');
+    }
+    MLV.chart(V_.$('#ch'), [{ pts: hist, color: '#0ea5a4' }], { xlabel: 'số bước GD', ylabel: 'mất mát', m: { l: 46, r: 10, t: 8, b: 34 } });
+    var T = total();
+    V_.$('#t').textContent = t; V_.$('#L').textContent = V_.fmt(T.L, 4); V_.$('#acc').textContent = Math.round(100 * T.acc) + '%';
+    V_.$('#nact').textContent = T.act + ' / ' + pts.length;
+    var k = kind(), msg;
+    if (k === 'ce') msg = 'Với entropy chéo, mọi điểm đều có mất mát dương, kể cả những điểm đã được phân loại đúng rất xa ranh giới: dòng "Điểm có mất mát dương" luôn bằng tổng số điểm. Các ranh giới thường gần với SVM, nhưng mọi điểm đều góp phần quyết định chúng.';
+    else if (lam() > 0.3) msg = '$\\lambda$ lớn: $\\mathbf{W}$ bị ép nhỏ, các điểm số gần nhau, và hầu hết các điểm nằm trong vùng không an toàn (vùng nhạt quanh ranh giới, nơi hai điểm số cao nhất chênh nhau dưới 1). Giảm $\\lambda$ để lề co lại.';
+    else msg = 'Vùng nhạt quanh ranh giới là nơi hai điểm số cao nhất chênh nhau dưới $\\Delta = 1$. Các điểm có viền đậm có mất mát dương; chỉ chúng đóng góp vào gradient, như vector hỗ trợ của SVM hai lớp. ' + (k === 'ww' ? 'Đổi sang Crammer–Singer: mỗi điểm chỉ bị phạt theo lớp vi phạm nhiều nhất, thay vì cộng mọi lớp.' : 'So với hàm của sách, Crammer–Singer chỉ phạt lớp vi phạm nhiều nhất, nên mất mát nhỏ hơn hoặc bằng.');
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  var player = V_.Player({ btn: V_.$('#play'), speed: V_.$('#speed'), step: function () { run(10); render(); return t < 30000; } });
+  V_.$('#step').addEventListener('click', function () { player.stop(); run(100); render(); });
+  V_.$('#reset').addEventListener('click', function () { player.stop(); seed++; init(); render(); });
+  V_.$('#lam').addEventListener('input', function () { hist.push([t, total().L]); render(); });
+  ['#data', '#cls', '#loss'].forEach(function (s) {
+    V_.$$(s + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$(s + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        if (s === '#data') { player.stop(); makeData(); init(); for (var q = 0; q < 30; q++) run(10); render(); }
+        if (s === '#loss') { hist = [[t, total().L]]; render(); }
+      });
+    });
+  });
+  svg.addEventListener('click', function (e) {
+    var a = P.at(e);
+    if (!P.inside(a.px, a.py)) return;
+    var hit = -1, best = 12;
+    pts.forEach(function (p, i) { var d = Math.hypot(P.sx(p[0]) - a.px, P.sy(p[1]) - a.py); if (d < best) { best = d; hit = i; } });
+    if (hit >= 0) sel = hit;
+    else { pts.push([a.x, a.y, +V_.$('#cls [aria-pressed=true]').dataset.v]); sel = pts.length - 1; hist.push([t, total().L]); }
+    render();
+  });
+  V_.texAll(document.body);
+  makeData(); init(); for (var q = 0; q < 30; q++) run(10); render();
+  window.__msvmCheck = function () { var T = total(); return { t: t, L: T.L, acc: T.acc, act: T.act }; };
+})();
+</script>
+</body>
+</html>

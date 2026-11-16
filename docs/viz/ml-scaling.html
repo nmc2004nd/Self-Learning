@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chuẩn hoá đặc trưng · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Chuẩn hoá đặc trưng và $K$ lân cận</h1>
+      <div class="crumbs"><a href="../#/ml/ch06_vi">← Chương 6 Các kỹ thuật xây dựng đặc trưng</a></div>
+    </div>
+    <p class="lead">Dữ liệu rượu vang Wine (UCI): ba giống nho, hai đặc trưng có thang đo rất khác nhau. Màu nền là vùng quyết định của $K$ lân cận. Bấm vào bản đồ để chọn một điểm: các vòng tròn đánh dấu $K$ láng giềng gần nhất của nó theo khoảng cách mà thuật toán đang dùng.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-scaling.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Đặc trưng</span>
+      <div class="seg" id="feat"><button type="button" data-v="1" aria-pressed="true">Độ cồn, proline</button><button type="button" data-v="2" aria-pressed="false">Độ cồn, cường độ màu</button></div>
+    </div>
+    <div class="ctrl">
+      <span class="lb">Chuẩn hoá</span>
+      <div class="seg" id="scale"><button type="button" data-v="none" aria-pressed="true">Không</button><button type="button" data-v="minmax" aria-pressed="false">Min-max (6.5.1)</button><button type="button" data-v="std" aria-pressed="false">Phân phối chuẩn (6.5.2)</button></div>
+      <label for="k">$K$</label><input id="k" type="range" min="1" max="15" step="1" value="5"><span class="val" id="k-v"></span>
+    </div>
+    <div class="plotbox click"><canvas id="cv" width="560" height="440"></canvas><svg id="sv" viewBox="0 0 560 440" role="img" aria-label="Dữ liệu Wine và vùng quyết định của K lân cận"></svg></div>
+    <table class="mtab" id="tab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, RAW = [[14.23,1065.0,5.64,0],[13.2,1050.0,4.38,0],[13.16,1185.0,5.68,0],[14.37,1480.0,7.8,0],[13.24,735.0,4.32,0],[14.2,1450.0,6.75,0],[14.39,1290.0,5.25,0],[14.06,1295.0,5.05,0],[14.83,1045.0,5.2,0],[13.86,1045.0,7.22,0],[14.1,1510.0,5.75,0],[14.12,1280.0,5.0,0],[13.75,1320.0,5.6,0],[14.75,1150.0,5.4,0],[14.38,1547.0,7.5,0],[13.63,1310.0,7.3,0],[14.3,1280.0,6.2,0],[13.83,1130.0,6.6,0],[14.19,1680.0,8.7,0],[13.64,845.0,5.1,0],[14.06,780.0,5.65,0],[12.93,770.0,4.5,0],[13.71,1035.0,3.8,0],[12.85,1015.0,3.93,0],[13.5,845.0,3.52,0],[13.05,830.0,3.58,0],[13.39,1195.0,4.8,0],[13.3,1285.0,3.95,0],[13.87,915.0,4.5,0],[14.02,1035.0,4.7,0],[13.73,1285.0,5.7,0],[13.58,1515.0,6.9,0],[13.68,990.0,3.84,0],[13.76,1235.0,5.4,0],[13.51,1095.0,4.2,0],[13.48,920.0,5.1,0],[13.28,880.0,4.6,0],[13.05,1105.0,4.25,0],[13.07,1020.0,3.7,0],[14.22,760.0,5.1,0],[13.56,795.0,6.13,0],[13.41,1035.0,4.28,0],[13.88,1095.0,5.43,0],[13.24,680.0,4.36,0],[13.05,885.0,5.04,0],[14.21,1080.0,5.24,0],[14.38,1065.0,4.9,0],[13.9,985.0,6.1,0],[14.1,1060.0,6.2,0],[13.94,1260.0,8.9,0],[13.05,1150.0,7.2,0],[13.83,1265.0,5.6,0],[13.82,1190.0,7.05,0],[13.77,1375.0,6.3,0],[13.74,1060.0,5.85,0],[13.56,1120.0,6.25,0],[14.22,970.0,6.38,0],[13.29,1270.0,6.0,0],[13.72,1285.0,6.8,0],[12.37,520.0,1.95,1],[12.33,680.0,3.27,1],[12.64,450.0,5.75,1],[13.67,630.0,3.8,1],[12.37,420.0,4.45,1],[12.17,355.0,2.95,1],[12.37,678.0,4.6,1],[13.11,502.0,5.3,1],[12.37,510.0,4.68,1],[13.34,750.0,3.17,1],[12.21,718.0,2.85,1],[12.29,870.0,3.05,1],[13.86,410.0,3.38,1],[13.49,472.0,3.74,1],[12.99,985.0,3.35,1],[11.96,886.0,3.21,1],[11.66,428.0,3.8,1],[13.03,392.0,4.6,1],[11.84,500.0,2.65,1],[12.33,750.0,3.4,1],[12.7,463.0,2.57,1],[12.0,278.0,2.5,1],[12.72,714.0,3.9,1],[12.08,630.0,2.2,1],[13.05,515.0,4.8,1],[11.84,520.0,3.05,1],[12.67,450.0,2.62,1],[12.16,495.0,2.45,1],[11.65,562.0,2.6,1],[11.64,680.0,2.8,1],[12.08,625.0,1.74,1],[12.08,480.0,2.4,1],[12.0,450.0,3.6,1],[12.69,495.0,3.05,1],[12.29,290.0,2.15,1],[11.62,345.0,3.25,1],[12.47,937.0,2.6,1],[11.81,625.0,2.5,1],[12.29,428.0,2.9,1],[12.37,660.0,4.5,1],[12.29,406.0,2.3,1],[12.08,710.0,3.3,1],[12.6,562.0,2.45,1],[12.34,438.0,2.8,1],[11.82,415.0,2.06,1],[12.51,672.0,2.94,1],[12.42,315.0,2.7,1],[12.25,510.0,3.4,1],[12.72,488.0,3.3,1],[12.22,312.0,2.7,1],[11.61,680.0,2.65,1],[11.46,562.0,2.9,1],[12.52,325.0,2.0,1],[11.76,607.0,3.8,1],[11.41,434.0,3.08,1],[12.08,385.0,2.9,1],[11.03,407.0,1.9,1],[11.82,495.0,1.95,1],[12.42,345.0,2.06,1],[12.77,372.0,3.4,1],[12.0,564.0,1.28,1],[11.45,625.0,3.25,1],[11.56,465.0,6.0,1],[12.42,365.0,2.08,1],[13.05,380.0,2.6,1],[11.87,380.0,2.8,1],[12.07,378.0,2.76,1],[12.43,352.0,3.94,1],[11.79,466.0,3.0,1],[12.37,342.0,2.12,1],[12.04,580.0,2.6,1],[12.86,630.0,4.1,2],[12.88,530.0,5.4,2],[12.81,560.0,5.7,2],[12.7,600.0,5.0,2],[12.51,650.0,5.45,2],[12.6,695.0,7.1,2],[12.25,720.0,3.85,2],[12.53,515.0,5.0,2],[13.49,580.0,5.7,2],[12.84,590.0,4.92,2],[12.93,600.0,4.6,2],[13.36,780.0,5.6,2],[13.52,520.0,4.35,2],[13.62,550.0,4.4,2],[12.25,855.0,8.21,2],[13.16,830.0,4.0,2],[13.88,415.0,4.9,2],[12.87,625.0,7.65,2],[13.32,650.0,8.42,2],[13.08,550.0,9.4,2],[13.5,500.0,8.6,2],[12.79,480.0,10.8,2],[13.11,425.0,7.1,2],[13.23,675.0,10.52,2],[12.58,640.0,7.6,2],[13.17,725.0,7.9,2],[13.84,480.0,9.01,2],[12.45,880.0,7.5,2],[14.34,660.0,13.0,2],[13.48,620.0,11.75,2],[12.36,520.0,7.65,2],[13.69,680.0,5.88,2],[12.85,570.0,5.58,2],[12.96,675.0,5.28,2],[13.78,615.0,9.58,2],[13.73,520.0,6.62,2],[13.45,695.0,10.68,2],[12.82,685.0,10.26,2],[13.58,750.0,8.66,2],[13.4,630.0,8.5,2],[12.2,510.0,5.5,2],[12.77,470.0,9.899999,2],[14.16,660.0,9.7,2],[13.71,740.0,7.7,2],[13.4,750.0,7.3,2],[13.27,835.0,10.2,2],[13.17,840.0,9.3,2],[14.13,560.0,9.2,2]], COL = MLV.CLASS, RGB = COL.map(MLV.hexRgb);
+  var NAMES = { 1: ['độ cồn (%)', 'proline (mg/L)'], 2: ['độ cồn (%)', 'cường độ màu'] };
+  var svg = V_.$('#sv'), cv = V_.$('#cv'), q = null;
+  function feat() { return +V_.$('#feat [aria-pressed=true]').dataset.v; }
+  function scaling() { return V_.$('#scale [aria-pressed=true]').dataset.v; }
+  function pts() { var f = feat(); return RAW.map(function (r) { return [r[0], r[f], r[3]]; }); }
+  function scaler(P) {
+    var s = scaling(), out = [];
+    for (var d = 0; d < 2; d++) {
+      var v = P.map(function (p) { return p[d]; }), mn = Math.min.apply(null, v), mx = Math.max.apply(null, v);
+      var mu = v.reduce(function (a, b) { return a + b; }, 0) / v.length, sd = Math.sqrt(v.reduce(function (a, b) { return a + (b - mu) * (b - mu); }, 0) / v.length);
+      out.push(s === 'none' ? [0, 1] : s === 'minmax' ? [mn, mx - mn] : [mu, sd]);
+    }
+    return function (x, y) { return [(x - out[0][0]) / out[0][1], (y - out[1][0]) / out[1][1]]; };
+  }
+  function knn(Z, z, K, skip) {
+    var d = [];
+    for (var i = 0; i < Z.length; i++) if (i !== skip) { var a = Z[i][0] - z[0], b = Z[i][1] - z[1]; d.push([a * a + b * b, i]); }
+    d.sort(function (u, v) { return u[0] - v[0]; });
+    return d.slice(0, K).map(function (e) { return e[1]; });
+  }
+  function vote(P, idx) { var c = [0, 0, 0]; idx.forEach(function (i) { c[P[i][2]]++; }); return c.indexOf(Math.max.apply(null, c)); }
+  function render() {
+    var P = pts(), T = scaler(P), Z = P.map(function (p) { return T(p[0], p[1]); }), K = +V_.$('#k').value, f = feat();
+    V_.$('#k-v').textContent = K;
+    var xs = P.map(function (p) { return p[0]; }), ys = P.map(function (p) { return p[1]; });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var Pl = MLV.Plot(svg, { W: 560, H: 440, x: [x0 - 0.05 * (x1 - x0), x1 + 0.05 * (x1 - x0)], y: [y0 - 0.05 * (y1 - y0), y1 + 0.05 * (y1 - y0)], m: { l: 52, r: 10, t: 10, b: 40 }, xlabel: NAMES[f][0], ylabel: NAMES[f][1] });
+    MLV.paint(cv, Pl, function (x, y) { var c = RGB[vote(P, knn(Z, T(x, y), K, -1))]; return [c[0], c[1], c[2], 55]; }, 5);
+    Pl.clear(); Pl.axes();
+    var g = Pl.layer(true);
+    P.forEach(function (p) { Pl.el('circle', { cx: Pl.sx(p[0]), cy: Pl.sy(p[1]), r: 3.6, fill: COL[p[2]], class: 'pl-pt' }, g); });
+    if (q) {
+      var nb = knn(Z, T(q[0], q[1]), K, -1);
+      nb.forEach(function (i) { Pl.el('circle', { cx: Pl.sx(P[i][0]), cy: Pl.sy(P[i][1]), r: 8, fill: 'none', stroke: '#1d2430', 'stroke-width': 2 }, g); Pl.el('line', { x1: Pl.sx(q[0]), y1: Pl.sy(q[1]), x2: Pl.sx(P[i][0]), y2: Pl.sy(P[i][1]), stroke: '#1d2430', 'stroke-width': 1, 'stroke-opacity': 0.5 }, g); });
+      Pl.el('rect', { x: Pl.sx(q[0]) - 6, y: Pl.sy(q[1]) - 6, width: 12, height: 12, fill: '#fff', stroke: '#1d2430', 'stroke-width': 2 }, g);
+    }
+    // độ chính xác bỏ-một-ra (leave-one-out)
+    var ok = 0; for (var i = 0; i < Z.length; i++) if (vote(P, knn(Z, Z[i], K, i)) === P[i][2]) ok++;
+    V_.$('#tab').innerHTML = '<tr><th>Thiết lập</th><th>Độ chính xác bỏ-một-ra (178 mẫu)</th></tr><tr><td>' + V_.$('#scale [aria-pressed=true]').textContent + ', K = ' + K + '</td><td>' + V_.fmt(100 * ok / Z.length, 1) + '%</td></tr>';
+    var msg;
+    if (scaling() === 'none' && f === 1) msg = 'Proline có khoảng giá trị gấp hàng trăm lần độ cồn, nên khoảng cách Euclid gần như chỉ là hiệu số proline. Ranh giới quyết định gần như nằm ngang: thuật toán bỏ qua độ cồn. Bấm một điểm: các láng giềng của nó nằm trên một dải ngang, dù có thể rất xa về độ cồn.';
+    else if (scaling() === 'none') msg = 'Hai đặc trưng này có thang đo gần nhau hơn (cả hai cỡ vài đơn vị đến vài chục), nên chuẩn hoá ít quan trọng hơn. Chuẩn hoá chủ yếu cần khi các thang đo chênh lệch lớn.';
+    else msg = 'Sau chuẩn hoá, hai đặc trưng đóng góp ngang nhau vào khoảng cách. Ranh giới quyết định dùng cả hai chiều, và các láng giềng của một điểm nằm "gần" theo cả hai đặc trưng.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  ['#feat', '#scale'].forEach(function (id) {
+    V_.$$(id + ' button').forEach(function (b) { b.addEventListener('click', function () { V_.$$(id + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); }); if (id === '#feat') q = null; render(); }); });
+  });
+  V_.$('#k').addEventListener('input', render);
+  svg.addEventListener('click', function (e) {
+    var P = pts(), xs = P.map(function (p) { return p[0]; }), ys = P.map(function (p) { return p[1]; });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var Pl = MLV.Plot(svg, { W: 560, H: 440, x: [x0 - 0.05 * (x1 - x0), x1 + 0.05 * (x1 - x0)], y: [y0 - 0.05 * (y1 - y0), y1 + 0.05 * (y1 - y0)], m: { l: 52, r: 10, t: 10, b: 40 } }), a = Pl.at(e);
+    if (!Pl.inside(a.px, a.py)) return; q = [a.x, a.y]; render();
+  });
+  V_.texAll(document.body);
+  q = [12.0, 900]; render();
+})();
+</script>
+</body>
+</html>

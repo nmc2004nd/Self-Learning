@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hồi quy tuyến tính · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .plot { position: relative; width: 100%; max-width: 620px; margin: 0 auto; touch-action: manipulation; }
+  .plot svg { display: block; width: 100%; height: auto; cursor: crosshair; user-select: none; }
+  .plot .frame { fill: var(--surface); stroke: var(--border); }
+  .plot .gridl { stroke: var(--border); stroke-width: 1; }
+  .plot .tick { fill: var(--muted); font-size: 11px; }
+  .plot .axl { fill: var(--text); font-size: 12px; font-weight: 600; }
+  .plot .pt { fill: var(--s1); stroke: var(--surface); stroke-width: 1.5; cursor: pointer; }
+  .plot .pt.out { fill: var(--s2); }
+  .plot .pt.test { fill: none; stroke: var(--s1); stroke-width: 2; stroke-dasharray: 3 2; }
+  .plot .pt:hover { stroke: var(--text); stroke-width: 2; }
+  .plot .resid { stroke: var(--hl); stroke-width: 1.5; }
+  .plot .sq { fill: var(--hl); fill-opacity: .16; stroke: var(--hl); stroke-opacity: .5; }
+  .plot .fit { fill: none; stroke: var(--accent); stroke-width: 3; }
+  .plot .fit-h { fill: none; stroke: #0ea5a4; stroke-width: 3; stroke-dasharray: 7 5; }
+  .plot .fit-ref { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 2 4; }
+  .formula { text-align: center; margin: 8px 0 2px; min-height: 2.2em; }
+  .mtab { width: 100%; max-width: 620px; margin: 10px auto 0; border-collapse: collapse; font-size: .9rem; font-variant-numeric: tabular-nums; }
+  .mtab th, .mtab td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: right; }
+  .mtab th:first-child, .mtab td:first-child { text-align: left; }
+  .mtab .sw { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Hồi quy tuyến tính</h1>
+      <div class="crumbs"><a href="../#/ml/ch07_vi">← Chương 7 Hồi quy tuyến tính</a></div>
+    </div>
+    <p class="lead">Đường hồi quy là đường làm <b>tổng diện tích các ô vuông sai số</b> nhỏ nhất, tức là tối thiểu hàm mất mát (7.4). Bấm vào đồ thị để thêm điểm và xem đường thẳng thay đổi. Thử thêm một điểm nhiễu, so sánh với hồi quy Huber, hoặc tăng bậc đa thức.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-linreg.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Dữ liệu</span>
+      <button type="button" class="btn" id="book">Dữ liệu của sách</button>
+      <button type="button" class="btn" id="noise">Thêm điểm nhiễu (150, 90)</button>
+      <button type="button" class="btn" id="clear">Xoá hết</button>
+    </div>
+    <div class="ctrl">
+      <span class="lb">Hiện</span>
+      <div class="seg" id="show"><button type="button" data-v="sq" aria-pressed="true">Ô vuông sai số</button><button type="button" data-v="line" aria-pressed="false">Đoạn sai số</button><button type="button" data-v="none" aria-pressed="false">Không</button></div>
+      <label><input type="checkbox" id="huber"> Hồi quy Huber</label>
+    </div>
+    <div class="ctrl">
+      <label for="deg">Bậc đa thức</label><input id="deg" type="range" min="1" max="6" step="1" value="1"><span class="val" id="deg-v">1</span>
+    </div>
+    <div class="plot"><svg id="sv" viewBox="0 0 620 420" role="img" aria-label="Đồ thị cân nặng theo chiều cao, các điểm dữ liệu và đường hồi quy"></svg></div>
+    <p class="note" style="text-align:center;margin:4px 0 0">Bấm vào chỗ trống để thêm điểm, bấm vào một điểm để xoá nó. Ô vuông có cạnh bằng độ lệch theo chiều dọc $|y_i - \hat y_i|$.</p>
+    <div class="legend" style="justify-content:center">
+      <span class="li"><span class="sw" style="background:var(--accent);height:3px"></span>bình phương tối thiểu (OLS)</span>
+      <span class="li" id="lg-h" hidden><span class="sw" style="background:#0ea5a4;height:3px"></span>Huber</span>
+      <span class="li"><span class="sw" style="background:var(--muted);height:2px"></span>nghiệm của sách, $w_1 = 0.559$, $w_0 = -33.74$</span>
+    </div>
+    <div class="formula" id="formula"></div>
+    <table class="mtab" id="mtab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz;
+  var BOOK = [[147, 49], [150, 50], [153, 51], [158, 54], [163, 58], [165, 59], [168, 60], [170, 62], [173, 63], [175, 64], [178, 66], [180, 67], [183, 68]];
+  var W = 620, H = 420, M = { l: 52, r: 16, t: 14, b: 44 };
+  var X0 = 140, X1 = 190, Y0 = 40, Y1 = 100;
+  var pts = BOOK.map(function (p) { return p.slice(); });
+  var svg = V_.$('#sv');
+  var NS = 'http://www.w3.org/2000/svg';
+
+  function sx(x) { return M.l + (x - X0) / (X1 - X0) * (W - M.l - M.r); }
+  function sy(y) { return H - M.b - (y - Y0) / (Y1 - Y0) * (H - M.t - M.b); }
+  function ix(px) { return X0 + (px - M.l) / (W - M.l - M.r) * (X1 - X0); }
+  function iy(py) { return Y0 + (H - M.b - py) / (H - M.t - M.b) * (Y1 - Y0); }
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    (parent || svg).appendChild(e);
+    return e;
+  }
+  function deg() { return +V_.$('#deg').value; }
+  function show() { return V_.$('#show [aria-pressed=true]').dataset.v; }
+  function useHuber() { return V_.$('#huber').checked; }
+
+  // ---- toán: bình phương tối thiểu có trọng số trên x đã chuẩn hoá, giải hệ (7.8) bằng khử Gauss
+  function solve(A, b) {
+    var n = b.length, i, j, k;
+    A = A.map(function (r, i) { return r.concat([b[i]]); });
+    for (i = 0; i < n; i++) {
+      var p = i;
+      for (j = i + 1; j < n; j++) if (Math.abs(A[j][i]) > Math.abs(A[p][i])) p = j;
+      var t = A[i]; A[i] = A[p]; A[p] = t;
+      if (Math.abs(A[i][i]) < 1e-12) return null;
+      for (j = i + 1; j < n; j++) {
+        var f = A[j][i] / A[i][i];
+        for (k = i; k <= n; k++) A[j][k] -= f * A[i][k];
+      }
+    }
+    var x = new Array(n);
+    for (i = n - 1; i >= 0; i--) {
+      var s = A[i][n];
+      for (j = i + 1; j < n; j++) s -= A[i][j] * x[j];
+      x[i] = s / A[i][i];
+    }
+    return x;
+  }
+  function stats() {
+    var n = pts.length, m = 0, v = 0;
+    pts.forEach(function (p) { m += p[0] / n; });
+    pts.forEach(function (p) { v += (p[0] - m) * (p[0] - m) / n; });
+    return { mu: m, sd: Math.sqrt(v) || 1 };
+  }
+  function feats(x, d, st) {
+    var z = (x - st.mu) / st.sd, f = [1];
+    for (var k = 1; k <= d; k++) f.push(Math.pow(z, k));
+    return f;
+  }
+  function wls(d, wts, st) {
+    var n = d + 1, A = [], b = [], i, j;
+    for (i = 0; i < n; i++) { A.push(new Array(n).fill(0)); b.push(0); }
+    pts.forEach(function (p, k) {
+      var f = feats(p[0], d, st), w = wts ? wts[k] : 1;
+      for (i = 0; i < n; i++) {
+        b[i] += w * f[i] * p[1];
+        for (j = 0; j < n; j++) A[i][j] += w * f[i] * f[j];
+      }
+    });
+    // ridge rất nhỏ để luôn giải được khi số điểm ít hơn số tham số (giống vai trò của pinv)
+    for (i = 0; i < n; i++) A[i][i] += 1e-9;
+    return solve(A, b);
+  }
+  function predictor(w, d, st) {
+    return function (x) { var f = feats(x, d, st), s = 0; for (var i = 0; i < f.length; i++) s += w[i] * f[i]; return s; };
+  }
+  // Huber: bình phương tối thiểu lặp có trọng số (IRLS), ngưỡng 1.35 × độ lệch chuẩn ước lượng bằng MAD
+  function huber(d, st) {
+    var w = wls(d, null, st), wts = pts.map(function () { return 1; }), k, it;
+    for (it = 0; it < 60 && w; it++) {
+      var f = predictor(w, d, st);
+      var res = pts.map(function (p) { return p[1] - f(p[0]); });
+      var abs = res.map(Math.abs).sort(function (a, b) { return a - b; });
+      var mad = abs[Math.floor(abs.length / 2)] / 0.6745 || 1e-6;
+      var c = 1.35 * mad;
+      for (k = 0; k < pts.length; k++) wts[k] = Math.abs(res[k]) <= c ? 1 : c / Math.abs(res[k]);
+      w = wls(d, wts, st);
+    }
+    return { w: w, wts: wts };
+  }
+
+  // ---- vẽ
+  function curve(f, cls) {
+    var dpath = '', first = true;
+    for (var px = M.l; px <= W - M.r; px += 3) {
+      var y = f(ix(px)), py = Math.max(-2000, Math.min(2000, sy(y)));
+      dpath += (first ? 'M' : 'L') + px.toFixed(1) + ' ' + py.toFixed(1);
+      first = false;
+    }
+    el('path', { d: dpath, class: cls, 'clip-path': 'url(#clip)' });
+  }
+  function axes() {
+    el('rect', { x: M.l, y: M.t, width: W - M.l - M.r, height: H - M.t - M.b, class: 'frame' });
+    var defs = el('defs', {});
+    var cp = el('clipPath', { id: 'clip' }, defs);
+    el('rect', { x: M.l, y: M.t, width: W - M.l - M.r, height: H - M.t - M.b }, cp);
+    for (var x = X0; x <= X1; x += 10) {
+      el('line', { x1: sx(x), x2: sx(x), y1: M.t, y2: H - M.b, class: 'gridl' });
+      el('text', { x: sx(x), y: H - M.b + 16, 'text-anchor': 'middle', class: 'tick' }).textContent = x;
+    }
+    for (var y = Y0; y <= Y1; y += 10) {
+      el('line', { x1: M.l, x2: W - M.r, y1: sy(y), y2: sy(y), class: 'gridl' });
+      el('text', { x: M.l - 8, y: sy(y) + 4, 'text-anchor': 'end', class: 'tick' }).textContent = y;
+    }
+    el('text', { x: (M.l + W - M.r) / 2, y: H - 6, 'text-anchor': 'middle', class: 'axl' }).textContent = 'Chiều cao (cm)';
+    var t = el('text', { x: 14, y: (M.t + H - M.b) / 2, 'text-anchor': 'middle', class: 'axl', transform: 'rotate(-90 14 ' + (M.t + H - M.b) / 2 + ')' });
+    t.textContent = 'Cân nặng (kg)';
+  }
+
+  function fmt(x, d) { return V_.fmt(x, d); }
+  function metrics(f) {
+    var n = pts.length, sse = 0, my = 0, sst = 0;
+    pts.forEach(function (p) { my += p[1] / n; });
+    pts.forEach(function (p) { var r = p[1] - f(p[0]); sse += r * r; sst += (p[1] - my) * (p[1] - my); });
+    return { L: sse / (2 * n), r2: sst > 0 ? 1 - sse / sst : NaN, rmse: Math.sqrt(sse / n) };
+  }
+  // Đổi hệ số bậc 1 trên x chuẩn hoá về w_1, w_0 trên thang đo cm
+  function lin(w, st) { return { w1: w[1] / st.sd, w0: w[0] - w[1] * st.mu / st.sd }; }
+
+  function render() {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    axes();
+    var d = deg(), n = pts.length;
+    V_.$('#deg-v').textContent = d;
+    V_.$('#lg-h').hidden = !useHuber();
+    curve(function (x) { return 0.55920496 * x - 33.73541021; }, 'fit-ref');
+    var st = stats(), ok = n >= 2, w = ok ? wls(d, null, st) : null, f = w ? predictor(w, d, st) : null;
+    var hb = ok && useHuber() ? huber(d, st) : null, fh = hb && hb.w ? predictor(hb.w, d, st) : null;
+    var mode = show();
+    if (f && mode !== 'none') {
+      var g = el('g', { 'clip-path': 'url(#clip)' });
+      pts.forEach(function (p) {
+        var yh = f(p[0]), a = sy(p[1]), b = sy(yh), side = Math.abs(a - b);
+        if (mode === 'sq') el('rect', { x: sx(p[0]) - (p[1] > yh ? side : 0), y: Math.min(a, b), width: side, height: side, class: 'sq' }, g);
+        el('line', { x1: sx(p[0]), x2: sx(p[0]), y1: a, y2: b, class: 'resid' }, g);
+      });
+    }
+    if (f) curve(f, 'fit');
+    if (fh) curve(fh, 'fit-h');
+    pts.forEach(function (p, k) {
+      var c = el('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 6, class: 'pt' + (hb && hb.wts[k] < 0.999 ? ' out' : '') });
+      c.dataset.k = k;
+      var tt = el('title', {}, c);
+      tt.textContent = p[0].toFixed(0) + ' cm, ' + p[1].toFixed(1) + ' kg' + (hb ? ' · trọng số Huber ' + hb.wts[k].toFixed(2) : '');
+    });
+
+    // công thức và bảng
+    var fe = V_.$('#formula'), tab = V_.$('#mtab'), ins = V_.$('#insight');
+    if (!f) {
+      fe.textContent = 'Cần ít nhất 2 điểm.';
+      tab.innerHTML = ''; ins.textContent = '';
+      return;
+    }
+    if (d === 1) {
+      var l = lin(w, st);
+      V_.tex(fe, '\\hat y = ' + fmt(l.w1, 4) + '\\,x ' + (l.w0 < 0 ? '- ' : '+ ') + fmt(Math.abs(l.w0), 2), true);
+    } else {
+      V_.tex(fe, '\\hat y = w_0 + w_1 z + \\dots + w_{' + d + '} z^{' + d + '},\\quad z = \\tfrac{x - ' + fmt(st.mu, 1) + '}{' + fmt(st.sd, 2) + '}', true);
+    }
+    var mo = metrics(f), rows = [['<span class="sw" style="background:var(--accent)"></span>OLS', mo, w]];
+    if (fh) rows.push(['<span class="sw" style="background:#0ea5a4"></span>Huber', metrics(fh), hb.w]);
+    var html = '<tr><th>Mô hình</th>' + (d === 1 ? '<th>$w_1$</th><th>$w_0$</th>' : '') + '<th>$\\mathcal{L}(\\mathbf{w})$ (7.4)</th><th>RMSE</th><th>$R^2$</th><th>dự đoán 160 cm</th></tr>';
+    rows.forEach(function (r) {
+      var pr = predictor(r[2], d, st)(160);
+      html += '<tr><td>' + r[0] + '</td>' + (d === 1 ? '<td>' + fmt(lin(r[2], st).w1, 4) + '</td><td>' + fmt(lin(r[2], st).w0, 2) + '</td>' : '') +
+        '<td>' + fmt(r[1].L, 3) + '</td><td>' + fmt(r[1].rmse, 3) + '</td><td>' + fmt(r[1].r2, 4) + '</td><td>' + fmt(pr, 2) + ' kg</td></tr>';
+    });
+    tab.innerHTML = html;
+    V_.texAll(tab);
+
+    var msg = '';
+    var hasNoise = pts.some(function (p) { return Math.abs(p[1] - (0.5592 * p[0] - 33.735)) > 12; });
+    if (d >= 4 && n <= d + 3) msg = 'Bậc ' + d + ' có ' + (d + 1) + ' tham số mà chỉ có ' + n + ' điểm: đường cong gần như đi qua mọi điểm (mất mát rất nhỏ) nhưng uốn lượn vô lý giữa các điểm. Đó là quá khớp.';
+    else if (d >= 3) msg = 'Bậc cao làm mất mát trên dữ liệu huấn luyện giảm, nhưng xem hai đầu đồ thị: đường cong bắt đầu đi lệch khỏi xu hướng. Mất mát nhỏ hơn không có nghĩa là mô hình tốt hơn.';
+    else if (hasNoise && !useHuber()) msg = 'Một điểm nằm xa đường thẳng có ô vuông sai số rất lớn. Để thu nhỏ ô này, OLS phải kéo cả đường thẳng về phía nó. Bật "Hồi quy Huber" để so sánh.';
+    else if (hasNoise && fh) msg = 'Huber giảm trọng số của những điểm có sai số lớn (màu cam), mạnh nhất là ở điểm nhiễu, nên đường Huber gần như trùng với nghiệm của sách. Đường OLS vẫn bị kéo lệch. Để ý rằng mất mát (7.4) của Huber lại lớn hơn OLS: OLS là đường tối thiểu đúng hàm mất mát đó, kể cả khi hàm mất mát ấy bị một điểm nhiễu chi phối.';
+    else msg = 'Đường thẳng màu chàm là nghiệm của (7.12). Mọi đường thẳng khác đều có tổng diện tích ô vuông lớn hơn. Bấm để thêm một điểm ở xa và xem điều gì xảy ra.';
+    ins.textContent = msg;
+  }
+
+  svg.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.classList && t.classList.contains('pt')) {
+      pts.splice(+t.dataset.k, 1);
+      render();
+      return;
+    }
+    var pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    var p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    var x = ix(p.x), y = iy(p.y);
+    if (x < X0 || x > X1 || y < Y0 || y > Y1) return;
+    pts.push([Math.round(x * 2) / 2, Math.round(y * 2) / 2]);
+    render();
+  });
+  V_.$('#book').addEventListener('click', function () { pts = BOOK.map(function (p) { return p.slice(); }); render(); });
+  V_.$('#noise').addEventListener('click', function () {
+    if (!pts.some(function (p) { return p[0] === 150 && p[1] === 90; })) pts.push([150, 90]);
+    render();
+  });
+  V_.$('#clear').addEventListener('click', function () { pts = []; render(); });
+  V_.$$('#show button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      V_.$$('#show button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      render();
+    });
+  });
+  V_.$('#huber').addEventListener('change', render);
+  V_.$('#deg').addEventListener('input', render);
+  V_.texAll(document.body);
+  render();
+})();
+</script>
+</body>
+</html>

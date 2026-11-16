@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hồi quy softmax · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .probe { display: grid; grid-template-columns: auto 1fr auto auto; gap: 4px 10px; align-items: center; max-width: 520px; margin: 10px auto 0; font-size: .9rem; font-variant-numeric: tabular-nums; }
+  .probe .bar { height: 14px; border-radius: 4px; }
+  .probe .bg { background: var(--surface-2); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Hồi quy softmax</h1>
+      <div class="crumbs"><a href="../#/ml/ch15_vi">← Chương 15 Hồi quy softmax</a></div>
+    </div>
+    <p class="lead">Mỗi lớp $k$ có một vector $\mathbf{w}_k$ và một điểm số $z_k = \mathbf{w}_k^T\bar{\mathbf{x}}$. Softmax biến các điểm số thành xác suất $a_k = e^{z_k} / \sum_j e^{z_j}$. Màu nền là lớp có xác suất lớn nhất, đậm khi mô hình chắc chắn. Các ranh giới luôn là đường thẳng.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-softmax.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Số lớp</span>
+      <div class="seg" id="nc"><button type="button" data-v="3" aria-pressed="true">3</button><button type="button" data-v="4" aria-pressed="false">4</button></div>
+      <span class="lb">Bấm để</span>
+      <div class="seg" id="mode"><button type="button" data-v="probe" aria-pressed="true">Xem xác suất ✚</button><button type="button" data-v="0" aria-pressed="false">Thêm lớp 1</button><button type="button" data-v="1" aria-pressed="false">Thêm lớp 2</button><button type="button" data-v="2" aria-pressed="false">Thêm lớp 3</button><button type="button" data-v="3" aria-pressed="false">Thêm lớp 4</button></div>
+    </div>
+    <div class="ctrl">
+      <label for="eta">$\eta$</label><input id="eta" type="range" min="-2" max="0.5" step="0.1" value="-0.3"><span class="val" id="eta-v"></span>
+      <label for="lam">$\lambda$</label><input id="lam" type="range" min="-4" max="1" step="0.25" value="-4"><span class="val" id="lam-v"></span>
+      <button type="button" class="btn pri" id="play"></button>
+      <button type="button" class="btn" id="step">10 bước</button>
+      <button type="button" class="btn" id="reset">Về $\mathbf{W} = \mathbf{0}$</button>
+      <label for="speed">Tốc độ</label><input id="speed" type="range" min="1" max="5" step="1" value="4">
+    </div>
+    <div class="stats"><span>Bước <b id="t"></b></span><span>Entropy chéo <b id="L"></b></span><span>Độ chính xác <b id="acc"></b></span></div>
+    <div class="plotbox click"><canvas id="cv" width="560" height="440"></canvas><svg id="sv" viewBox="0 0 560 440" role="img" aria-label="Dữ liệu nhiều lớp, vùng quyết định và điểm đang xem"></svg></div>
+    <div class="probe" id="probe"></div>
+    <div class="plotbox"><svg id="ch" viewBox="0 0 560 150" role="img" aria-label="Entropy chéo theo bước"></svg></div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, COL = MLV.CLASS;
+  var svg = V_.$('#sv'), cv = V_.$('#cv');
+  var P = MLV.Plot(svg, { W: 560, H: 440, x: [-4, 4], y: [-3.2, 3.2], m: { l: 32, r: 10, t: 10, b: 28 } });
+  var pts = [], W, t, hist, probeAt = [0.3, 0.2];
+
+  function C() { return +V_.$('#nc [aria-pressed=true]').dataset.v; }
+  function makeData() {
+    var r = MLV.rng(5), c = C(), centers = c === 3 ? [[-1.8, 1.2], [1.8, 1.2], [0, -1.7]] : [[-2, 1.4], [2, 1.4], [-1.6, -1.6], [1.8, -1.5]];
+    pts = [];
+    centers.forEach(function (m, k) { for (var i = 0; i < 30; i++) pts.push([m[0] + 0.85 * MLV.randn(r), m[1] + 0.85 * MLV.randn(r), k]); });
+  }
+  function scores(x) { var z = []; for (var k = 0; k < W.length; k++) z.push(W[k][0] * x[0] + W[k][1] * x[1] + W[k][2]); return z; }
+  function softmax(z) { var m = Math.max.apply(null, z), e = z.map(function (v) { return Math.exp(v - m); }), s = e.reduce(function (a, b) { return a + b; }, 0); return e.map(function (v) { return v / s; }); }
+  function lam() { var v = +V_.$('#lam').value; return v <= -4 ? 0 : Math.pow(10, v); }
+  function loss() {
+    var s = 0, n = pts.length, reg = 0;
+    pts.forEach(function (p) { s -= Math.log(Math.max(1e-15, softmax(scores(p))[p[2]])); });
+    W.forEach(function (wk) { reg += wk[0] * wk[0] + wk[1] * wk[1] + wk[2] * wk[2]; });
+    return s / n + 0.5 * lam() / n * reg;
+  }
+  function gdStep() {
+    var n = pts.length, G = W.map(function () { return [0, 0, 0]; }), e = Math.pow(10, +V_.$('#eta').value), L = lam();
+    pts.forEach(function (p) {
+      var a = softmax(scores(p));
+      for (var k = 0; k < W.length; k++) { var d = a[k] - (p[2] === k ? 1 : 0); G[k][0] += d * p[0]; G[k][1] += d * p[1]; G[k][2] += d; }
+    });
+    for (var k = 0; k < W.length; k++) for (var j = 0; j < 3; j++) W[k][j] -= e * (G[k][j] / n + L / n * W[k][j]);     // (15.13)
+    t++; hist.push([t, loss()]);
+  }
+  function step() { for (var i = 0; i < 10; i++) gdStep(); render(); return t < 20000; }
+  function reset() { W = []; for (var k = 0; k < C(); k++) W.push([0, 0, 0]); t = 0; hist = [[0, loss()]]; }
+
+  function render() {
+    V_.$('#eta-v').textContent = V_.fmt(Math.pow(10, +V_.$('#eta').value), 2);
+    V_.$('#lam-v').textContent = lam() === 0 ? '0' : V_.fmt(lam(), lam() < 0.01 ? 4 : 2);
+    V_.$$('#mode button').forEach(function (b) { b.hidden = b.dataset.v === '3' && C() < 4; });
+    var rgb = COL.map(MLV.hexRgb);
+    MLV.paint(cv, P, function (x, y) {
+      var a = softmax(scores([x, y])), k = 0;
+      for (var j = 1; j < a.length; j++) if (a[j] > a[k]) k = j;
+      var c = rgb[k], conf = (a[k] - 1 / a.length) / (1 - 1 / a.length);
+      return [c[0], c[1], c[2], Math.round(25 + 140 * conf)];
+    }, 4);
+    P.clear(); P.axes();
+    var g = P.layer(true), ok = 0;
+    pts.forEach(function (p) {
+      var a = softmax(scores(p)), k = a.indexOf(Math.max.apply(null, a));
+      if (k === p[2]) ok++;
+      P.el('circle', { cx: P.sx(p[0]), cy: P.sy(p[1]), r: 5, fill: COL[p[2]], class: 'pl-pt' }, g);
+      if (k !== p[2]) P.el('circle', { cx: P.sx(p[0]), cy: P.sy(p[1]), r: 8.5, fill: 'none', stroke: 'var(--text)', 'stroke-dasharray': '2 2' }, g);
+    });
+    var cx = P.sx(probeAt[0]), cy = P.sy(probeAt[1]);
+    P.el('path', { d: 'M' + (cx - 9) + ' ' + cy + 'H' + (cx + 9) + 'M' + cx + ' ' + (cy - 9) + 'V' + (cy + 9), stroke: 'var(--text)', 'stroke-width': 3 }, g);
+
+    var z = scores(probeAt), a = softmax(z), html = '<b></b><span class="note" style="margin:0">xác suất $a_k$</span><b>$z_k$</b><b>$a_k$</b>';
+    for (var k = 0; k < z.length; k++) {
+      html += '<span style="color:' + COL[k] + ';font-weight:700">lớp ' + (k + 1) + '</span><div class="bg"><div class="bar" style="width:' + (100 * a[k]).toFixed(1) + '%;background:' + COL[k] + '"></div></div><span>' + V_.fmt(z[k], 2) + '</span><span>' + V_.fmt(a[k], 3) + '</span>';
+    }
+    var probe = V_.$('#probe'); probe.innerHTML = html; V_.texAll(probe);
+    MLV.chart(V_.$('#ch'), [{ pts: hist, color: '#7c3aed' }], { xlabel: 'bước', ylabel: 'entropy chéo', m: { l: 52, r: 12, t: 8, b: 34 } });
+    V_.$('#t').textContent = t; V_.$('#L').textContent = V_.fmt(loss(), 4); V_.$('#acc').textContent = ok + ' / ' + pts.length;
+    var msg;
+    if (t === 0) msg = 'Với W = 0, mọi lớp có điểm số bằng nhau nên xác suất đều là 1/' + C() + ', và entropy chéo bằng ln ' + C() + ' ≈ ' + V_.fmt(Math.log(C()), 3) + '. Bấm "Phát" để huấn luyện.';
+    else msg = 'Bấm "Xem xác suất" rồi chọn một điểm gần chỗ các vùng giao nhau: các điểm số z gần nhau nên xác suất chia đều. Ở xa trung tâm, một điểm số áp đảo và xác suất của lớp đó tiến tới 1. Mỗi ranh giới là một đoạn thẳng nơi z_i = z_j (mục 15.5.2).';
+    V_.$('#insight').textContent = msg;
+  }
+
+  var player = V_.Player({ btn: V_.$('#play'), speed: V_.$('#speed'), step: step });
+  V_.$('#step').addEventListener('click', function () { player.stop(); step(); });
+  V_.$('#reset').addEventListener('click', function () { player.stop(); reset(); render(); });
+  ['#eta', '#lam'].forEach(function (s) { V_.$(s).addEventListener('input', render); });
+  ['#nc', '#mode'].forEach(function (sel) {
+    V_.$$(sel + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$(sel + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        if (sel === '#nc') { player.stop(); makeData(); reset(); render(); }
+      });
+    });
+  });
+  svg.addEventListener('click', function (e) {
+    var a = P.at(e);
+    if (!P.inside(a.px, a.py)) return;
+    var mode = V_.$('#mode [aria-pressed=true]').dataset.v;
+    if (mode === 'probe') probeAt = [a.x, a.y];
+    else if (+mode < C()) pts.push([a.x, a.y, +mode]);
+    render();
+  });
+  V_.texAll(document.body);
+  makeData(); reset(); render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phân tích thành phần chính · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Chọn hướng để chiếu dữ liệu</h1>
+      <div class="crumbs"><a href="../#/ml/ch21_vi">← Chương 21 Phân tích thành phần chính</a></div>
+    </div>
+    <p class="lead">Chiếu mọi điểm lên một đường thẳng đi qua trung bình. Phương sai của các điểm chiếu (phần giữ lại) cộng với sai số chiếu trung bình (phần mất đi) luôn bằng tổng phương sai. PCA chọn hướng giữ lại nhiều nhất, cũng là hướng làm mất ít nhất. Bấm vào bản đồ để thêm điểm.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-pca.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <label for="ang">Hướng chiếu</label><input id="ang" type="range" min="0" max="180" step="0.5" value="100"><span class="val" id="ang-v"></span>
+      <button type="button" class="btn pri" id="best">Hướng của thành phần chính 1</button>
+      <button type="button" class="btn" id="new">Dữ liệu mới</button>
+      <button type="button" class="btn" id="clear">Xoá hết điểm</button>
+    </div>
+    <div class="two-plots">
+      <div class="plotbox click"><svg id="sv" viewBox="0 0 440 400" role="img" aria-label="Dữ liệu và phép chiếu lên một đường thẳng"></svg></div>
+      <div class="plotbox"><svg id="ch" viewBox="0 0 360 300" role="img" aria-label="Phương sai giữ lại theo hướng chiếu"></svg></div>
+    </div>
+    <table class="mtab" id="tab"></table>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, CP = '#2f80f5', CQ = '#e8487f', CL = '#0ea5a4';
+  var svg = V_.$('#sv'), P = MLV.Plot(svg, { W: 440, H: 400, x: [-4, 4], y: [-3.6, 3.6], m: { l: 30, r: 10, t: 10, b: 26 } });
+  var pts = [], seed = 5;
+  function gen() {
+    var r = MLV.rng(seed), th = (r() - 0.5) * 2.4, a = 1.4 + r(), b = 0.25 + 0.5 * r(); pts = [];
+    for (var i = 0; i < 60; i++) { var u = a * MLV.randn(r), v = b * MLV.randn(r); pts.push([0.3 + u * Math.cos(th) - v * Math.sin(th), -0.2 + u * Math.sin(th) + v * Math.cos(th)]); }
+  }
+  function stats() {
+    var n = pts.length, mx = 0, my = 0; pts.forEach(function (p) { mx += p[0]; my += p[1]; }); mx /= n; my /= n;
+    var sxx = 0, syy = 0, sxy = 0; pts.forEach(function (p) { var a = p[0] - mx, b = p[1] - my; sxx += a * a; syy += b * b; sxy += a * b; });
+    return { mx: mx, my: my, sxx: sxx / n, syy: syy / n, sxy: sxy / n };
+  }
+  function varAlong(S, th) { var c = Math.cos(th), s = Math.sin(th); return c * c * S.sxx + 2 * c * s * S.sxy + s * s * S.syy; }
+  function pcAngle(S) { var t = 0.5 * Math.atan2(2 * S.sxy, S.sxx - S.syy); if (t < 0) t += Math.PI; return t; }
+  function render() {
+    var th = +V_.$('#ang').value * Math.PI / 180; V_.$('#ang-v').textContent = V_.fmt(+V_.$('#ang').value, 1) + '°';
+    P.clear(); P.axes();
+    var g = P.layer(true);
+    if (pts.length < 2) { V_.$('#tab').innerHTML = ''; V_.$('#insight').textContent = 'Cần ít nhất 2 điểm.'; pts.forEach(function (p) { P.el('circle', { cx: P.sx(p[0]), cy: P.sy(p[1]), r: 4, fill: CP }, g); }); return; }
+    var S = stats(), u = [Math.cos(th), Math.sin(th)], tot = S.sxx + S.syy, kept = varAlong(S, th), lost = tot - kept;
+    P.el('line', { x1: P.sx(S.mx - 6 * u[0]), y1: P.sy(S.my - 6 * u[1]), x2: P.sx(S.mx + 6 * u[0]), y2: P.sy(S.my + 6 * u[1]), stroke: CL, 'stroke-width': 2.5 }, g);
+    pts.forEach(function (p) {
+      var t = (p[0] - S.mx) * u[0] + (p[1] - S.my) * u[1], q = [S.mx + t * u[0], S.my + t * u[1]];
+      P.el('line', { x1: P.sx(p[0]), y1: P.sy(p[1]), x2: P.sx(q[0]), y2: P.sy(q[1]), stroke: CQ, 'stroke-width': 1, 'stroke-opacity': 0.6 }, g);
+      P.el('circle', { cx: P.sx(q[0]), cy: P.sy(q[1]), r: 2.5, fill: CL }, g);
+      P.el('circle', { cx: P.sx(p[0]), cy: P.sy(p[1]), r: 4, fill: CP, class: 'pl-pt' }, g);
+    });
+    P.el('circle', { cx: P.sx(S.mx), cy: P.sy(S.my), r: 6, fill: '#fff', stroke: '#1d2430', 'stroke-width': 2 }, g);
+    var curve = [], loss = [];
+    for (var d = 0; d <= 180; d += 2) { var v = varAlong(S, d * Math.PI / 180); curve.push([d, v]); loss.push([d, tot - v]); }
+    var pc = pcAngle(S) * 180 / Math.PI;
+    MLV.chart(V_.$('#ch'), [{ pts: curve, color: CL }, { pts: loss, color: CQ, dash: '5 4' }], { x: [0, 180], y: [0, tot * 1.05], xlabel: 'hướng chiếu (độ)', ylabel: 'phương sai', vline: +V_.$('#ang').value, m: { l: 46, r: 10, t: 8, b: 34 } });
+    var lam1 = varAlong(S, pc * Math.PI / 180), lam2 = tot - lam1;
+    V_.$('#tab').innerHTML = '<tr><th>Đại lượng</th><th>Hướng đang chọn</th><th>Thành phần chính 1</th></tr>' +
+      '<tr><td><span style="color:' + CL + ';font-weight:700">Phương sai giữ lại</span></td><td>' + V_.fmt(kept, 3) + ' (' + V_.fmt(100 * kept / tot, 1) + '%)</td><td>' + V_.fmt(lam1, 3) + ' = $\\lambda_1$</td></tr>' +
+      '<tr><td><span style="color:' + CQ + ';font-weight:700">Sai số chiếu trung bình</span></td><td>' + V_.fmt(lost, 3) + '</td><td>' + V_.fmt(lam2, 3) + ' = $\\lambda_2$</td></tr>' +
+      '<tr><td>Hướng</td><td>' + V_.fmt(+V_.$('#ang').value, 1) + '°</td><td>' + V_.fmt(pc, 1) + '°</td></tr>';
+    V_.texAll(V_.$('#tab'));
+    var off = Math.abs(((+V_.$('#ang').value - pc) + 90 + 180) % 180 - 90);
+    var msg = off < 1 ? 'Đây là thành phần chính thứ nhất: vector riêng ứng với trị riêng lớn nhất của ma trận hiệp phương sai. Phương sai giữ lại bằng $\\lambda_1$, sai số chiếu bằng $\\lambda_2$, đúng như công thức của mục 21.1.'
+      : 'Đường liền (bên phải) là phương sai giữ lại theo hướng chiếu, đường đứt là phần mất đi; tổng của chúng không đổi. Cực đại của đường liền và cực tiểu của đường đứt nằm ở cùng một hướng. Lệch ' + V_.fmt(off, 1) + '° so với thành phần chính 1, ta mất thêm ' + V_.fmt(lost - lam2, 3) + ' phương sai.';
+    if (lam1 / tot < 0.6) msg += ' Dữ liệu này gần như tròn đều ($\\lambda_1 \\approx \\lambda_2$): không có hướng nào nổi trội, giảm xuống 1 chiều sẽ mất nhiều thông tin.';
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+  V_.$('#ang').addEventListener('input', render);
+  V_.$('#best').addEventListener('click', function () { if (pts.length > 1) { V_.$('#ang').value = (pcAngle(stats()) * 180 / Math.PI).toFixed(1); render(); } });
+  V_.$('#new').addEventListener('click', function () { seed++; gen(); render(); });
+  V_.$('#clear').addEventListener('click', function () { pts = []; render(); });
+  svg.addEventListener('click', function (e) { var a = P.at(e); if (!P.inside(a.px, a.py)) return; pts.push([a.x, a.y]); render(); });
+  V_.texAll(document.body);
+  gen(); render();
+})();
+</script>
+</body>
+</html>
