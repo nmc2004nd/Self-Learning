@@ -165,15 +165,15 @@ Không có mạng mục tiêu, tác tử cũng chạm được mức 500 vài l�
 
 | Notebook | Nội dung | Mở |
 |---|---|---|
-| `DQN_vi.ipynb` | DQN trên CartPole-v0, viết bằng PyTorch theo khung chung của EasyRL | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/DQN_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/DQN_vi.ipynb) |
+| `DQN_vi.ipynb` | DQN trên CartPole-v0, viết bằng PyTorch theo khung chung của EasyRL | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/DQN_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/DQN_vi.ipynb) |
 
 Dự án 2 của chương 7 ([Dùng DQN giải CartPole-v0](chapter7/project2_vi)) đi qua cùng bài toán theo từng bước.
 
 ## 6. Chạy trên máy
 
 ```bash
-git clone https://github.com/nmc2004nd/easy-rl-vi.git
-cd easy-rl-vi/docs/code/py          # chạy từ đây để import được minrl_vi, viz
+git clone https://github.com/nmc2004nd/Self-Learning.git
+cd Self-Learning/docs/code/py          # chạy từ đây để import được minrl_vi, viz
 pip install numpy matplotlib pillow gymnasium torch
 ```
 

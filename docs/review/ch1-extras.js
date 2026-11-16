@@ -403,7 +403,7 @@
   // ======================================================================
   // TAB "Sơ đồ"
   // ======================================================================
-  var NB = 'https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/';
+  var NB = 'https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/';
 
   function renderMap(root, ctx) {
     root.innerHTML = '';

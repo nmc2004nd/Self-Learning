@@ -139,8 +139,8 @@ Các điểm nằm dọc theo một đường song song với $1/\lVert w - w^{\
 ## 4. Chạy trên máy
 
 ```bash
-git clone https://github.com/nmc2004nd/easy-rl-vi.git
-cd easy-rl-vi/docs/code/py          # chạy từ đây để import được viz
+git clone https://github.com/nmc2004nd/Self-Learning.git
+cd Self-Learning/docs/code/py          # chạy từ đây để import được viz
 pip install numpy matplotlib pillow
 ```
 

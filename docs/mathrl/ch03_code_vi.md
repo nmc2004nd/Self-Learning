@@ -182,8 +182,8 @@ Số ô mà π* đi đúng đường ngắn nhất (không qua ô cấm): 19 / 1
 ## 5. Chạy trên máy
 
 ```bash
-git clone https://github.com/nmc2004nd/easy-rl-vi.git
-cd easy-rl-vi/docs/code/py          # chạy từ đây để import được zhao_grid, viz
+git clone https://github.com/nmc2004nd/Self-Learning.git
+cd Self-Learning/docs/code/py          # chạy từ đây để import được zhao_grid, viz
 pip install numpy matplotlib pillow
 ```
 

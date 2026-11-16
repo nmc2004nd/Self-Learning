@@ -164,7 +164,7 @@ print(f"-Σ w log π = {loss_pg:.4f},  entropy chéo có trọng số = {loss_ce
 
 ## 4. Notebook của EasyRL
 
-Notebook [`PolicyGradient_vi.ipynb`](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/PolicyGradient_vi.ipynb) ([Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/PolicyGradient_vi.ipynb)) cài cùng thuật toán theo một cách khác. Có hai chỗ đáng để ý:
+Notebook [`PolicyGradient_vi.ipynb`](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/PolicyGradient_vi.ipynb) ([Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/PolicyGradient_vi.ipynb)) cài cùng thuật toán theo một cách khác. Có hai chỗ đáng để ý:
 
 ```python
 # Trích từ PolicyGradient_vi.ipynb
@@ -186,8 +186,8 @@ for i in reversed(range(len(reward_pool))):
 ## 5. Chạy trên máy
 
 ```bash
-git clone https://github.com/nmc2004nd/easy-rl-vi.git
-cd easy-rl-vi/docs/code/py          # chạy từ đây để import được viz
+git clone https://github.com/nmc2004nd/Self-Learning.git
+cd Self-Learning/docs/code/py          # chạy từ đây để import được viz
 pip install numpy matplotlib pillow gymnasium torch
 ```
 

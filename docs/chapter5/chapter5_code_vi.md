@@ -191,13 +191,13 @@ cartpole_gif({"PPO": lambda o: agent.select_action(o, deterministic=True)}, "car
 
 | Notebook | Nội dung | Mở |
 |---|---|---|
-| `PPO_vi.ipynb` | PPO-clip trên CartPole-v1, cập nhật theo các lô thu từ nhiều tập | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/PPO_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/PPO_vi.ipynb) |
+| `PPO_vi.ipynb` | PPO-clip trên CartPole-v1, cập nhật theo các lô thu từ nhiều tập | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/PPO_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/PPO_vi.ipynb) |
 
 ## 6. Chạy trên máy
 
 ```bash
-git clone https://github.com/nmc2004nd/easy-rl-vi.git
-cd easy-rl-vi/docs/code/py          # chạy từ đây để import được minrl_vi, viz
+git clone https://github.com/nmc2004nd/Self-Learning.git
+cd Self-Learning/docs/code/py          # chạy từ đây để import được minrl_vi, viz
 pip install numpy matplotlib pillow gymnasium torch
 ```
 

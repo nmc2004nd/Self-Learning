@@ -253,18 +253,18 @@ Mỗi kỹ thuật của chương có một notebook riêng, viết bằng PyTor
 
 | Notebook | Kỹ thuật | Mở |
 |---|---|---|
-| `DoubleDQN_vi.ipynb` | DQN kép (mục 7.1) | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/DoubleDQN_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/DoubleDQN_vi.ipynb) |
-| `DuelingDQN_vi.ipynb` | DQN đối đầu (mục 7.2) | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/DuelingDQN_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/DuelingDQN_vi.ipynb) |
-| `PER_DQN_vi.ipynb` | Phát lại kinh nghiệm ưu tiên, dùng cây tổng (sum tree) (mục 7.3) | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/PER_DQN_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/PER_DQN_vi.ipynb) |
-| `NoisyDQN_vi.ipynb` | Mạng nhiễu (mục 7.5) | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/NoisyDQN_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/NoisyDQN_vi.ipynb) |
+| `DoubleDQN_vi.ipynb` | DQN kép (mục 7.1) | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/DoubleDQN_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/DoubleDQN_vi.ipynb) |
+| `DuelingDQN_vi.ipynb` | DQN đối đầu (mục 7.2) | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/DuelingDQN_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/DuelingDQN_vi.ipynb) |
+| `PER_DQN_vi.ipynb` | Phát lại kinh nghiệm ưu tiên, dùng cây tổng (sum tree) (mục 7.3) | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/PER_DQN_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/PER_DQN_vi.ipynb) |
+| `NoisyDQN_vi.ipynb` | Mạng nhiễu (mục 7.5) | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/NoisyDQN_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/NoisyDQN_vi.ipynb) |
 
 Bản PER trong MinRL tính xác suất bằng cách duyệt cả bộ đệm, nên mỗi lần lấy mẫu tốn $O(N)$. Notebook `PER_DQN_vi` dùng cây tổng để lấy mẫu trong $O(\log N)$, là cách làm chuẩn khi bộ đệm lớn.
 
 ## 6. Chạy trên máy
 
 ```bash
-git clone https://github.com/nmc2004nd/easy-rl-vi.git
-cd easy-rl-vi/docs/code/py          # chạy từ đây để import được minrl_vi, viz
+git clone https://github.com/nmc2004nd/Self-Learning.git
+cd Self-Learning/docs/code/py          # chạy từ đây để import được minrl_vi, viz
 pip install numpy matplotlib pillow gymnasium torch
 ```
 

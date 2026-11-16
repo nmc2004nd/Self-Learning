@@ -6,9 +6,9 @@
 
 **Hope for Future** là một trang tự học trí tuệ nhân tạo bằng tiếng Việt, **phi thương mại**. Nội dung đi theo lộ trình **Toán nền tảng → Học máy → Học sâu → Học tăng cường → LLM**. Các khoá được xây từ những giáo trình mở có uy tín (dịch, trích nguyên văn hoặc tổng hợp lại, có ghi nguồn đầy đủ), rồi bổ sung thêm code chạy được, mô phỏng tương tác và ví dụ trên dữ liệu thật.
 
-📖 **Đọc online:** https://nmc2004nd.github.io/easy-rl-vi/
+📖 **Đọc online:** https://nmc2004nd.github.io/Self-Learning/
 
-Repo này ban đầu chỉ là bản dịch tiếng Việt của Sách Nấm EasyRL (vì vậy tên repo vẫn là `easy-rl-vi`). Bản dịch đó nay là một phần của khoá Học tăng cường.
+Repo này ban đầu chỉ là bản dịch tiếng Việt của Sách Nấm EasyRL, với tên cũ là `easy-rl-vi`. Bản dịch đó nay là một phần của khoá Học tăng cường.
 
 ## Các khoá học
 
@@ -60,8 +60,8 @@ Gợi ý: học theo **Lộ trình học** trên trang chủ. Với mỗi bài, 
 Đọc offline (không cần mạng sau khi tải về):
 
 ```bash
-git clone https://github.com/nmc2004nd/easy-rl-vi.git
-cd easy-rl-vi/docs
+git clone https://github.com/nmc2004nd/Self-Learning.git
+cd Self-Learning/docs
 python3 -m http.server 3000
 # mở http://localhost:3000
 ```
@@ -79,15 +79,15 @@ Script chạy lần lượt các khối code có đánh dấu `<!-- run -->`, r�
 - **Ghi rõ đâu là của ai.** Nội dung dịch hoặc trích nguyên văn được giữ nguyên ý tác giả. Sửa lỗi của bản gốc được đánh dấu **"Ghi chú của người dịch"**; phần viết thêm được đánh dấu **"Ghi chú của người biên soạn"**.
 - **Thuật ngữ** được dịch sang tiếng Việt và giữ tiếng Anh trong ngoặc ở lần đầu xuất hiện, ví dụ: tác tử (agent), chính sách (policy), hàm giá trị (value function), lợi tức (return). Tên chương của sách *Machine Learning cơ bản* giữ tiếng Anh như trong sách.
 - **Thuật toán** được viết dạng pseudocode: từ khoá tiếng Anh (`for`, `while`, `if`), phép gán `←`, chú thích tiếng Việt.
-- **Ký hiệu** của phần tổng hợp và các bài mới theo một chuẩn chung ([Quy ước ký hiệu](https://nmc2004nd.github.io/easy-rl-vi/#/notation_vi)). Các chương EasyRL giữ ký hiệu gốc, kèm bảng đối chiếu.
+- **Ký hiệu** của phần tổng hợp và các bài mới theo một chuẩn chung ([Quy ước ký hiệu](https://nmc2004nd.github.io/Self-Learning/#/notation_vi)). Các chương EasyRL giữ ký hiệu gốc, kèm bảng đối chiếu.
 - **Tên người Trung Quốc** được ghi bằng phiên âm kèm chữ Hán, ví dụ: Wu Wenhao (吴文昊).
 - Chữ trong một số hình vẽ sẵn của bản gốc vẫn là tiếng Trung vì không thể chỉnh sửa.
 
-Nội dung có thể còn sai sót. Rất mong nhận được góp ý qua [Issues](https://github.com/nmc2004nd/easy-rl-vi/issues).
+Nội dung có thể còn sai sót. Rất mong nhận được góp ý qua [Issues](https://github.com/nmc2004nd/Self-Learning/issues).
 
 ## Nguồn và ghi công
 
-Người biên soạn không sở hữu và không nhận bất kỳ phần nội dung gốc nào là của mình. Nếu tác giả của một nguồn dưới đây không đồng ý với cách sử dụng, hoặc muốn nội dung được điều chỉnh, xin liên hệ qua [Issues](https://github.com/nmc2004nd/easy-rl-vi/issues); người biên soạn sẽ chỉnh sửa hoặc gỡ theo yêu cầu.
+Người biên soạn không sở hữu và không nhận bất kỳ phần nội dung gốc nào là của mình. Nếu tác giả của một nguồn dưới đây không đồng ý với cách sử dụng, hoặc muốn nội dung được điều chỉnh, xin liên hệ qua [Issues](https://github.com/nmc2004nd/Self-Learning/issues); người biên soạn sẽ chỉnh sửa hoặc gỡ theo yêu cầu.
 
 ### Sách Nấm EasyRL (khoá Học tăng cường)
 

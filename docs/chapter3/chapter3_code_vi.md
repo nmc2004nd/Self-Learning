@@ -1,6 +1,6 @@
 # Chương 3 · Code
 
-> Ghi chú của người dịch: trang này do người dịch biên soạn, không có trong sách gốc. Code dạng bảng chuyển thể từ [MinRL](https://github.com/10-OASIS-01/minrl/tree/ed5eb99) (Yibin Liu, giấy phép MIT, commit `ed5eb99`) và từ [notebook đi kèm](https://github.com/nmc2004nd/easy-rl-vi/tree/main/notebooks) của bản gốc EasyRL. Chú thích đã dịch sang tiếng Việt. Phần không có trong MinRL được ghi *(thêm)*.
+> Ghi chú của người dịch: trang này do người dịch biên soạn, không có trong sách gốc. Code dạng bảng chuyển thể từ [MinRL](https://github.com/10-OASIS-01/minrl/tree/ed5eb99) (Yibin Liu, giấy phép MIT, commit `ed5eb99`) và từ [notebook đi kèm](https://github.com/nmc2004nd/Self-Learning/tree/main/notebooks) của bản gốc EasyRL. Chú thích đã dịch sang tiếng Việt. Phần không có trong MinRL được ghi *(thêm)*.
 >
 > Ký hiệu: trang này giữ ký hiệu của [chương 3](chapter3/chapter3_vi) ($V(s)$, $Q(s,a)$, $\alpha$, $\gamma$). Bảng quy đổi: [Quy ước ký hiệu](notation_vi).
 
@@ -8,7 +8,7 @@
 
 Mỗi khối code trên trang đã được chạy sẵn. Ngay bên dưới là kết quả (khung có nhãn "kết quả"), hình vẽ và ảnh động. Các khối chạy lần lượt từ trên xuống, dùng chung biến như các ô của một notebook.
 
-Muốn tự sửa tham số (ví dụ `alpha`, `epsilon`) rồi chạy lại, xem [mục 6](#_6-chạy-trên-máy). Môi trường lưới, bộ đánh giá chính sách và hàm vẽ nằm trong thư mục [`docs/code/py/`](https://github.com/nmc2004nd/easy-rl-vi/tree/main/docs/code/py) (gói nhỏ `minrl_vi` và mô-đun `viz`). Phần thuật toán của chương được viết thẳng trên trang để đọc cho dễ.
+Muốn tự sửa tham số (ví dụ `alpha`, `epsilon`) rồi chạy lại, xem [mục 6](#_6-chạy-trên-máy). Môi trường lưới, bộ đánh giá chính sách và hàm vẽ nằm trong thư mục [`docs/code/py/`](https://github.com/nmc2004nd/Self-Learning/tree/main/docs/code/py) (gói nhỏ `minrl_vi` và mô-đun `viz`). Phần thuật toán của chương được viết thẳng trên trang để đọc cho dễ.
 
 ## 1. Môi trường lưới
 
@@ -449,7 +449,7 @@ save_gif(draw_walk, n_frames, "cliff_walk.gif", fps=3, figsize=(6, 4.2))
 
 ## 4. Code notebook của EasyRL
 
-Bản gốc EasyRL có notebook cho chương này. Bản dịch đã chuyển chúng từ Gym sang Gymnasium. Lớp `QLearning` dưới đây lấy nguyên từ [`QLearning_vi.ipynb`](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/Q-learning/QLearning_vi.ipynb). Khác biệt so với MinRL: bảng Q là `defaultdict`, và $\varepsilon$ giảm dần theo hàm mũ thay vì cố định. Khối này cần thêm `gymnasium`. Phần vẽ bằng `turtle` và `seaborn` đã được bỏ đi.
+Bản gốc EasyRL có notebook cho chương này. Bản dịch đã chuyển chúng từ Gym sang Gymnasium. Lớp `QLearning` dưới đây lấy nguyên từ [`QLearning_vi.ipynb`](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/Q-learning/QLearning_vi.ipynb). Khác biệt so với MinRL: bảng Q là `defaultdict`, và $\varepsilon$ giảm dần theo hàm mũ thay vì cố định. Khối này cần thêm `gymnasium`. Phần vẽ bằng `turtle` và `seaborn` đã được bỏ đi.
 
 <!-- run -->
 ```python
@@ -550,10 +550,10 @@ Các notebook đầy đủ của chương này. Notebook nào chỉ dùng môi t
 
 | Notebook | Nội dung | Mở |
 |---|---|---|
-| `Q-learning/QLearning_vi.ipynb` | Q-learning trên CliffWalking, có vẽ đường cong | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/Q-learning/QLearning_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/Q-learning/QLearning_vi.ipynb) |
-| `Q-learning/Q-learning探索策略研究_vi.ipynb` | So sánh các chiến lược khám phá | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/Q-learning/Q-learning探索策略研究_vi.ipynb) |
-| `Sarsa_vi.ipynb` | Sarsa trên FrozenLake-v1 | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/Sarsa_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/Sarsa_vi.ipynb) |
-| `MonteCarlo_vi.ipynb` | Monte Carlo điều khiển trên Racetrack (môi trường tự viết trong `notebooks/envs/`) | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/MonteCarlo_vi.ipynb) |
+| `Q-learning/QLearning_vi.ipynb` | Q-learning trên CliffWalking, có vẽ đường cong | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/Q-learning/QLearning_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/Q-learning/QLearning_vi.ipynb) |
+| `Q-learning/Q-learning探索策略研究_vi.ipynb` | So sánh các chiến lược khám phá | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/Q-learning/Q-learning探索策略研究_vi.ipynb) |
+| `Sarsa_vi.ipynb` | Sarsa trên FrozenLake-v1 | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/Sarsa_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/Sarsa_vi.ipynb) |
+| `MonteCarlo_vi.ipynb` | Monte Carlo điều khiển trên Racetrack (môi trường tự viết trong `notebooks/envs/`) | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/MonteCarlo_vi.ipynb) |
 
 ## 5. Bài tập
 
@@ -577,8 +577,8 @@ Các notebook đầy đủ của chương này. Notebook nào chỉ dùng môi t
 Gói `minrl_vi` chỉ cần `numpy`, thêm `matplotlib` để vẽ (và `pillow` để lưu GIF). Mục 4 cần thêm `gymnasium`.
 
 ```bash
-git clone https://github.com/nmc2004nd/easy-rl-vi.git
-cd easy-rl-vi/docs/code/py          # chạy từ thư mục này để import được minrl_vi, viz
+git clone https://github.com/nmc2004nd/Self-Learning.git
+cd Self-Learning/docs/code/py          # chạy từ thư mục này để import được minrl_vi, viz
 pip install numpy matplotlib pillow gymnasium
 python -c "from minrl_vi import CliffWalking; print(CliffWalking().render())"
 ```

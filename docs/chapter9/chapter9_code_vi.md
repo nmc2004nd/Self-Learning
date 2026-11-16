@@ -119,13 +119,13 @@ cartpole_gif({"Actor-critic": lambda o: agent.select_action(o, deterministic=Tru
 
 ## 4. Notebook của EasyRL: A2C với nhiều môi trường song song
 
-Notebook [`A2C_vi.ipynb`](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/A2C_vi.ipynb) cài **A2C**: nhiều bản sao môi trường chạy song song (`notebooks/common/multiprocessing_env_vi.py`). Mỗi lần cập nhật dùng $n$ bước của tất cả các bản sao, với mục tiêu $n$ bước $r_t + \gamma r_{t+1} + \dots + \gamma^n V(s_{t+n})$. Chạy song song làm dữ liệu trong một lô bớt tương quan với nhau. Đây cũng là ý tưởng của A3C ở mục 9.4, nhưng các bản sao được đồng bộ thay vì bất đồng bộ. Notebook cần file trong `notebooks/common/`, nên hãy clone repo rồi chạy trên máy.
+Notebook [`A2C_vi.ipynb`](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/A2C_vi.ipynb) cài **A2C**: nhiều bản sao môi trường chạy song song (`notebooks/common/multiprocessing_env_vi.py`). Mỗi lần cập nhật dùng $n$ bước của tất cả các bản sao, với mục tiêu $n$ bước $r_t + \gamma r_{t+1} + \dots + \gamma^n V(s_{t+n})$. Chạy song song làm dữ liệu trong một lô bớt tương quan với nhau. Đây cũng là ý tưởng của A3C ở mục 9.4, nhưng các bản sao được đồng bộ thay vì bất đồng bộ. Notebook cần file trong `notebooks/common/`, nên hãy clone repo rồi chạy trên máy.
 
 ## 5. Chạy trên máy
 
 ```bash
-git clone https://github.com/nmc2004nd/easy-rl-vi.git
-cd easy-rl-vi/docs/code/py          # chạy từ đây để import được minrl_vi, viz
+git clone https://github.com/nmc2004nd/Self-Learning.git
+cd Self-Learning/docs/code/py          # chạy từ đây để import được minrl_vi, viz
 pip install numpy matplotlib pillow gymnasium torch
 ```
 

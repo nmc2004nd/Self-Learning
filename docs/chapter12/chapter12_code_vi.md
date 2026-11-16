@@ -189,9 +189,9 @@ save_gif(draw, 100, "pendulum.gif", fps=15, figsize=(5, 2.8), dpi=72)
 
 | Notebook | Nội dung | Mở |
 |---|---|---|
-| `DDPG_vi.ipynb` | DDPG trên Pendulum-v1, nhiễu OU | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/DDPG_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/DDPG_vi.ipynb) |
-| `TD3_vi.ipynb` | TD3 trên Pendulum-v1 | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/TD3_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/TD3_vi.ipynb) |
-| `SAC_vi.ipynb` | SAC (diễn viên-nhà phê bình mềm), không có trong sách | [GitHub](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/SAC_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/easy-rl-vi/blob/main/notebooks/SAC_vi.ipynb) |
+| `DDPG_vi.ipynb` | DDPG trên Pendulum-v1, nhiễu OU | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/DDPG_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/DDPG_vi.ipynb) |
+| `TD3_vi.ipynb` | TD3 trên Pendulum-v1 | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/TD3_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/TD3_vi.ipynb) |
+| `SAC_vi.ipynb` | SAC (diễn viên-nhà phê bình mềm), không có trong sách | [GitHub](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/SAC_vi.ipynb) · [Colab](https://colab.research.google.com/github/nmc2004nd/Self-Learning/blob/main/notebooks/SAC_vi.ipynb) |
 
 Bản gốc của `DDPG_vi.ipynb` tạo mạng mục tiêu như sau:
 
@@ -223,8 +223,8 @@ Theo output lưu sẵn trong notebook, bản gốc vẫn học được trên Pe
 ## 5. Chạy trên máy
 
 ```bash
-git clone https://github.com/nmc2004nd/easy-rl-vi.git
-cd easy-rl-vi/docs/code/py          # chạy từ đây để import được viz
+git clone https://github.com/nmc2004nd/Self-Learning.git
+cd Self-Learning/docs/code/py          # chạy từ đây để import được viz
 pip install numpy matplotlib pillow gymnasium torch
 ```
 

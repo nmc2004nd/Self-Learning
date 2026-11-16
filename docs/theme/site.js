@@ -35,7 +35,7 @@
   };
   // Trang chung của cả site, không thuộc khoá nào.
   var GLOBAL_PAGES = ['/', '/roadmap_vi', '/mindmap_vi', '/mindmap_dl_vi'];
-  var REPO = 'https://github.com/nmc2004nd/easy-rl-vi';
+  var REPO = 'https://github.com/nmc2004nd/Self-Learning';
   var LAST_KEY = 'easyrl-last';
   // Các khoá học. Mục lục chung một tệp; mỗi nhóm thuộc về khoá của các trang bên trong nó,
   // và cột trái chỉ hiện các nhóm của khoá đang chọn.

@@ -78,7 +78,7 @@ Phần này tuân thủ chặt [chuẩn ký hiệu chung của site](notation_vi
 
 - **Sách gốc:** Shiyu Zhao, *Mathematical Foundations of Reinforcement Learning*, Springer Nature Press và Tsinghua University Press, 2025. Tác giả công bố miễn phí bản PDF, slide bài giảng và mã nguồn tại [GitHub MathFoundationRL](https://github.com/MathFoundationRL/Book-Mathematical-Foundation-of-Reinforcement-Learning). Video bài giảng có trên [YouTube](https://www.youtube.com/playlist?list=PLEhdbSEZZbDaFWPX4gehhwB9vJZJ1DNm8) và [Bilibili](https://space.bilibili.com/2044042934).
 - **Ghi chú bổ sung:** loạt bài [Reinforcement Learning trên blog lyk-love.cn](https://lyk-love.cn/tags/reinforcement-learning/), giấy phép CC BY-NC-SA 4.0. Các ý lấy từ blog được ghi *(theo lyk-love)*.
-- Toàn bộ hình ảnh, ví dụ và cấu trúc chương thuộc về tác giả Shiyu Zhao. Người biên soạn chỉ diễn giải lại bằng tiếng Việt cho mục đích học tập, phi thương mại. Nếu tác giả không đồng ý, xin liên hệ qua [Issues của repo](https://github.com/nmc2004nd/easy-rl-vi/issues) để chỉnh sửa hoặc gỡ bỏ.
+- Toàn bộ hình ảnh, ví dụ và cấu trúc chương thuộc về tác giả Shiyu Zhao. Người biên soạn chỉ diễn giải lại bằng tiếng Việt cho mục đích học tập, phi thương mại. Nếu tác giả không đồng ý, xin liên hệ qua [Issues của repo](https://github.com/nmc2004nd/Self-Learning/issues) để chỉnh sửa hoặc gỡ bỏ.
 
 ```bibtex
 @book{zhao2025RLBook,

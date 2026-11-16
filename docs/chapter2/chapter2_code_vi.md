@@ -1,6 +1,6 @@
 # Chương 2 · Code
 
-> Ghi chú của người dịch: trang này do người dịch biên soạn, không có trong sách gốc. Code chuyển thể từ [MinRL](https://github.com/10-OASIS-01/minrl/tree/ed5eb99) (Yibin Liu, giấy phép MIT, commit `ed5eb99`) và từ [notebook đi kèm](https://github.com/nmc2004nd/easy-rl-vi/tree/main/notebooks) của bản gốc EasyRL. Chú thích đã dịch sang tiếng Việt. Phần không có trong MinRL được ghi *(thêm)*.
+> Ghi chú của người dịch: trang này do người dịch biên soạn, không có trong sách gốc. Code chuyển thể từ [MinRL](https://github.com/10-OASIS-01/minrl/tree/ed5eb99) (Yibin Liu, giấy phép MIT, commit `ed5eb99`) và từ [notebook đi kèm](https://github.com/nmc2004nd/Self-Learning/tree/main/notebooks) của bản gốc EasyRL. Chú thích đã dịch sang tiếng Việt. Phần không có trong MinRL được ghi *(thêm)*.
 >
 > Ký hiệu: trang này giữ ký hiệu của [chương 2](chapter2/chapter2_vi) ($V(s)$, $Q(s,a)$, $R$, $P$, $\gamma$). Bảng quy đổi: [Quy ước ký hiệu](notation_vi).
 
@@ -244,7 +244,7 @@ save_gif(draw_vi, len(frames), "value_iteration.gif", fps=2, figsize=(3.6, 3.8),
 
 ## 4. Code notebook của EasyRL
 
-Notebook [`Value Iteration/value_iteration_vi.ipynb`](https://github.com/nmc2004nd/easy-rl-vi/blob/main/notebooks/Value%20Iteration/value_iteration_vi.ipynb) chạy lặp giá trị trên môi trường "người say đi trong hẻm" (`DrunkenWalkEnv`, bản đồ `theAlley`, nằm trong `notebooks/envs/simple_grid.py`). Con hẻm là một hàng 13 ô `S...H...H...G`. Trên mặt đường thường, người say đi đúng hướng với xác suất 0.8 và lệch sang hai bên với xác suất 0.1 mỗi bên. Ở ổ gà `H`, người đó vấp ngã với xác suất 0.2 (phần thưởng $-5$, tập kết thúc). Tới `G` được $+10$. Vì vậy `env.P[s][a]` là một danh sách nhiều bộ `(xác suất, s', r, kết_thúc)`. Hàm `value_iteration` dưới đây lấy nguyên từ notebook. Hàm lặp trên bảng $Q$ thay vì $V$ (công thức (2.23) và (2.24) gộp làm một).
+Notebook [`Value Iteration/value_iteration_vi.ipynb`](https://github.com/nmc2004nd/Self-Learning/blob/main/notebooks/Value%20Iteration/value_iteration_vi.ipynb) chạy lặp giá trị trên môi trường "người say đi trong hẻm" (`DrunkenWalkEnv`, bản đồ `theAlley`, nằm trong `notebooks/envs/simple_grid.py`). Con hẻm là một hàng 13 ô `S...H...H...G`. Trên mặt đường thường, người say đi đúng hướng với xác suất 0.8 và lệch sang hai bên với xác suất 0.1 mỗi bên. Ở ổ gà `H`, người đó vấp ngã với xác suất 0.2 (phần thưởng $-5$, tập kết thúc). Tới `G` được $+10$. Vì vậy `env.P[s][a]` là một danh sách nhiều bộ `(xác suất, s', r, kết_thúc)`. Hàm `value_iteration` dưới đây lấy nguyên từ notebook. Hàm lặp trên bảng $Q$ thay vì $V$ (công thức (2.23) và (2.24) gộp làm một).
 
 <!-- run -->
 ```python
@@ -312,8 +312,8 @@ Chính sách tối ưu là luôn đi sang phải (hành động 2). Không thể
 ## 5. Chạy trên máy
 
 ```bash
-git clone https://github.com/nmc2004nd/easy-rl-vi.git
-cd easy-rl-vi/docs/code/py          # chạy từ đây để import được minrl_vi, viz
+git clone https://github.com/nmc2004nd/Self-Learning.git
+cd Self-Learning/docs/code/py          # chạy từ đây để import được minrl_vi, viz
 pip install numpy matplotlib pillow gymnasium
 ```
 
