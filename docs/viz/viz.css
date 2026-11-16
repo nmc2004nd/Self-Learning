@@ -3,17 +3,17 @@
  * Chế độ nhúng (?embed) luôn dùng nền sáng cho khớp với giao diện docsify.
  */
 :root {
-  --bg: #f6f7f9;
+  --bg: #f3f8ff;
   color-scheme: light;
   --surface: #ffffff;
-  --surface-2: #eef1f4;
-  --text: #1d2430;
-  --muted: #5d6878;
-  --border: #dde2e8;
-  --accent: #4f46e5;
+  --surface-2: #e5effe;
+  --text: #0f1d45;
+  --muted: #5b6b8c;
+  --border: #e1eaf8;
+  --accent: #3b82f6;
   --on-accent: #ffffff;
-  --accent-soft: #eceeff;
-  --accent-text: #4338ca;
+  --accent-soft: #e7f0ff;
+  --accent-text: #1d4ed8;
   --s1: #2a78d6;
   --s2: #eb6834;
   --hl: #c98a12;
@@ -26,17 +26,17 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0d0f1f;
+    --bg: #0a1124;
     color-scheme: dark;
-    --surface: #13162e;
-    --surface-2: #1c2042;
-    --text: #e4e8f4;
-    --muted: #98a2bb;
-    --border: #272b52;
-    --accent: #5b5bf0;
+    --surface: #101b36;
+    --surface-2: #1b2b52;
+    --text: #e8efff;
+    --muted: #97a7c9;
+    --border: #22335c;
+    --accent: #3b82f6;
     --on-accent: #ffffff;
-    --accent-soft: #1f2356;
-    --accent-text: #aab4ff;
+    --accent-soft: #16284f;
+    --accent-text: #93c5fd;
     --s1: #3987e5;
     --s2: #d95926;
     --hl: #e3ac45;
@@ -49,17 +49,17 @@
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0d0f1f;
+  --bg: #0a1124;
   color-scheme: dark;
-  --surface: #13162e;
-  --surface-2: #1c2042;
-  --text: #e4e8f4;
-  --muted: #98a2bb;
-  --border: #272b52;
-  --accent: #5b5bf0;
+  --surface: #101b36;
+  --surface-2: #1b2b52;
+  --text: #e8efff;
+  --muted: #97a7c9;
+  --border: #22335c;
+  --accent: #3b82f6;
     --on-accent: #ffffff;
-  --accent-soft: #1f2356;
-  --accent-text: #aab4ff;
+  --accent-soft: #16284f;
+  --accent-text: #93c5fd;
   --s1: #3987e5;
   --s2: #d95926;
   --hl: #e3ac45;
@@ -75,7 +75,7 @@ html, body { margin: 0; }
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Plus Jakarta Sans", "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -261,3 +261,22 @@ details.pseudo[open] > summary::before { transform: rotate(90deg); }
 .card h3 { margin: 2px 0 6px; font-size: 1rem; }
 .card p { margin: 0; font-size: .88rem; color: var(--muted); }
 @media (max-width: 600px) { .calc { font-size: .8rem; } .blk { padding: 14px 12px; } .top h1 { font-size: 1.15rem; } }
+
+/* ===== Đồ thị của khoá Học máy (ml-common.js) ===== */
+.plotbox { position: relative; width: 100%; max-width: 620px; margin: 0 auto; }
+.plotbox svg { position: relative; display: block; width: 100%; height: auto; user-select: none; }
+.plotbox canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.plotbox.click svg { cursor: crosshair; }
+.pl-frame { fill: var(--surface); stroke: var(--border); }
+.plotbox canvas + svg .pl-frame { fill: none; }
+.pl-grid { stroke: var(--border); stroke-width: 1; }
+.pl-tick { fill: var(--muted); font-size: 11px; }
+.pl-lab { fill: var(--text); font-size: 12px; font-weight: 600; }
+.pl-vline { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.pl-pt { stroke: var(--surface); stroke-width: 1.5; }
+.mtab { width: 100%; max-width: 620px; margin: 10px auto 0; border-collapse: collapse; font-size: .9rem; font-variant-numeric: tabular-nums; }
+.mtab th, .mtab td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: right; }
+.mtab th:first-child, .mtab td:first-child { text-align: left; }
+.mtab .sw, .legend .sw.dot { display: inline-block; vertical-align: middle; }
+.two-plots { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 760px) { .two-plots { grid-template-columns: minmax(0, 1fr); } }
