@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ngưỡng và chỉ số · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  :root { --tp: #16a34a; --fn: #dc2626; --fp: #f08a24; --tn: #0ea5a4; --pos: #e8487f; --neg: #2f80f5; }
+  .ev-main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .ev-curves { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 8px; }
+  @media (max-width: 720px) { .ev-main, .ev-curves { grid-template-columns: minmax(0, 1fr); } }
+  .ev-h { font-size: .82rem; font-weight: 700; color: var(--muted); margin: 2px 0 6px; text-transform: uppercase; letter-spacing: .03em; }
+  .cm { display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px; font-variant-numeric: tabular-nums; }
+  .cm .hd { font-size: .78rem; color: var(--muted); font-weight: 600; text-align: center; align-self: end; padding-bottom: 2px; }
+  .cm .rh { font-size: .78rem; color: var(--muted); font-weight: 600; align-self: center; text-align: right; padding-right: 4px; line-height: 1.2; }
+  .cm .c { border-radius: 10px; padding: 8px 6px; text-align: center; border: 2px solid; }
+  .cm .c b { display: block; font-size: 1.35rem; line-height: 1.15; }
+  .cm .c span { font-size: .72rem; font-weight: 700; letter-spacing: .02em; }
+  .c.tp { border-color: var(--tp); background: color-mix(in srgb, var(--tp) 14%, transparent); color: var(--tp); }
+  .c.fn { border-color: var(--fn); background: color-mix(in srgb, var(--fn) 14%, transparent); color: var(--fn); }
+  .c.fp { border-color: var(--fp); background: color-mix(in srgb, var(--fp) 16%, transparent); color: #c2620a; }
+  .c.tn { border-color: var(--tn); background: color-mix(in srgb, var(--tn) 14%, transparent); color: #0b7d7c; }
+  .c b { color: var(--text); }
+  .bars { display: grid; gap: 7px; margin-top: 14px; }
+  .bar { display: grid; grid-template-columns: 7.2em minmax(0, 1fr) 3.4em; gap: 8px; align-items: center; font-size: .86rem; }
+  .bar .tr { display: block; height: 12px; border-radius: 6px; background: var(--surface-2); overflow: hidden; position: relative; }
+  .bar .fl { display: block; height: 100%; border-radius: 6px; transition: width .12s; }
+  .bar .mk { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: .55; }
+  .bar .v { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bar .nm small { color: var(--muted); font-weight: 400; }
+  #hist { cursor: ew-resize; touch-action: none; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Ngưỡng và chỉ số đánh giá</h1>
+      <div class="crumbs"><a href="../#/ml/eval_vi">← Đánh giá mô hình</a></div>
+    </div>
+    <p class="lead">Một mô hình chấm điểm cho 1000 mẫu. Kéo ngưỡng để xem ma trận nhầm lẫn, precision, recall, F1 và vị trí trên đường ROC, đường precision–recall thay đổi cùng lúc. Đổi tỉ lệ lớp dương để thấy accuracy đánh lừa ra sao khi dữ liệu mất cân bằng.</p>
+  </div>
+  <div class="only-embed open-full"><a href="ml-eval.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <label for="thr">Ngưỡng $t$</label><input id="thr" type="range" min="-4" max="4" step="0.05" value="0"><span class="val" id="thr-v"></span>
+      <label for="sep">Độ tách hai lớp</label><input id="sep" type="range" min="0" max="5" step="0.1" value="2"><span class="val" id="sep-v"></span>
+    </div>
+    <div class="ctrl">
+      <label for="rate">Tỉ lệ lớp dương</label><input id="rate" type="range" min="0" max="7" step="1" value="6"><span class="val" id="rate-v"></span>
+      <button type="button" class="btn" id="resample">Lấy mẫu lại</button>
+      <label><input type="checkbox" id="same"> Cùng thang cho hai lớp</label>
+    </div>
+    <div class="ctrl presets">
+      <span class="note">Thử nhanh:</span>
+      <button type="button" class="btn" data-p="0,2,6">Hai lớp cân bằng</button>
+      <button type="button" class="btn" data-p="1.2,2,1">Bệnh hiếm 2%, ngưỡng cao</button>
+      <button type="button" class="btn" data-p="0,2,1">Bệnh hiếm, hạ ngưỡng</button>
+      <button type="button" class="btn" data-p="0,0,6">Mô hình đoán mò</button>
+    </div>
+
+    <div class="ev-main">
+      <div>
+        <div class="ev-h">Phân phối điểm số · kéo để đổi ngưỡng</div>
+        <div class="plotbox"><svg id="hist" viewBox="0 0 560 330" role="img" aria-label="Biểu đồ điểm số của hai lớp và ngưỡng"></svg></div>
+        <div class="legend" style="justify-content:center">
+          <span class="li"><span class="sw" style="background:var(--tp);height:10px"></span>TP</span>
+          <span class="li"><span class="sw" style="background:var(--fn);height:10px"></span>FN (bỏ sót)</span>
+          <span class="li"><span class="sw" style="background:var(--fp);height:10px"></span>FP (báo nhầm)</span>
+          <span class="li"><span class="sw" style="background:var(--tn);height:10px"></span>TN</span>
+        </div>
+      </div>
+      <div>
+        <div class="ev-h">Ma trận nhầm lẫn</div>
+        <div class="cm">
+          <div></div><div class="hd">đoán dương</div><div class="hd">đoán âm</div>
+          <div class="rh">thật<br>dương</div>
+          <div class="c tp"><b id="tp">0</b><span>TP</span></div>
+          <div class="c fn"><b id="fn">0</b><span>FN</span></div>
+          <div class="rh">thật<br>âm</div>
+          <div class="c fp"><b id="fp">0</b><span>FP</span></div>
+          <div class="c tn"><b id="tn">0</b><span>TN</span></div>
+        </div>
+        <div class="bars" id="bars"></div>
+        <p class="note" style="margin:8px 0 0">Vạch đen trên thanh accuracy: accuracy của mốc "luôn đoán âm".</p>
+      </div>
+    </div>
+
+    <div class="ev-curves">
+      <div>
+        <div class="ev-h">Đường ROC</div>
+        <div class="plotbox"><svg id="roc" viewBox="0 0 320 300" role="img" aria-label="Đường ROC"></svg></div>
+      </div>
+      <div>
+        <div class="ev-h">Đường precision–recall</div>
+        <div class="plotbox"><svg id="pr" viewBox="0 0 320 300" role="img" aria-label="Đường precision recall"></svg></div>
+      </div>
+    </div>
+    <div class="stats"><span>ROC-AUC <b id="auc"></b></span><span>AP <b id="ap"></b></span><span>Mốc ngẫu nhiên của AP <b id="base"></b></span><span>F1 lớn nhất <b id="f1max"></b></span></div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script src="ml-common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, N = 1000, seed = 11;
+  var RATES = [0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5, 0.7];
+  var pos = [], neg = [], sorted = [];
+  var TP = '#16a34a', FN = '#dc2626', FP = '#f08a24', TN = '#0ea5a4';
+
+  function sample() {
+    var r = MLV.rng(seed), d = +V_.$('#sep').value, rate = RATES[+V_.$('#rate').value];
+    var nPos = Math.max(1, Math.round(N * rate));
+    pos = []; neg = [];
+    // dùng cùng dãy nhiễu cho mọi tỉ lệ/độ tách để kéo thanh trượt thấy thay đổi mượt
+    for (var i = 0; i < N; i++) { var z = MLV.randn(r); if (i < nPos) pos.push(z + d / 2); else neg.push(z - d / 2); }
+    sorted = pos.map(function (s) { return [s, 1]; }).concat(neg.map(function (s) { return [s, 0]; }))
+      .sort(function (a, b) { return b[0] - a[0]; });
+  }
+
+  function count(t) {
+    var tp = 0, fp = 0;
+    pos.forEach(function (s) { if (s >= t) tp++; });
+    neg.forEach(function (s) { if (s >= t) fp++; });
+    return { tp: tp, fn: pos.length - tp, fp: fp, tn: neg.length - fp };
+  }
+
+  // đường ROC và PR từ điểm số đã sắp xếp (gộp các điểm bằng nhau)
+  function curves() {
+    var P = pos.length, Nn = neg.length, tp = 0, fp = 0, roc = [[0, 0]], pr = [], auc = 0, ap = 0, f1max = 0;
+    for (var i = 0; i < sorted.length; i++) {
+      if (sorted[i][1]) tp++; else fp++;
+      if (i + 1 < sorted.length && sorted[i + 1][0] === sorted[i][0]) continue;
+      var x = fp / Nn, y = tp / P, prev = roc[roc.length - 1];
+      auc += (x - prev[0]) * (y + prev[1]) / 2;
+      var prec = tp / (tp + fp), rec = tp / P, prevRec = pr.length ? pr[pr.length - 1][0] : 0;
+      ap += (rec - prevRec) * prec;
+      if (prec + rec > 0) f1max = Math.max(f1max, 2 * prec * rec / (prec + rec));
+      roc.push([x, y]); pr.push([rec, prec]);
+    }
+    return { roc: roc, pr: [[0, pr.length ? pr[0][1] : 1]].concat(pr), auc: auc, ap: ap, f1max: f1max };
+  }
+
+  var histP;
+  function drawHist(t) {
+    var svg = V_.$('#hist'), same = V_.$('#same').checked;
+    var lo = -6, hi = 6, nb = 48, w = (hi - lo) / nb, hp = new Array(nb).fill(0), hn = new Array(nb).fill(0);
+    function bin(s) { return Math.max(0, Math.min(nb - 1, Math.floor((s - lo) / w))); }
+    pos.forEach(function (s) { hp[bin(s)]++; }); neg.forEach(function (s) { hn[bin(s)]++; });
+    var mp = Math.max.apply(null, hp) || 1, mn = Math.max.apply(null, hn) || 1;
+    if (same) mp = mn = Math.max(mp, mn);
+    var P = histP = MLV.Plot(svg, { W: 560, H: 330, x: [lo, hi], y: [-1, 1], m: { l: 16, r: 12, t: 22, b: 40 }, xlabel: 'điểm số của mô hình (logit)', grid: false });
+    P.clear(); P.axes({ yticks: [] });
+    var base = P.sy(0);
+    P.el('line', { x1: P.sx(lo), x2: P.sx(hi), y1: base, y2: base, stroke: 'var(--border)', 'stroke-width': 1.5 });
+    for (var k = 0; k < nb; k++) {
+      var x0 = lo + k * w, cut = Math.max(x0, Math.min(x0 + w, t));
+      // lớp âm vẽ lên trên, lớp dương vẽ xuống dưới; phần bên phải ngưỡng là "đoán dương"
+      [[hn[k] / mn, -1, FP, TN], [hp[k] / mp, 1, TP, FN]].forEach(function (b) {
+        if (!b[0]) return;
+        var h = b[0] * (P.ph / 2 - 6), y = b[1] < 0 ? base - h : base;
+        if (cut > x0) P.el('rect', { x: P.sx(x0) + 0.5, y: y, width: P.sx(cut) - P.sx(x0), height: h, fill: b[3], opacity: 0.8 });
+        if (cut < x0 + w) P.el('rect', { x: P.sx(cut), y: y, width: P.sx(x0 + w) - P.sx(cut) - 0.5, height: h, fill: b[2], opacity: 0.85 });
+      });
+    }
+    var lab = function (txt, y, col) { var e = P.el('text', { x: P.sx(lo) + 6, y: y, class: 'pl-lab', fill: col }); e.textContent = txt; e.style.fill = col; };
+    lab('lớp âm: ' + neg.length + ' mẫu', P.m.t + 12, '#2f80f5');
+    lab('lớp dương: ' + pos.length + ' mẫu', P.H - P.m.b - 8, '#e8487f');
+    if (!same) { var n2 = P.el('text', { x: P.sx(hi) - 4, y: P.m.t + 12, 'text-anchor': 'end', class: 'pl-tick' }); n2.textContent = 'mỗi nửa một thang'; }
+    var tx = P.sx(t);
+    P.el('line', { x1: tx, x2: tx, y1: P.m.t - 6, y2: P.H - P.m.b, stroke: 'var(--text)', 'stroke-width': 2.2, 'stroke-dasharray': '6 4' });
+    P.el('rect', { x: tx - 7, y: P.m.t - 16, width: 14, height: 12, rx: 3, fill: 'var(--text)' });
+    var a = P.el('text', { x: tx + 10, y: P.m.t - 6, class: 'pl-tick' }); a.textContent = 'đoán dương →';
+    var b2 = P.el('text', { x: tx - 10, y: P.m.t - 6, 'text-anchor': 'end', class: 'pl-tick' }); b2.textContent = '← đoán âm';
+  }
+
+  function drawCurve(id, pts, cur, xl, yl, diag, baseY) {
+    var P = MLV.Plot(V_.$(id), { W: 320, H: 300, x: [0, 1], y: [0, 1.02], m: { l: 44, r: 12, t: 10, b: 40 }, xlabel: xl, ylabel: yl, nx: 5, ny: 5 });
+    P.clear(); P.axes();
+    if (diag) P.poly([[0, 0], [1, 1]], { stroke: 'var(--muted)', 'stroke-dasharray': '5 4', 'stroke-width': 1.2 });
+    if (baseY != null) P.poly([[0, baseY], [1, baseY]], { stroke: 'var(--muted)', 'stroke-dasharray': '2 3', 'stroke-width': 1.2 });
+    P.poly(pts, { stroke: '#2f80f5', 'stroke-width': 2.4 });
+    if (cur) {
+      P.el('circle', { cx: P.sx(cur[0]), cy: P.sy(cur[1]), r: 7, fill: 'var(--text)', class: 'pl-pt' });
+    }
+  }
+
+  function bar(name, v, col, mark) {
+    return '<div class="bar"><span class="nm">' + name + '</span><span class="tr"><span class="fl" style="width:' + (100 * v).toFixed(1) + '%;background:' + col + '"></span>' +
+      (mark != null ? '<span class="mk" style="left:' + (100 * mark).toFixed(1) + '%"></span>' : '') + '</span><span class="v">' + (isNaN(v) ? '—' : V_.fmt(v, 3)) + '</span></div>';
+  }
+
+  function render() {
+    var t = +V_.$('#thr').value, rate = RATES[+V_.$('#rate').value];
+    V_.$('#thr-v').textContent = V_.fmt(t, 2);
+    V_.$('#sep-v').textContent = V_.fmt(+V_.$('#sep').value, 1);
+    V_.$('#rate-v').textContent = (100 * rate) + '%';
+    var c = count(t), P = pos.length, Nn = neg.length;
+    ['tp', 'fn', 'fp', 'tn'].forEach(function (k) { V_.$('#' + k).textContent = c[k]; });
+    var acc = (c.tp + c.tn) / N, prec = c.tp + c.fp ? c.tp / (c.tp + c.fp) : NaN, rec = c.tp / P, spec = c.tn / Nn;
+    var f1 = (prec + rec) > 0 ? 2 * prec * rec / (prec + rec) : 0;
+    if (isNaN(prec)) f1 = 0;
+    V_.$('#bars').innerHTML =
+      bar('accuracy', acc, '#7c3aed', Nn / N) +
+      bar('precision <small>TP/(TP+FP)</small>', prec, '#f08a24') +
+      bar('recall <small>TP/P</small>', rec, '#16a34a') +
+      bar('specificity <small>TN/N</small>', spec, '#0ea5a4') +
+      bar('F1', f1, '#1f2340');
+    drawHist(t);
+    var cv = curves();
+    drawCurve('#roc', cv.roc, [c.fp / Nn, rec], 'FPR = FP / N', 'TPR = recall', true, null);
+    drawCurve('#pr', cv.pr, isNaN(prec) ? null : [rec, prec], 'recall', 'precision', false, P / N);
+    V_.$('#auc').textContent = V_.fmt(cv.auc, 3);
+    V_.$('#ap').textContent = V_.fmt(cv.ap, 3);
+    V_.$('#base').textContent = V_.fmt(P / N, 3);
+    V_.$('#f1max').textContent = V_.fmt(cv.f1max, 3);
+
+    var msg, base = Nn / N;
+    if (cv.auc < 0.6) msg = 'Hai lớp gần như trùng nhau: điểm số không mang thông tin, đường ROC bám đường chéo (AUC ' + V_.fmt(cv.auc, 2) + '). Dịch ngưỡng chỉ đổi chỗ giữa hai loại lỗi chứ không giảm tổng số lỗi.';
+    else if (rate <= 0.05 && acc >= base - 0.01 && rec < 0.6) msg = 'Bẫy accuracy: accuracy ' + V_.fmt(acc, 3) + ' trông rất cao, nhưng mốc "luôn đoán âm" cũng đạt ' + V_.fmt(base, 3) + '. Mô hình chỉ bắt được ' + c.tp + '/' + P + ' ca dương. Thử kéo ngưỡng sang trái.';
+    else if (rate <= 0.05 && rec >= 0.7) msg = 'Bắt được ' + c.tp + '/' + P + ' ca dương, nhưng phải báo nhầm ' + c.fp + ' mẫu âm: cứ ' + V_.fmt((c.tp + c.fp) / Math.max(1, c.tp), 1) + ' lần báo động mới có 1 lần đúng. Tỉ lệ báo nhầm FPR = ' + V_.fmt(c.fp / Nn, 3) + ' nghe nhỏ, nhưng nhân với ' + Nn + ' mẫu âm thì thành rất nhiều. Vì vậy đường ROC trông vẫn đẹp, còn đường PR thì tụt sâu.';
+    else if (rec > 0.9 && prec < 0.6) msg = 'Ngưỡng dễ dãi: recall ' + V_.fmt(rec, 2) + ' nhưng precision chỉ ' + V_.fmt(prec, 2) + '. Hợp với sàng lọc, nơi bỏ sót đắt hơn báo nhầm.';
+    else if (prec > 0.9 && rec < 0.6) msg = 'Ngưỡng khắt khe: hầu như không báo nhầm (precision ' + V_.fmt(prec, 2) + ') nhưng bỏ sót ' + c.fn + ' ca dương. Hợp với lọc thư rác, nơi báo nhầm đắt hơn bỏ sót.';
+    else msg = 'Precision ' + V_.fmt(prec, 2) + ', recall ' + V_.fmt(rec, 2) + ', F1 ' + V_.fmt(f1, 3) + ' (F1 lớn nhất có thể là ' + V_.fmt(cv.f1max, 3) + '). Kéo ngưỡng để thấy precision và recall đổi chỗ cho nhau, trong khi AUC không đổi: AUC là của điểm số, không phụ thuộc ngưỡng.';
+    V_.$('#insight').textContent = msg;
+  }
+
+  // kéo ngưỡng trực tiếp trên biểu đồ
+  var dragging = false;
+  function setFromEvent(e) {
+    if (!histP) return;
+    var x = histP.at(e).x, s = V_.$('#thr');
+    x = Math.max(+s.min, Math.min(+s.max, Math.round(x / 0.05) * 0.05));
+    s.value = x; render();
+  }
+  var hsv = V_.$('#hist');
+  hsv.addEventListener('pointerdown', function (e) { dragging = true; hsv.setPointerCapture(e.pointerId); setFromEvent(e); });
+  hsv.addEventListener('pointermove', function (e) { if (dragging) setFromEvent(e); });
+  hsv.addEventListener('pointerup', function () { dragging = false; });
+
+  V_.$('#thr').addEventListener('input', render);
+  ['#sep', '#rate'].forEach(function (s) { V_.$(s).addEventListener('input', function () { sample(); render(); }); });
+  V_.$('#same').addEventListener('change', render);
+  V_.$('#resample').addEventListener('click', function () { seed += 1; sample(); render(); });
+  V_.$$('[data-p]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var p = b.dataset.p.split(',');
+      V_.$('#thr').value = p[0]; V_.$('#sep').value = p[1]; V_.$('#rate').value = p[2];
+      sample(); render();
+    });
+  });
+  V_.texAll(document.body);
+  sample(); render();
+})();
+</script>
+</body>
+</html>
