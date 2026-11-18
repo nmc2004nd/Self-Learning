@@ -2,6 +2,8 @@
 
 > Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch06_循环神经网络(RNN)), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
 
+> **Biên tập:** bản gốc viết khoảng 2018, khi RNN/LSTM còn là lựa chọn mặc định cho dữ liệu chuỗi. Từ đó Transformer đã thay RNN trong hầu hết bài toán ngôn ngữ và nhiều bài toán chuỗi khác, và từ 2023 có thêm họ mô hình không gian trạng thái (Mamba) mang lại ưu điểm của RNN ở quy mô lớn. Mục 6.15 (người biên tập viết, cập nhật tới 2026) tóm tắt các thay đổi này; nội dung RNN/LSTM của chương vẫn là nền tảng cần nắm.
+
 ## 6.1 Vì sao cần RNN?
 
 <div class="qa-theory">
@@ -577,6 +579,72 @@ CW-RNN có cấu trúc giống SRN, cũng gồm tầng đầu vào (Input), tầ
 ### 6.14.9 CNN-LSTM
 
 1. Để tận dụng ưu điểm của cả CNN và LSTM, người ta đề xuất CNN-LSTM. Trong mô hình này, CNN trích xuất đặc trưng của đối tượng, LSTM dùng để dự đoán. Nhờ đặc tính tích chập, CNN nắm bắt nhanh và chính xác đặc trưng của đối tượng; ưu điểm của LSTM là nắm bắt được phụ thuộc dài hạn giữa các dữ liệu. (Ví dụ: nhận dạng hành động trong video, mô tả ảnh.)
+
+## 6.15 Bổ sung: RNN sau khi có Transformer (2017–2026)
+
+> **Biên tập:** mục này do người biên tập viết, không có trong bản gốc.
+
+### 6.15.1 Vì sao Transformer thay RNN trong hầu hết bài toán chuỗi?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 11.6 Self-attention và mã hóa vị trí](https://d2l.ai/chapter_attention-mechanisms-and-transformers/self-attention-and-positional-encoding.html) ↗ · [Ôn tập · 16.6 Giải thích nguyên lý của cơ chế attention?](qa/ch16_vi?id=_166-giải-thích-nguyên-lý-của-cơ-chế-attention) · [Ôn tập · 6.2.7 Minh họa cơ chế attention trong RNN](qa/ch06_vi?id=_627-minh-họa-cơ-chế-attention-trong-rnn)
+
+</div>
+
+Attention ban đầu được gắn thêm vào RNN (mục 6.2.7). Transformer (Vaswani và cộng sự 2017, "Attention Is All You Need") bỏ hẳn phần hồi tiếp, chỉ dùng self-attention. So sánh một tầng xử lý chuỗi dài $n$, chiều $d$ (theo bảng 1 của bài báo):
+
+| Loại tầng | Độ phức tạp mỗi tầng | Số bước tuần tự | Đường đi dài nhất giữa hai vị trí |
+| --- | --- | --- | --- |
+| Self-attention | $O(n^2 d)$ | $O(1)$ | $O(1)$ |
+| Hồi tiếp (RNN) | $O(n d^2)$ | $O(n)$ | $O(n)$ |
+| Tích chập (kernel $k$) | $O(k n d^2)$ | $O(1)$ | $O(\log_k n)$ |
+
+Ba lý do chính:
+
+1. **Song song hóa khi huấn luyện:** RNN phải tính $h_t$ sau khi có $h_{t-1}$, nên $n$ bước nối tiếp nhau; self-attention tính mọi vị trí cùng lúc, tận dụng hết GPU (chương 15). Đây là lý do quyết định khi mô hình và dữ liệu lớn dần.
+2. **Phụ thuộc xa:** thông tin giữa hai từ cách nhau $n$ bước phải đi qua $n$ phép biến đổi trong RNN, gây tiêu biến/bùng nổ gradient (6.9b, 6.10); trong self-attention chỉ cách nhau một bước.
+3. **Mở rộng quy mô:** Transformer cải thiện đều đặn khi tăng tham số và dữ liệu, nền tảng của BERT, GPT và các mô hình ngôn ngữ lớn (chương 16).
+
+Cái giá là chi phí $O(n^2)$ theo độ dài chuỗi, và khi **suy luận sinh từng token**, Transformer phải giữ bộ đệm khóa–giá trị (KV cache) lớn dần theo độ dài ngữ cảnh, trong khi RNN chỉ giữ một trạng thái kích thước cố định.
+
+### 6.15.2 Mô hình không gian trạng thái (S4, Mamba) là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 6.15.1 Vì sao Transformer thay RNN trong hầu hết bài toán chuỗi?](qa/ch06_vi?id=_6151-vì-sao-transformer-thay-rnn-trong-hầu-hết-bài-toán-chuỗi) · [Ôn tập · 6.3 Đặc điểm điển hình của RNN?](qa/ch06_vi?id=_63-Đặc-điểm-điển-hình-của-rnn)
+
+</div>
+
+Mô hình không gian trạng thái (state space model, SSM) là một RNN **tuyến tính** theo trạng thái:
+
+$$h_t = \bar A\,h_{t-1} + \bar B\,x_t,\qquad y_t = C\,h_t.$$
+
+Vì không có hàm phi tuyến giữa các bước, có thể trải hồi quy ra thành một **tích chập** với kernel $K = (C\bar B,\ C\bar A\bar B,\ C\bar A^2\bar B,\ \dots)$:
+
+$$y_t = \sum_{k=0}^{t} K_k\, x_{t-k}.$$
+
+(Đã kiểm tra bằng NumPy với $\bar A$ đường chéo $4\times4$ và chuỗi dài 10: tính theo hồi quy và theo tích chập cho cùng kết quả.) Nhờ vậy SSM có ưu điểm của cả hai: **huấn luyện song song** như CNN/Transformer (qua tích chập hoặc phép quét song song), **suy luận từng bước với trạng thái cố định** như RNN, chi phí tuyến tính theo độ dài chuỗi.
+
+- **S4** (Gu, Goel, Ré 2022): tham số hóa $\bar A$ đặc biệt (dựa trên lý thuyết HiPPO) để nhớ được chuỗi rất dài; vượt Transformer trên các bài kiểm tra chuỗi dài.
+- **Mamba** (Gu và Dao 2023): SSM **chọn lọc**, cho $\bar B$, $C$ và bước thời gian phụ thuộc vào đầu vào $x_t$, giống cơ chế cổng của LSTM, để mô hình tự quyết định nhớ hay quên từng token; mất tính chất tích chập nên dùng thuật toán quét song song tối ưu cho GPU. Mamba đạt chất lượng mô hình ngôn ngữ ngang Transformer cùng cỡ, suy luận nhanh hơn nhiều với chuỗi dài.
+- Các hướng cùng tinh thần "RNN tuyến tính, huấn luyện song song": RWKV, RetNet, attention tuyến tính (về bản chất là một RNN có trạng thái ma trận), xLSTM (Beck, Hochreiter và cộng sự 2024, LSTM cải tiến với bộ nhớ ma trận).
+- Mô hình **lai** xen kẽ tầng Mamba với một số tầng attention (như Jamba, 2024) đang được dùng để giảm chi phí ngữ cảnh dài mà giữ khả năng truy hồi chính xác của attention.
+
+### 6.15.3 RNN/LSTM hiện còn được dùng ở đâu?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 6.11 LSTM](qa/ch06_vi?id=_611-lstm) · [Ôn tập · 6.12 LSTM và GRU khác nhau thế nào?](qa/ch06_vi?id=_612-lstm-và-gru-khác-nhau-thế-nào)
+
+</div>
+
+- **Xử lý luồng, độ trễ thấp:** nhận dạng giọng nói trực tuyến (bộ RNN-Transducer trên điện thoại), bàn phím dự đoán từ, phát hiện từ khóa đánh thức: dữ liệu đến từng mẫu và cần trạng thái nhỏ, cố định.
+- **Thiết bị nhúng, vi điều khiển:** mô hình nhỏ, bộ nhớ hạn chế, không chứa nổi KV cache.
+- **Chuỗi thời gian dữ liệu vừa và nhỏ:** dự báo nhu cầu, cảm biến; LSTM/GRU vẫn là baseline tốt bên cạnh các mô hình cây (gradient boosting) và Transformer cho chuỗi thời gian.
+- **Học tăng cường có trạng thái ẩn:** tác tử cần nhớ quan sát cũ (môi trường quan sát một phần), như LSTM trong các tác tử chơi game (xem chương 10).
+
+Khi bắt đầu một bài toán chuỗi mới hiện nay, lựa chọn mặc định thường là Transformer (hoặc tinh chỉnh một mô hình huấn luyện sẵn); chỉ chọn RNN/SSM khi có ràng buộc rõ về độ trễ, bộ nhớ hoặc độ dài chuỗi.
 
 ## Tài liệu tham khảo
 

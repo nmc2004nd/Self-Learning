@@ -2,6 +2,8 @@
 
 > Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch04_经典网络), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
 
+> **Biên tập:** bản gốc (khoảng 2018–2019) dừng ở GoogLeNet; phần ResNet, DenseNet và mục 4.8 (các mạng sau ResNet: EfficientNet, Vision Transformer, Swin, ConvNeXt, backbone huấn luyện trước) do người biên tập viết thêm, cập nhật tới 2026.
+
 ## 4.1 LeNet-5
 
 <div class="qa-theory">
@@ -387,6 +389,93 @@ So với ResNet:
 - Đổi mới mô hình rất khó: cải tiến mô hình cơ sở cần rất nhiều thí nghiệm, tích lũy kinh nghiệm và cảm hứng, tỉ lệ đầu tư/kết quả có thể thấp.
 - Hạn chế tài nguyên: tạo một mô hình mới cần nhiều thời gian và tài nguyên tính toán, thường không khả thi ở trường học và nhóm doanh nghiệp nhỏ.
 - Trong ứng dụng thực tế, thật ra có rất nhiều cấu hình mô hình không chuẩn.
+
+> **Biên tập (cập nhật 2026):** tiền đề của câu hỏi đã cũ. Từ khoảng 2020, mạng nền mặc định cho thị giác là ResNet, EfficientNet, rồi Vision Transformer và ConvNeXt (mục 4.8); và người ta hầu như không còn "điều chỉnh" kiến trúc mà lấy nguyên một mạng nền **đã huấn luyện trước** trên dữ liệu rất lớn (ImageNet-21k, hàng trăm triệu cặp ảnh–chữ của CLIP, hay học tự giám sát như DINOv2) rồi tinh chỉnh. Lý do thì vẫn như bản gốc nêu: so sánh công bằng với mạng chuẩn, và chi phí tìm kiến trúc mới rất cao (tìm kiến trúc tự động NAS, xem 14.6, đã giải quyết một phần).
+
+## 4.8 Bổ sung: các mạng sau ResNet (2017–2026)
+
+> **Biên tập:** mục này do người biên tập viết, không có trong bản gốc. Các mạng nhẹ cho thiết bị di động (MobileNet, ShuffleNet, SqueezeNet, Xception) đã được trình bày ở chương 17, mục 17.9.
+
+### 4.8.1 EfficientNet mở rộng mạng theo cách nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 17.9.3 MobileNet-v2](qa/ch17_vi?id=_1793-mobilenet-v2) · [d2l (tiếng Anh) · 8.8 Thiết kế kiến trúc mạng tích chập](https://d2l.ai/chapter_convolutional-modern/cnn-design.html) ↗
+
+</div>
+
+Trước EfficientNet, muốn mạng mạnh hơn người ta tăng **một** chiều: sâu hơn (ResNet-50 → 152), rộng hơn (nhiều kênh hơn), hoặc ảnh vào lớn hơn. Tan và Le (2019) nhận thấy tăng một chiều nhanh chóng bão hòa, còn tăng cả ba **cân đối** thì hiệu quả hơn. Họ đề xuất mở rộng hỗn hợp (compound scaling) với một hệ số $\phi$:
+
+$$\text{độ sâu } d=\alpha^{\phi},\quad \text{độ rộng } w=\beta^{\phi},\quad \text{độ phân giải } r=\gamma^{\phi},\qquad \alpha\cdot\beta^2\cdot\gamma^2\approx2,$$
+
+với $\alpha=1{,}2$, $\beta=1{,}1$, $\gamma=1{,}15$ tìm bằng lưới nhỏ trên mạng gốc. Vì FLOPs tỉ lệ với $d\cdot w^2\cdot r^2$, mỗi lần tăng $\phi$ thêm 1 thì FLOPs khoảng gấp đôi. Mạng gốc EfficientNet-B0 tìm bằng NAS (khối MBConv của MobileNetV2 kèm Squeeze-and-Excitation); từ đó mở rộng ra B1…B7. EfficientNet-B7 đạt khoảng 84,3% top-1 trên ImageNet với 66 triệu tham số, ít hơn nhiều lần so với các mạng cùng độ chính xác thời đó.
+
+Khối **Squeeze-and-Excitation** (SENet, Hu và cộng sự 2018, quán quân ILSVRC 2017) dùng trong EfficientNet là một dạng attention theo kênh: gộp trung bình toàn cục mỗi kênh thành một số, qua hai tầng kết nối đầy đủ và sigmoid ra trọng số $\in(0,1)$ cho từng kênh, rồi nhân lại vào bản đồ đặc trưng.
+
+### 4.8.2 Vision Transformer (ViT) xử lý ảnh thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 11.8 Vision Transformer](https://d2l.ai/chapter_attention-mechanisms-and-transformers/vision-transformer.html) ↗ · [Ôn tập · 16.6 Giải thích nguyên lý của cơ chế attention?](qa/ch16_vi?id=_166-giải-thích-nguyên-lý-của-cơ-chế-attention)
+
+</div>
+
+ViT (Dosovitskiy và cộng sự 2020, "An Image is Worth 16×16 Words") bỏ hẳn tích chập, đưa ảnh vào Transformer giống như một câu:
+
+1. cắt ảnh $224\times224\times3$ thành các mảnh $16\times16$, được $14\times14=196$ mảnh; mỗi mảnh duỗi thành vector $16\cdot16\cdot3=768$ chiều rồi chiếu tuyến tính thành một token;
+2. thêm một token phân loại `[CLS]` và cộng nhúng vị trí học được;
+3. qua $L$ khối Transformer encoder (self-attention nhiều đầu + MLP, xem 16.6); ViT-B/16 có 12 khối, chiều 768, khoảng 86 triệu tham số;
+4. đầu ra ở token `[CLS]` đi vào bộ phân loại.
+
+Khác biệt cốt lõi với CNN là **thiên kiến quy nạp**: CNN "biết sẵn" tính cục bộ và bất biến tịnh tiến (5.19), còn self-attention cho mọi mảnh nhìn thấy mọi mảnh ngay từ tầng đầu nhưng phải tự học cấu trúc không gian. Hệ quả: huấn luyện trên ImageNet-1k (1,3 triệu ảnh) ViT thua ResNet cùng cỡ; huấn luyện trước trên dữ liệu rất lớn (JFT-300M, ImageNet-21k) thì vượt. DeiT (Touvron và cộng sự 2021) cho thấy với tăng cường dữ liệu mạnh và chưng cất, ViT huấn luyện tốt chỉ với ImageNet-1k.
+
+### 4.8.3 Swin Transformer khắc phục nhược điểm gì của ViT?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 4.8.2 Vision Transformer (ViT) xử lý ảnh thế nào?](qa/ch04_vi?id=_482-vision-transformer-vit-xử-lý-ảnh-thế-nào)
+
+</div>
+
+ViT có hai nhược điểm cho các bài toán dày đặc (phát hiện, phân vùng): chỉ có một độ phân giải (mảnh $16\times16$), và chi phí self-attention tăng theo **bình phương** số mảnh. Swin Transformer (Liu và cộng sự 2021, giải thưởng bài báo hay nhất ICCV 2021):
+
+- tính self-attention **trong từng cửa sổ** cố định $M\times M$ mảnh (thường $M=7$); với bản đồ $h\times w$ và $C$ kênh, chi phí là $4hwC^2 + 2M^2hwC$, tuyến tính theo số mảnh, thay vì $4hwC^2 + 2(hw)^2C$ của attention toàn cục;
+- **dịch cửa sổ** (shifted window) xen kẽ giữa các khối để thông tin trao đổi qua ranh giới cửa sổ;
+- **gộp mảnh** (patch merging) qua các tầng để có kim tự tháp đặc trưng nhiều độ phân giải ($1/4, 1/8, 1/16, 1/32$) như ResNet, nên lắp thẳng vào FPN, Mask R-CNN (chương 8, 9).
+
+### 4.8.4 ConvNeXt cho thấy điều gì về CNN và Transformer?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · Vì sao ResNet huấn luyện được mạng rất sâu?](qa/ch04_vi?id=vì-sao-resnet-huấn-luyện-được-mạng-rất-sâu) · [Ôn tập · 17.8.2 Tích chập tách được theo chiều sâu (depthwise separable convolution)](qa/ch17_vi?id=_1782-tích-chập-tách-được-theo-chiều-sâu-depthwise-separable-convolution)
+
+</div>
+
+Liu và cộng sự (2022, "A ConvNet for the 2020s") lấy ResNet-50 và lần lượt áp dụng các lựa chọn thiết kế của Swin, xem mỗi bước cải thiện bao nhiêu:
+
+- chương trình huấn luyện hiện đại (AdamW, tăng cường dữ liệu mạnh, 300 epoch): riêng bước này đã tăng ResNet-50 từ 76,1% lên 78,8%;
+- tỉ lệ số khối giữa các tầng như Swin; phần đầu (stem) "cắt mảnh" bằng tích chập $4\times4$ stride 4;
+- tích chập theo chiều sâu (17.8.2) với kernel lớn $7\times7$, khối nút cổ chai đảo ngược (như MobileNetV2);
+- thay BatchNorm bằng LayerNorm, ReLU bằng GELU, dùng ít hàm kích hoạt và chuẩn hóa hơn.
+
+Kết quả ConvNeXt-T đạt 82,1% so với 81,3% của Swin-T ở cùng FLOPs. Thông điệp: phần lớn lợi thế của ViT đến từ **cách huấn luyện và các lựa chọn thiết kế vi mô**, không chỉ từ self-attention; CNN được hiện đại hóa vẫn cạnh tranh, và đơn giản, nhanh hơn khi triển khai.
+
+### 4.8.5 Hiện nay nên chọn mạng nền nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 11.3.9 Tinh chỉnh (fine-tune) là gì?](qa/ch11_vi?id=_1139-tinh-chỉnh-fine-tune-là-gì) · [Ôn tập · 17.4.8 So sánh một số cấu trúc mạng nhẹ](qa/ch17_vi?id=_1748-so-sánh-một-số-cấu-trúc-mạng-nhẹ)
+
+</div>
+
+Gợi ý thực tế (2026):
+
+- **Dữ liệu ít, cần nhanh, triển khai trên thiết bị:** CNN huấn luyện sẵn (ResNet, EfficientNet, ConvNeXt nhỏ; MobileNetV3/V4 cho di động); thiên kiến quy nạp của CNN giúp khi dữ liệu ít.
+- **Có nhiều dữ liệu hoặc cần biểu diễn tổng quát:** ViT huấn luyện trước, đặc biệt các mạng nền **tự giám sát hoặc ảnh–chữ**: MAE (He và cộng sự 2022, che 75% mảnh rồi tái tạo), DINOv2 (Oquab và cộng sự 2023, đặc trưng dùng thẳng cho phân loại, phân vùng, ước lượng độ sâu), CLIP/SigLIP (khớp ảnh với chữ, phân loại không cần huấn luyện bằng câu mô tả lớp).
+- **Phát hiện, phân vùng:** mạng nền có kim tự tháp đặc trưng (ConvNeXt, Swin) hoặc ViT kèm bộ chuyển đổi.
+- **Cách dùng:** hầu như luôn bắt đầu từ trọng số huấn luyện trước rồi tinh chỉnh (chương 11, mục 11.3.9) hoặc chỉ huấn luyện đầu phân loại trên đặc trưng cố định (linear probing); thư viện `timm` có sẵn hàng trăm mạng nền kèm trọng số.
+
+Thực tế độ chính xác giữa các họ mạng tốt hiện nay chênh nhau ít khi dùng cùng chế độ huấn luyện; yếu tố quyết định thường là dữ liệu huấn luyện trước, chi phí suy luận trên phần cứng đích, và mức hỗ trợ của công cụ triển khai.
 
 ## Tài liệu tham khảo
 

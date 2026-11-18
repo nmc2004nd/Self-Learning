@@ -2,7 +2,7 @@
 
 > Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch07_生成对抗网络(GAN)), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
 
-> **Biên tập:** bản gốc đánh số trùng: có hai mục 7.3 (mô hình sinh khác; ứng dụng dịch ảnh) và hai mục 7.4 (cải tiến GAN; sinh văn bản). Bản dịch giữ số gốc, nhóm trùng thứ hai thêm hậu tố "b" (7.3b, 7.4b). Một số số trích dẫn trong bài trỏ nhầm sang mục khác của danh mục tài liệu; bản dịch ghi thẳng tên bài báo. Lưu ý thêm về bối cảnh: chương này viết năm 2019. Từ khoảng 2021, sinh ảnh chất lượng cao chủ yếu dùng **mô hình khuếch tán** (diffusion: DDPM, Stable Diffusion…), còn sinh văn bản dùng mô hình ngôn ngữ tự hồi quy; GAN vẫn được dùng khi cần sinh nhanh trong một bước (siêu phân giải, chuyển đổi ảnh thời gian thực) và làm thành phần mất mát đối kháng trong các mô hình khác.
+> **Biên tập:** bản gốc đánh số trùng: có hai mục 7.3 (mô hình sinh khác; ứng dụng dịch ảnh) và hai mục 7.4 (cải tiến GAN; sinh văn bản). Bản dịch giữ số gốc, nhóm trùng thứ hai thêm hậu tố "b" (7.3b, 7.4b). Một số số trích dẫn trong bài trỏ nhầm sang mục khác của danh mục tài liệu; bản dịch ghi thẳng tên bài báo. Lưu ý thêm về bối cảnh: chương này viết năm 2019. Từ khoảng 2021, sinh ảnh chất lượng cao chủ yếu dùng **mô hình khuếch tán** (diffusion: DDPM, Stable Diffusion…), còn sinh văn bản dùng mô hình ngôn ngữ tự hồi quy; GAN vẫn được dùng khi cần sinh nhanh trong một bước (siêu phân giải, chuyển đổi ảnh thời gian thực) và làm thành phần mất mát đối kháng trong các mô hình khác. Mục 7.6 (bổ sung năm 2026, do người biên tập viết) trình bày mô hình khuếch tán và các mô hình sinh ra đời sau bản gốc.
 
 ## 7.1 Khái niệm cơ bản về GAN
 
@@ -217,6 +217,8 @@ Cách đánh giá GAN phổ biến nhất là đánh giá chủ quan bằng mắ
 - Nếu GAN quá khớp (học thuộc dữ liệu huấn luyện), mẫu sinh ra sẽ rất thật, điểm chủ quan của người rất cao, nhưng đó không phải GAN tốt.
 
 Vì vậy nhiều nhà nghiên cứu đã đề xuất các phương pháp đánh giá khách quan cho GAN.
+
+> **Biên tập (cập nhật 2026):** câu "phổ biến nhất là đánh giá bằng mắt" đúng với giai đoạn đầu của GAN. Từ khoảng 2018, thước đo khách quan **FID** (mục 7.2.6) trở thành chuẩn mặc định để so mô hình sinh ảnh, thường kèm precision/recall cho mô hình sinh (đo riêng chất lượng và độ đa dạng). Với mô hình sinh ảnh từ văn bản (mục 7.6.3) còn dùng **CLIP score** (ảnh có khớp câu mô tả không) và các mô hình chấm điểm học từ đánh giá ưa thích của người; đánh giá bằng người (so sánh từng cặp ảnh) vẫn được dùng làm thước đo cuối cùng, nhưng có quy trình chặt chẽ chứ không phải "nhìn qua".
 
 ### 7.2.2 Inception Score
 
@@ -847,6 +849,107 @@ Siêu phân giải và hoàn thiện ảnh đều có thể coi là bài toán d
 </div>
 
 So với lĩnh vực ảnh nở rộ khắp nơi, GAN được ứng dụng trong tiếng nói ít hơn nhiều. Đây là vài ví dụ rời rạc về GAN trong tiếng nói. Bài [7] đề xuất SEGAN để khử nhiễu âm thanh, khắc phục việc phương pháp truyền thống chỉ hỗ trợ ít loại nhiễu và khả năng tổng quát hóa kém. Donahue và cộng sự [8] dùng GAN để tăng cường tiếng nói, nâng tỉ lệ nhận dạng của hệ thống nhận dạng tiếng nói (ASR). (Về sau, các bộ tạo âm thanh từ phổ như MelGAN, HiFi-GAN dùng mất mát đối kháng và trở thành thành phần phổ biến của hệ thống chuyển văn bản thành tiếng nói.)
+
+## 7.6 Bổ sung: mô hình khuếch tán và các mô hình sinh từ 2020 tới 2026
+
+> **Biên tập:** mục này do người biên tập viết, không có trong bản gốc (viết khoảng 2019). Từ 2021–2022, mô hình khuếch tán đã thay GAN làm phương pháp chính để sinh ảnh, video và âm thanh chất lượng cao.
+
+### 7.6.1 Mô hình khuếch tán (diffusion model) là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Lilian Weng (tiếng Anh) · What are Diffusion Models?](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/) ↗ · [Ôn tập · 7.3.2 VAE là gì?](qa/ch07_vi?id=_732-vae-là-gì)
+
+</div>
+
+Ý tưởng: thay vì học sinh ảnh trong một bước như GAN, ta **phá hủy dần** dữ liệu bằng cách thêm nhiễu Gauss qua rất nhiều bước nhỏ, rồi huấn luyện một mạng neuron học **đảo ngược** từng bước khử nhiễu. Khi sinh, bắt đầu từ nhiễu thuần và khử nhiễu dần cho tới khi ra một ảnh. Dạng phổ biến nhất là DDPM (Ho, Jain, Abbeel 2020).
+
+**Quá trình thuận (thêm nhiễu).** Với lịch phương sai $\beta_1,\dots,\beta_T$ nhỏ (ví dụ tăng tuyến tính từ $10^{-4}$ tới $0{,}02$, $T=1000$):
+
+$$q(x_t\mid x_{t-1}) = \mathcal N\big(\sqrt{1-\beta_t}\,x_{t-1},\ \beta_t I\big).$$
+
+Đặt $\alpha_t = 1-\beta_t$, $\bar\alpha_t=\prod_{s\le t}\alpha_s$, thì nhảy thẳng được từ $x_0$ tới bước $t$ bất kỳ:
+
+$$q(x_t\mid x_0) = \mathcal N\big(\sqrt{\bar\alpha_t}\,x_0,\ (1-\bar\alpha_t) I\big),\qquad x_t = \sqrt{\bar\alpha_t}\,x_0 + \sqrt{1-\bar\alpha_t}\,\varepsilon,\ \ \varepsilon\sim\mathcal N(0, I).$$
+
+Với lịch tuyến tính trên, $\bar\alpha_{1000}\approx 4\times10^{-5}$, nên $x_T$ gần như là nhiễu chuẩn thuần. Kiểm tra bằng mô phỏng: lặp 500 bước thêm nhiễu từ $x_0=2$ cho trung bình $0{,}563$, phương sai $0{,}923$; công thức đóng cho $2\sqrt{\bar\alpha_{500}}\approx0{,}561$ và $1-\bar\alpha_{500}\approx0{,}921$.
+
+**Huấn luyện.** Mạng $\varepsilon_\theta(x_t, t)$ (thường là U-Net hoặc Transformer) học dự đoán nhiễu đã thêm vào:
+
+$$\mathcal L = \mathbb E_{x_0,\,t,\,\varepsilon}\Big[\big\lVert \varepsilon - \varepsilon_\theta\big(\sqrt{\bar\alpha_t}x_0 + \sqrt{1-\bar\alpha_t}\,\varepsilon,\ t\big)\big\rVert^2\Big].$$
+
+Mỗi bước huấn luyện chỉ cần: lấy một ảnh, chọn ngẫu nhiên $t$, thêm nhiễu theo công thức đóng, tính sai số bình phương. Không có trò chơi min–max nên huấn luyện ổn định như học có giám sát thông thường.
+
+**Sinh mẫu.** Bắt đầu từ $x_T\sim\mathcal N(0,I)$, lặp $t = T,\dots,1$:
+
+$$x_{t-1} = \frac{1}{\sqrt{\alpha_t}}\Big(x_t - \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\,\varepsilon_\theta(x_t,t)\Big) + \sigma_t z,\qquad z\sim\mathcal N(0,I).$$
+
+Có thể hiểu mạng học **hàm điểm** (score) $\nabla_x\log p_t(x)\approx -\varepsilon_\theta(x_t,t)/\sqrt{1-\bar\alpha_t}$, tức hướng làm ảnh "giống dữ liệu thật hơn"; cách nhìn này thống nhất DDPM với mô hình dựa trên điểm (Song và cộng sự 2021, dùng phương trình vi phân ngẫu nhiên).
+
+### 7.6.2 Vì sao mô hình khuếch tán thay GAN trong sinh ảnh?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 7.1.7 Sụp đổ chế độ (mode collapse) là gì?](qa/ch07_vi?id=_717-sụp-đổ-chế-độ-mode-collapse-là-gì) · [Ôn tập · 7.4.4 Vì sao GAN dễ bị sụp đổ khi huấn luyện?](qa/ch07_vi?id=_744-vì-sao-gan-dễ-bị-sụp-đổ-khi-huấn-luyện)
+
+</div>
+
+| | GAN | Mô hình khuếch tán |
+| --- | --- | --- |
+| Huấn luyện | trò chơi min–max, dễ mất ổn định, sụp đổ chế độ (7.1.7, 7.4.4) | một hàm mất mát hồi quy đơn giản, ổn định, dễ mở rộng quy mô |
+| Độ đa dạng | dễ bỏ sót chế độ | phủ phân phối tốt hơn |
+| Chất lượng | rất tốt trên miền hẹp (mặt người với StyleGAN) | tốt nhất trên dữ liệu đa dạng (Dhariwal và Nichol 2021: khuếch tán vượt GAN về FID trên ImageNet) |
+| Điều khiển | cần thiết kế riêng | dễ thêm điều kiện (văn bản, ảnh, bản phác thảo) và dẫn hướng |
+| Tốc độ sinh | một bước, rất nhanh | gốc cần hàng trăm–nghìn bước; nay giảm còn 1–50 bước (7.6.4) |
+
+Điểm yếu lớn nhất của khuếch tán là tốc độ sinh, và phần lớn nghiên cứu sau 2021 nhằm giảm số bước.
+
+### 7.6.3 Sinh ảnh từ văn bản hoạt động thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 7.4.1 Sinh ảnh theo loại chỉ định thế nào: GAN có điều kiện](qa/ch07_vi?id=_741-sinh-ảnh-theo-loại-chỉ-định-thế-nào-gan-có-điều-kiện) · [Ôn tập · 16.19 Sinh mô tả ảnh (image captioning) là gì? Nguyên lý kỹ thuật?](qa/ch16_vi?id=_1619-sinh-mô-tả-ảnh-image-captioning-là-gì-nguyên-lý-kỹ-thuật)
+
+</div>
+
+Các hệ sinh ảnh từ văn bản hiện nay (Stable Diffusion, DALL·E 2/3, Imagen, Midjourney, FLUX…) ghép ba thành phần:
+
+1. **Bộ mã hóa văn bản** (CLIP, T5 hoặc một mô hình ngôn ngữ) biến câu mô tả thành vector; mạng khử nhiễu đọc vector này qua cross-attention.
+2. **Khuếch tán trong không gian ẩn** (latent diffusion, Rombach và cộng sự 2022, nền của Stable Diffusion): một autoencoder nén ảnh $512\times512\times3$ thành ẩn cỡ $64\times64\times4$; khuếch tán chạy trên ẩn nên rẻ hơn hàng chục lần, cuối cùng bộ giải mã đưa ẩn về ảnh. Bộ giải mã này được huấn luyện có kèm **mất mát đối kháng**, tức GAN vẫn là một thành phần.
+3. **Dẫn hướng không cần bộ phân loại** (classifier-free guidance, Ho và Salimans 2022): huấn luyện cùng một mạng cả có điều kiện $c$ lẫn không điều kiện (thỉnh thoảng bỏ $c$); khi sinh, đẩy dự đoán ra xa phía không điều kiện:
+   $$\tilde\varepsilon = \varepsilon_\theta(x_t,\varnothing) + w\big(\varepsilon_\theta(x_t,c) - \varepsilon_\theta(x_t,\varnothing)\big),$$
+   với $w$ thường 3–8: $w$ lớn thì ảnh bám sát câu mô tả hơn nhưng kém đa dạng. Đây là phiên bản hiện đại của GAN có điều kiện ở 7.4.1.
+
+Kiến trúc mạng khử nhiễu chuyển dần từ U-Net sang **Transformer** (DiT, Peebles và Xie 2023), giúp mở rộng quy mô tốt hơn; các mô hình sinh video (như Sora, 2024) dùng Transformer khuếch tán trên các mảnh không gian–thời gian.
+
+### 7.6.4 Làm sao sinh nhanh trong vài bước: flow matching, consistency model, chưng cất?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 7.6.1 Mô hình khuếch tán (diffusion model) là gì?](qa/ch07_vi?id=_761-mô-hình-khuếch-tán-diffusion-model-là-gì)
+
+</div>
+
+- **Bộ lấy mẫu tất định** (DDIM, Song và cộng sự 2021; các bộ giải ODE như DPM-Solver): dùng cùng mạng đã huấn luyện nhưng giải phương trình vi phân thường, còn 20–50 bước.
+- **Flow matching / rectified flow** (Lipman và cộng sự 2023; Liu và cộng sự 2023): học thẳng một trường vận tốc đưa nhiễu tới dữ liệu theo đường gần thẳng, ví dụ trên đường $x_t = (1-t)\,x_0 + t\,\varepsilon$ thì mục tiêu là $\varepsilon - x_0$. Đường thẳng hơn nên cần ít bước hơn; Stable Diffusion 3 và FLUX dùng cách này.
+- **Consistency model** (Song và cộng sự 2023): học ánh xạ thẳng từ điểm bất kỳ trên quỹ đạo về điểm cuối, sinh trong 1–2 bước.
+- **Chưng cất** (progressive distillation; adversarial diffusion distillation như SDXL-Turbo): dạy mô hình trò sinh trong 1–4 bước bắt chước mô hình thầy nhiều bước, thường kèm mất mát đối kháng, tức lại dùng tới ý tưởng GAN.
+
+### 7.6.5 GAN hiện nay còn được dùng ở đâu?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 7.3b.4 Sinh ảnh và video độ phân giải cao thế nào?](qa/ch07_vi?id=_73b4-sinh-ảnh-và-video-độ-phân-giải-cao-thế-nào) · [Ôn tập · 7.5.2 Siêu phân giải và hoàn thiện ảnh](qa/ch07_vi?id=_752-siêu-phân-giải-và-hoàn-thiện-ảnh)
+
+</div>
+
+GAN không biến mất mà chuyển sang vai trò khác:
+
+- **cần một bước, thời gian thực:** siêu phân giải (Real-ESRGAN), chỉnh sửa khuôn mặt, chuyển đổi ảnh trên điện thoại; StyleGAN (2019–2021) vẫn là chuẩn cho sinh và chỉnh sửa trên miền hẹp; GigaGAN (2023) cho thấy GAN lớn vẫn sinh ảnh từ văn bản cạnh tranh được và rất nhanh;
+- **làm thành phần mất mát:** mất mát đối kháng trong bộ giải mã của autoencoder ảnh (VQGAN, VAE của Stable Diffusion), bộ tạo âm thanh (HiFi-GAN, 7.5.3), và trong chưng cất mô hình khuếch tán (7.6.4);
+- **ý tưởng đối kháng** ở các lĩnh vực khác: thích nghi miền (chương 11, DANN), học tăng cường bắt chước (GAIL).
+
+Với văn bản, như 7.4b đã nhận xét, GAN không hợp; sinh văn bản hiện dùng mô hình ngôn ngữ tự hồi quy (Transformer, xem chương 16), cùng nguyên lý với pixelCNN ở 7.3.1.
 
 ## Tài liệu tham khảo
 
