@@ -2,6 +2,8 @@
 
 > Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch03_深度学习基础), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
 
+> **Biên tập:** bản gốc viết khoảng 2018–2019. Mục 3.15 (GELU/SwiGLU, LayerNorm/RMSNorm, pre-norm, AdamW, khởi động và lịch cosin) do người biên tập viết thêm, cập nhật tới 2026.
+
 ## 3.1 Khái niệm cơ bản
 
 <div class="qa-theory">
@@ -598,6 +600,8 @@ Các lựa chọn thường gặp:
 
 > **Biên tập:** bản gốc ghi ưu điểm của ReLU là "đạo hàm bằng 0 khi đầu vào âm", đây lại chính là nhược điểm (gây neuron chết). Ý đúng (theo bài giảng của Andrew Ng mà mục này dựa vào) là đạo hàm không tiến về 0 ở miền dương. Câu "tanh tốt, hợp với hầu hết mọi trường hợp" cũng được viết lại đúng ý: tanh tốt hơn sigmoid ở tầng ẩn.
 
+> **Biên tập:** các lời khuyên trên vẫn đúng cho CNN và MLP. Transformer và các mô hình lớn hiện nay dùng GELU hoặc SwiGLU thay cho ReLU, xem 3.15.1.
+
 ### 3.4.6 ReLU có những ưu điểm gì?
 
 1. Trên phần lớn miền đầu vào, đạo hàm (độ dốc) của ReLU khác xa 0; khi cài đặt chỉ là một câu lệnh if-else, còn sigmoid cần tính hàm mũ. Trong thực tế, mạng dùng ReLU thường học nhanh hơn mạng dùng sigmoid hay tanh.
@@ -1063,6 +1067,8 @@ Trong CNN, BN nên đặt trước phép biến đổi phi tuyến (hàm kích h
 
 BN hợp nhất khi mỗi mini-batch khá lớn và phân phối dữ liệu giữa các batch gần nhau. Trước khi huấn luyện phải xáo trộn (shuffle) dữ liệu kỹ, nếu không kết quả sẽ kém đi nhiều. Ngoài ra, do BN phải thống kê moment bậc một và bậc hai của từng mini-batch khi chạy, nên không hợp với cấu trúc mạng động và RNN (với RNN thường dùng Layer Normalization).
 
+> **Biên tập:** Transformer cũng dùng LayerNorm hoặc biến thể RMSNorm thay cho BN; xem 3.15.2 và cách đặt chuẩn hóa (pre-norm) ở 3.15.3.
+
 ## 3.7 Tiền huấn luyện và tinh chỉnh
 
 <div class="qa-theory">
@@ -1221,6 +1227,8 @@ Trong học máy, học có giám sát định nghĩa một mô hình và ước
 Hạ gradient cơ bản dùng một tốc độ học cố định, cả quá trình tối ưu cập nhật với bước cố định. Tốt hơn là: giai đoạn đầu dùng tốc độ học lớn, bước dài, để đi xuống nhanh; giai đoạn sau giảm dần tốc độ học, bước ngắn lại, giúp thuật toán hội tụ và tiến gần nghiệm tối ưu hơn. Vì vậy, cách cập nhật tốc độ học trở thành mối quan tâm của các nhà nghiên cứu.
 
 Các cách giảm tốc độ học thường dùng: giảm theo từng khúc hằng, giảm theo đa thức, giảm theo hàm mũ, giảm theo hàm mũ tự nhiên, giảm theo cosin, giảm theo cosin tuyến tính, giảm theo cosin tuyến tính có nhiễu.
+
+> **Biên tập:** các mục 3.9.2–3.9.7 dùng tên API TensorFlow 1.x. Trong PyTorch, các lịch tương ứng nằm ở `torch.optim.lr_scheduler` (`StepLR`, `MultiStepLR`, `ExponentialLR`, `PolynomialLR`, `CosineAnnealingLR`…). Lịch dùng nhiều nhất hiện nay là khởi động tuyến tính rồi giảm theo cosin, xem 3.15.5.
 
 ### 3.9.2 Các tham số thường gặp khi giảm tốc độ học
 
@@ -1425,6 +1433,141 @@ Thứ hai, thay đổi ở đầu vào tầng dưới có thể có xu hướng 
 Thứ ba, cập nhật của mỗi tầng ảnh hưởng tới các tầng khác, nên chiến lược cập nhật tham số của mỗi tầng phải hết sức thận trọng.
 
 > **Biên tập:** ICS là cách giải thích của bài báo BN gốc (Ioffe & Szegedy, 2015). Santurkar và cộng sự (2018, "How Does Batch Normalization Help Optimization?") cho thấy BN không thực sự giảm ICS, mà hiệu quả của nó chủ yếu đến từ việc làm mặt hàm mất mát trơn hơn. Khi phỏng vấn nên nhắc cả hai cách nhìn.
+
+## 3.15 Bổ sung: các thành phần chuẩn của mạng hiện đại (2017–2026)
+
+> **Biên tập:** mục này do người biên tập viết, không có trong bản gốc. Bản gốc viết trước khi Transformer phổ biến; các mạng lớn hiện nay (mô hình ngôn ngữ, ViT, mô hình khuếch tán) dùng một bộ thành phần khá cố định: kích hoạt GELU/SwiGLU, LayerNorm/RMSNorm đặt trước khối (pre-norm), bộ tối ưu AdamW, tốc độ học khởi động rồi giảm theo cosin. Các con số trong mục đã kiểm bằng PyTorch 2 trên CPU.
+
+### 3.15.1 GELU, SiLU (Swish) và SwiGLU là gì? Vì sao Transformer không dùng ReLU?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 3.4.2 Các hàm kích hoạt thường gặp và đồ thị](qa/ch03_vi?id=_342-các-hàm-kích-hoạt-thường-gặp-và-đồ-thị) · [Ôn tập · 3.4.5 Chọn hàm kích hoạt thế nào?](qa/ch03_vi?id=_345-chọn-hàm-kích-hoạt-thế-nào) · [d2l (tiếng Anh) · 11.7 Transformer](https://d2l.ai/chapter_attention-mechanisms-and-transformers/transformer.html) ↗
+
+</div>
+
+**GELU** (Hendrycks và Gimpel 2016) nhân đầu vào với xác suất để một biến chuẩn nhỏ hơn nó:
+
+$$\mathrm{GELU}(x) = x\,\Phi(x) \approx 0{,}5\,x\Big(1+\tanh\big(\sqrt{2/\pi}\,(x+0{,}044715\,x^3)\big)\Big),$$
+
+với $\Phi$ là hàm phân phối tích lũy của phân phối chuẩn. Dạng xấp xỉ tanh lệch dạng chính xác tối đa khoảng $4{,}7\times10^{-4}$ trên $[-6, 6]$. GELU dùng trong BERT, GPT-2/3, ViT.
+
+**SiLU / Swish** (Ramachandran và cộng sự 2017; Elfwing và cộng sự 2018): $\mathrm{SiLU}(x) = x\,\sigma(x)$, với $\sigma$ là sigmoid. Dùng nhiều trong EfficientNet, các mạng YOLO mới và U-Net của mô hình khuếch tán.
+
+Cả hai giống ReLU ở hai đầu ($\approx x$ khi $x$ lớn, $\approx 0$ khi $x$ rất âm) nhưng **trơn** và **không đơn điệu**: có một vùng âm nhỏ (GELU nhỏ nhất $\approx -0{,}170$ tại $x\approx-0{,}75$; SiLU nhỏ nhất $\approx-0{,}278$ tại $x\approx-1{,}28$). Gradient ở miền âm khác 0 nên không có neuron "chết" như ReLU (3.4.6), và đạo hàm liên tục giúp tối ưu ổn định hơn một chút. Lợi ích đo được thường nhỏ (vài phần mười điểm phần trăm), nhưng ở quy mô lớn vẫn đáng giá.
+
+**SwiGLU** (Shazeer 2020, "GLU Variants Improve Transformer") thay khối truyền thẳng (FFN) của Transformer bằng một **cổng**:
+
+$$\mathrm{FFN}_{\mathrm{SwiGLU}}(x) = \big(\mathrm{SiLU}(xW_1)\odot xV\big)\,W_2 .$$
+
+Một nhánh qua SiLU đóng vai cổng, nhân từng phần tử với nhánh tuyến tính thứ hai. Vì dùng 3 ma trận thay vì 2, chiều ẩn thường giảm từ $4d$ xuống $\tfrac{8}{3}d$ để giữ nguyên số tham số ($2\cdot d\cdot4d = 3\cdot d\cdot\tfrac83 d = 8d^2$). SwiGLU là lựa chọn mặc định của phần lớn mô hình ngôn ngữ mở (PaLM, LLaMA, Mistral, Qwen…).
+
+**Vậy năm 2026 chọn gì?** CNN cỡ vừa và nhỏ: ReLU vẫn tốt và rẻ nhất (lời khuyên ở 3.4.5 vẫn đúng cho trường hợp này). Mạng cho thiết bị di động: ReLU6 hoặc hard-swish (MobileNetV3). Transformer: GELU, hoặc SwiGLU trong khối FFN.
+
+### 3.15.2 LayerNorm và RMSNorm khác batch normalization thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 3.6.8 Batch Normalization là gì?](qa/ch03_vi?id=_368-batch-normalization-là-gì) · [Ôn tập · 3.6.11 So sánh batch normalization và group normalization](qa/ch03_vi?id=_3611-so-sánh-batch-normalization-và-group-normalization) · [d2l (tiếng Anh) · 8.5 Batch Normalization](https://d2l.ai/chapter_convolutional-modern/batch-norm.html) ↗
+
+</div>
+
+BN (3.6.8) chuẩn hóa mỗi kênh theo **các mẫu trong batch**. **Layer Normalization** (Ba, Kiros, Hinton 2016) chuẩn hóa mỗi mẫu theo **các đặc trưng của chính nó**: với vector $x\in\mathbb R^d$ của một token,
+
+$$\mu=\frac1d\sum_i x_i,\quad \sigma^2=\frac1d\sum_i (x_i-\mu)^2,\quad \mathrm{LN}(x) = \gamma\odot\frac{x-\mu}{\sqrt{\sigma^2+\epsilon}} + \beta .$$
+
+Vì không phụ thuộc batch, LayerNorm chạy giống hệt nhau khi huấn luyện và suy luận, không cần trung bình trượt. Nó cũng hoạt động với batch cỡ 1 và chuỗi dài ngắn khác nhau. Đây là lý do Transformer và RNN dùng LayerNorm (3.6.13).
+
+**RMSNorm** (Zhang và Sennrich 2019) bỏ bước trừ trung bình và bỏ $\beta$, chỉ chia cho căn trung bình bình phương:
+
+$$\mathrm{RMSNorm}(x) = \gamma\odot\frac{x}{\sqrt{\frac1d\sum_i x_i^2+\epsilon}} .$$
+
+LayerNorm chính là RMSNorm áp vào $x-\mu$ (đã kiểm bằng `torch.nn.LayerNorm` và `torch.nn.RMSNorm`). Bỏ phép trừ trung bình làm RMSNorm rẻ hơn mà chất lượng gần như không đổi, nên T5, LLaMA và phần lớn mô hình ngôn ngữ lớn dùng RMSNorm.
+
+| | BatchNorm | LayerNorm / RMSNorm | GroupNorm |
+| --- | --- | --- | --- |
+| Thống kê theo | batch (mỗi kênh) | từng mẫu (mọi đặc trưng) | từng mẫu, theo nhóm kênh |
+| Phụ thuộc cỡ batch | có, batch nhỏ thì kém | không | không |
+| Huấn luyện khác suy luận | có (trung bình trượt) | không | không |
+| Dùng nhiều ở | CNN phân loại | Transformer, RNN, ConvNeXt | phát hiện/phân vùng batch nhỏ, U-Net khuếch tán |
+
+### 3.15.3 Pre-norm và post-norm là gì? Vì sao các mô hình lớn dùng pre-norm?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 4.8.2 Vision Transformer (ViT) xử lý ảnh thế nào?](qa/ch04_vi?id=_482-vision-transformer-vit-xử-lý-ảnh-thế-nào) · [d2l (tiếng Anh) · 11.7 Transformer](https://d2l.ai/chapter_attention-mechanisms-and-transformers/transformer.html) ↗
+
+</div>
+
+Một khối Transformer gồm tầng con $F$ (attention hoặc FFN) cộng nối tắt (residual). Có hai cách đặt chuẩn hóa:
+
+- **Post-norm** (bài Transformer gốc 2017, BERT): $x_{l+1} = \mathrm{LN}\big(x_l + F(x_l)\big)$.
+- **Pre-norm** (GPT-2 trở đi, ViT, LLaMA): $x_{l+1} = x_l + F\big(\mathrm{LN}(x_l)\big)$, thêm một LN ở cuối mạng.
+
+Với pre-norm, đường nối tắt từ đầu vào tới đầu ra là phép đồng nhất thuần, không bị LN chen giữa, nên gradient truyền thẳng về các tầng đầu giống ResNet. Xiong và cộng sự (2020, "On Layer Normalization in the Transformer Architecture") chỉ ra gradient ở các tầng gần đầu ra của post-norm rất lớn lúc khởi tạo, nên post-norm **bắt buộc** khởi động tốc độ học (3.15.5) và dễ phân kỳ khi mạng sâu; pre-norm huấn luyện ổn định hơn, chịu được tốc độ học lớn hơn.
+
+Đổi lại, ở pre-norm biên độ $x_l$ tăng dần theo độ sâu nên đóng góp của các tầng sau nhỏ dần; post-norm nếu huấn luyện được thì đôi khi cho chất lượng nhỉnh hơn. Các biến thể như DeepNorm và sandwich-norm tìm cách lấy cả hai ưu điểm. Thực tế năm 2026: hầu hết mô hình lớn dùng pre-norm với RMSNorm.
+
+### 3.15.4 AdamW khác Adam với L2 thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 12.10.1 Thuật toán](dl/ch12_s10_vi?id=_12101-thuật-toán) · [Ôn tập · 3.12.1 Vì sao cần điều chuẩn?](qa/ch03_vi?id=_3121-vì-sao-cần-điều-chuẩn) · [Ôn tập · 13.19.1 Sau Adam có những bộ tối ưu nào đáng biết?](qa/ch13_vi?id=_13191-sau-adam-có-những-bộ-tối-ưu-nào-đáng-biết)
+
+</div>
+
+Với SGD, thêm điều chuẩn L2 $\tfrac\lambda2\lVert\theta\rVert^2$ vào hàm mất mát tương đương với **suy giảm trọng số** (weight decay): mỗi bước nhân $\theta$ với $(1-\eta\lambda)$. Với Adam thì **không** tương đương. Loshchilov và Hutter (2019, "Decoupled Weight Decay Regularization") chỉ ra điều này:
+
+- **Adam + L2** (`torch.optim.Adam(weight_decay=λ)`): cộng $\lambda\theta$ vào gradient, rồi cả tổng bị chia cho $\sqrt{\hat v}$. Tham số có gradient lịch sử lớn thì gần như không bị suy giảm, tham số có gradient nhỏ lại bị suy giảm rất mạnh. Điều chuẩn bị méo theo độ lớn gradient.
+- **AdamW** (`torch.optim.AdamW`): tách suy giảm ra khỏi bước thích nghi,
+  $$\theta_t = \theta_{t-1} - \eta\Big(\frac{\hat m_t}{\sqrt{\hat v_t}+\epsilon} + \lambda\,\theta_{t-1}\Big),$$
+  nên mọi tham số bị co đều theo cùng tỉ lệ $(1-\eta\lambda)$ mỗi bước, đúng ý nghĩa của weight decay.
+
+Ví dụ kiểm bằng PyTorch: một tham số có gradient luôn bằng 0, giá trị đầu 1, $\eta=0{,}1$, $\lambda=0{,}1$, sau 100 bước. AdamW cho $0{,}366 = 0{,}99^{100}$, đúng mức co đều mong đợi. Adam + L2 cho $0{,}003$: gradient duy nhất là $\lambda\theta$, bị chuẩn hóa thành bước cỡ $\eta$ mỗi lần, nên tham số bị kéo về 0 sau khoảng 10 bước.
+
+Cách dùng phổ biến: AdamW với $\lambda$ khoảng 0,01–0,1 (mô hình ngôn ngữ thường 0,1, $\beta_2 = 0{,}95$), **không** áp suy giảm cho bias và tham số của tầng chuẩn hóa:
+
+```python
+decay    = [p for n, p in model.named_parameters() if p.ndim >= 2]   # ma trận trọng số, kernel tích chập
+no_decay = [p for n, p in model.named_parameters() if p.ndim < 2]    # bias, gamma/beta của LayerNorm
+opt = torch.optim.AdamW([{"params": decay, "weight_decay": 0.1},
+                         {"params": no_decay, "weight_decay": 0.0}],
+                        lr=3e-4, betas=(0.9, 0.95))
+```
+
+### 3.15.5 Vì sao cần khởi động (warmup) tốc độ học? Lịch cosin hoạt động thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 12.11.3.3 Bộ lập lịch Cosin](dl/ch12_s11_vi?id=_121133-bộ-lập-lịch-cosin) · [Học sâu · 12.11.3.4 Khởi động](dl/ch12_s11_vi?id=_121134-khởi-động) · [Ôn tập · 3.9.1 Vai trò của tốc độ học](qa/ch03_vi?id=_391-vai-trò-của-tốc-độ-học)
+
+</div>
+
+Lịch phổ biến nhất hiện nay ghép hai đoạn. Đầu tiên $T_w$ bước **tăng tuyến tính** từ gần 0 lên $\eta_{\max}$. Sau đó **giảm theo nửa chu kỳ cosin** về $\eta_{\min}$ (thường bằng 1/10 hoặc 0 lần $\eta_{\max}$) ở bước cuối $T$:
+
+$$\eta_t=\begin{cases}\eta_{\max}\,\dfrac{t}{T_w}, & t<T_w,\\[2mm] \eta_{\min}+\dfrac12(\eta_{\max}-\eta_{\min})\Big(1+\cos\dfrac{\pi(t-T_w)}{T-T_w}\Big), & t\ge T_w.\end{cases}$$
+
+Khởi động cần thiết vì những bước đầu là lúc huấn luyện dễ hỏng nhất, có ba lý do:
+
+1. Lúc đầu Adam ước lượng $\hat v$ từ quá ít bước nên rất nhiễu, có thể cho bước cập nhật quá lớn (đây là phân tích của RAdam, Liu và cộng sự 2019).
+2. Với batch lớn, tốc độ học phải tăng theo cỡ batch (quy tắc tỉ lệ tuyến tính, Goyal và cộng sự 2017, huấn luyện ResNet-50 trong 1 giờ). Tốc độ học lớn như vậy chỉ an toàn sau vài epoch khởi động.
+3. Transformer post-norm có gradient lúc khởi tạo rất lớn (3.15.3).
+
+Giảm theo cosin mượt, chỉ cần chọn $\eta_{\max}$ và tổng số bước, và trong thực nghiệm thường tốt bằng hoặc hơn giảm bậc thang (3.9.3). Một biến thể gần đây cho mô hình ngôn ngữ là **WSD** (warmup – stable – decay): giữ $\eta$ không đổi phần lớn thời gian rồi mới giảm nhanh ở đoạn cuối. Ưu điểm là có thể dừng hoặc huấn luyện tiếp ở bất kỳ điểm nào mà không cần biết trước $T$.
+
+Code PyTorch (đã chạy thử: với $\eta_{\max}=3\times10^{-4}$, $T_w=100$, $T=1000$, tốc độ học đạt $3{,}00\times10^{-4}$ ở bước 100, $1{,}65\times10^{-4}$ ở bước 550 và $3{,}00\times10^{-5}$ ở bước cuối):
+
+```python
+total, warm = 1000, 100
+sched = torch.optim.lr_scheduler.SequentialLR(opt, [
+    torch.optim.lr_scheduler.LinearLR(opt, start_factor=0.01, total_iters=warm),
+    torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=total - warm, eta_min=3e-5)],
+    milestones=[warm])
+for step in range(total):
+    ...                 # forward, loss.backward()
+    opt.step()
+    sched.step()        # gọi sau mỗi bước (không phải mỗi epoch)
+```
 
 ## Tài liệu tham khảo
 

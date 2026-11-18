@@ -2,7 +2,7 @@
 
 > Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch09_图像分割), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
 
-> **Biên tập:** bản gốc đánh số lẫn lộn: mục 9.3 FCN chứa các câu hỏi đánh số 9.2.4–9.2.10, rồi lại có một mục 9.3 U-Net. Bản dịch đánh lại các câu hỏi con của FCN thành 9.3.4–9.3.10 và gọi mục U-Net là 9.3b; các số khác giữ nguyên. Ảnh của mục 9.10.5 không có trong repo gốc. Nhiều đoạn chép từ blog (có câu hỏi tự đặt của người viết như "vì sao?"), bản dịch giữ ý. Từ sau khi chương này được viết, phân vùng ảnh có thêm các hướng lớn: mạng dựa trên Transformer (SegFormer, Mask2Former) và mô hình nền tảng phân vùng mọi thứ theo gợi ý (Segment Anything, SAM, 2023).
+> **Biên tập:** bản gốc đánh số lẫn lộn: mục 9.3 FCN chứa các câu hỏi đánh số 9.2.4–9.2.10, rồi lại có một mục 9.3 U-Net. Bản dịch đánh lại các câu hỏi con của FCN thành 9.3.4–9.3.10 và gọi mục U-Net là 9.3b; các số khác giữ nguyên. Ảnh của mục 9.10.5 không có trong repo gốc. Nhiều đoạn chép từ blog (có câu hỏi tự đặt của người viết như "vì sao?"), bản dịch giữ ý. Từ sau khi chương này được viết, phân vùng ảnh có thêm các hướng lớn: mạng dựa trên Transformer (SegFormer, Mask2Former) và mô hình nền tảng phân vùng mọi thứ theo gợi ý (Segment Anything, SAM, 2023). Các hướng này được trình bày ở mục 9.14 do người biên tập viết thêm, cập nhật tới 2026.
 
 ## 9.1 Các thuật toán phân vùng ảnh được phân loại thế nào?
 
@@ -1113,3 +1113,123 @@ Kết quả phân vùng:
 Hình 9.52 Ảnh, nhãn thật và dự đoán phân vùng toàn cảnh
 
 > **Biên tập:** các công thức PQ trong bản gốc là ảnh, đã gõ lại; thêm ngưỡng 50% cho nhãn rỗng theo bài báo. Danh sách TODO cuối bản gốc ("công cụ gán nhãn phân vùng, chỉ số đánh giá, UNet++") được xử lý một phần: chỉ số đánh giá ở mục bổ sung trên; công cụ gán nhãn xem 8.7 (labelme, CVAT hỗ trợ đa giác và mặt nạ).
+
+## 9.14 Bổ sung: phân vùng ảnh từ 2020 tới 2026
+
+> **Biên tập:** mục này do người biên tập viết, không có trong bản gốc. Ba thay đổi lớn sau khi bản gốc được viết: mạng nền Transformer cho phân vùng ngữ nghĩa, cách nhìn "phân loại mặt nạ" thống nhất cả ba bài toán phân vùng, và các mô hình nền tảng phân vùng theo gợi ý (SAM).
+
+### 9.14.1 Transformer được dùng cho phân vùng ngữ nghĩa thế nào (SETR, SegFormer)?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 4.8.2 Vision Transformer (ViT) xử lý ảnh thế nào?](qa/ch04_vi?id=_482-vision-transformer-vit-xử-lý-ảnh-thế-nào) · [Ôn tập · 4.8.3 Swin Transformer khắc phục nhược điểm gì của ViT?](qa/ch04_vi?id=_483-swin-transformer-khắc-phục-nhược-điểm-gì-của-vit) · [Ôn tập · 9.8.4 DeepLabv3+](qa/ch09_vi?id=_984-deeplabv3)
+
+</div>
+
+Hạn chế lớn của FCN và DeepLab (9.3, 9.8) là vùng nhìn hữu hạn. Các mạng này phải dùng tích chập giãn, kim tự tháp (ASPP, PSP) để thấy ngữ cảnh rộng. Self-attention cho mỗi vị trí nhìn toàn ảnh ngay từ tầng đầu, nên rất hợp với phân vùng.
+
+- **SETR** (Zheng và cộng sự 2021) dùng thẳng ViT làm bộ mã hóa, nối thêm bộ giải mã nâng mẫu. Cách này chứng minh được ý tưởng nhưng nặng, và chỉ có đặc trưng ở một độ phân giải ($1/16$).
+- **SegFormer** (Xie và cộng sự 2021) là thiết kế thực dụng hơn:
+  1. Bộ mã hóa phân cấp (Mix Transformer) cho đặc trưng 4 tỉ lệ $1/4$–$1/32$ như CNN; attention được giảm chi phí bằng cách thu nhỏ khóa/giá trị.
+  2. Không dùng mã hóa vị trí cố định. Thông tin vị trí đến từ một tích chập depthwise $3\times3$ trong khối FFN, nên chạy được ở độ phân giải khác lúc huấn luyện.
+  3. Bộ giải mã chỉ gồm vài tầng MLP: đưa 4 tỉ lệ về cùng số kênh, nâng mẫu lên $1/4$, nối lại, rồi phân loại từng điểm ảnh.
+
+  SegFormer cho thấy khi bộ mã hóa đủ mạnh và có ngữ cảnh toàn cục, bộ giải mã không cần phức tạp.
+- Cách phổ biến khác là giữ nguyên bộ giải mã quen thuộc (UPerNet) và thay mạng nền bằng Swin, ConvNeXt (4.8.3–4.8.4) hoặc ViT huấn luyện trước bằng DINOv2.
+
+### 9.14.2 "Phân loại mặt nạ" là gì? MaskFormer và Mask2Former thống nhất các bài toán phân vùng thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 9.13 Phân vùng toàn cảnh](qa/ch09_vi?id=_913-phân-vùng-toàn-cảnh) · [Ôn tập · 9.9 Mask R-CNN](qa/ch09_vi?id=_99-mask-r-cnn) · [DETR (tiếng Anh) · End-to-End Object Detection with Transformers](https://arxiv.org/abs/2005.12872) ↗
+
+</div>
+
+Trước đây mỗi bài toán có một kiểu kiến trúc riêng:
+- phân vùng ngữ nghĩa phân loại **từng điểm ảnh** (FCN, DeepLab);
+- phân vùng thể hiện thì **phát hiện rồi tô mặt nạ** (Mask R-CNN, 9.9);
+- phân vùng toàn cảnh (9.13) ghép kết quả hai nhánh bằng luật thủ công.
+
+**MaskFormer** (Cheng và cộng sự 2021) đổi cách đặt bài toán: thay vì phân loại điểm ảnh, mô hình dự đoán một tập $N$ cặp (mặt nạ nhị phân, nhãn lớp). Nó mượn cách làm của DETR:
+
+1. Mạng nền + bộ giải mã điểm ảnh cho đặc trưng mỗi điểm ảnh $\mathcal E_{\text{pixel}}\in\mathbb R^{C\times H\times W}$.
+2. Một bộ giải mã Transformer biến $N$ **truy vấn** học được (thường $N=100$) thành $N$ vector $q_i$. Mỗi vector cho ra:
+   - xác suất lớp $p_i$ trên $K$ lớp, cộng thêm lớp "không có gì" $\varnothing$;
+   - mặt nạ $m_i = \sigma(q_i^\top \mathcal E_{\text{pixel}})\in[0,1]^{H\times W}$.
+3. Khi huấn luyện, ghép một–một các dự đoán với các vùng thật bằng **thuật toán Hungary**. Chi phí ghép gồm mất mát phân loại và mất mát mặt nạ (focal/BCE + Dice). Dự đoán không được ghép thì học nhãn $\varnothing$.
+
+Cùng một mô hình giải được cả ba bài toán, chỉ khác bước hậu xử lý:
+- **ngữ nghĩa:** $\text{seg}(h,w)=\arg\max_{c}\sum_i p_i(c)\,m_i(h,w)$;
+- **thể hiện:** mỗi truy vấn có điểm cao là một thể hiện;
+- **toàn cảnh:** gán mỗi điểm ảnh cho truy vấn có $p_i\cdot m_i$ lớn nhất, bỏ vùng quá nhỏ.
+
+**Mask2Former** (Cheng và cộng sự 2022) thêm **masked attention**: trong cross-attention, mỗi truy vấn chỉ nhìn vào vùng mặt nạ nó dự đoán ở tầng trước. Mô hình cũng dùng đặc trưng nhiều tỉ lệ và vài mẹo tiết kiệm bộ nhớ. Kết quả là một kiến trúc duy nhất đạt kết quả hàng đầu cả ba bài toán trên COCO, ADE20K, Cityscapes. Các mô hình sau (OneFormer, Mask DINO) đi tiếp hướng này.
+
+### 9.14.3 Segment Anything (SAM) là gì? Khác gì các mô hình phân vùng trước?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 4.8.5 Hiện nay nên chọn mạng nền nào?](qa/ch04_vi?id=_485-hiện-nay-nên-chọn-mạng-nền-nào) · [Ôn tập · 11.4.1 Mô hình nền tảng (foundation model) là gì? Nó thay đổi học chuyển giao thế nào?](qa/ch11_vi?id=_1141-mô-hình-nền-tảng-foundation-model-là-gì-nó-thay-đổi-học-chuyển-giao-thế-nào)
+
+</div>
+
+**SAM** (Kirillov và cộng sự, Meta AI, 2023) là mô hình nền tảng cho bài toán **phân vùng theo gợi ý** (promptable segmentation). Đầu vào gồm ảnh và một gợi ý: điểm (dương/âm), hộp hoặc mặt nạ thô. Đầu ra là mặt nạ của vật được chỉ. SAM không trả về tên lớp.
+
+Kiến trúc chia ba phần, bố trí để dùng tương tác:
+1. **Bộ mã hóa ảnh** lớn (ViT-H huấn luyện trước bằng MAE) chạy **một lần** cho mỗi ảnh, cho embedding $64\times64$.
+2. **Bộ mã hóa gợi ý** rất nhẹ biến điểm, hộp thành token và mặt nạ thành đặc trưng tích chập.
+3. **Bộ giải mã mặt nạ** nhẹ (2 tầng Transformer hai chiều) ghép hai thứ trên, chạy khoảng vài chục mili giây. Nhờ vậy người dùng nhấp chuột liên tục mà không phải chạy lại bộ mã hóa ảnh.
+
+Một gợi ý có thể **mơ hồ**: nhấp vào áo có thể là áo, người, hay cả nhóm người. Vì vậy SAM trả về 3 mặt nạ ở các mức khác nhau kèm điểm IoU dự đoán. Khi huấn luyện, chỉ lan truyền mất mát của mặt nạ tốt nhất trong ba.
+
+Điều làm SAM khác biệt là **dữ liệu**: tập SA-1B gồm 11 triệu ảnh và 1,1 tỉ mặt nạ. Tập này tạo bằng một "vòng dữ liệu" ba giai đoạn:
+1. người gán nhãn với sự trợ giúp của SAM;
+2. bán tự động, SAM đề xuất trước, người bổ sung phần còn thiếu;
+3. hoàn toàn tự động bằng lưới điểm gợi ý.
+
+Mô hình tốt hơn giúp gán nhãn nhanh hơn, dữ liệu nhiều hơn lại làm mô hình tốt hơn. Kết quả là SAM tổng quát hóa không cần học thêm (zero-shot) sang rất nhiều miền ảnh mới.
+
+Các phiên bản sau:
+- **SAM 2** (2024) mở rộng sang video bằng một **bộ nhớ** lưu đặc trưng và mặt nạ của các khung trước, xử lý từng khung theo dòng: gợi ý ở một khung, mặt nạ được theo dõi qua cả video.
+- **SAM 3** (cuối 2025) thêm gợi ý bằng **khái niệm**: cụm danh từ ngắn hoặc ảnh mẫu. Mô hình tìm và phân vùng mọi thể hiện của khái niệm đó, tức tiến gần tới phân vùng từ vựng mở (9.14.4).
+- Các bản rút gọn chạy trên thiết bị: MobileSAM, EfficientSAM, EfficientViT-SAM.
+
+Hạn chế:
+- SAM gốc không biết lớp;
+- biên vật mảnh còn thô;
+- ảnh y tế, viễn thám vẫn thường cần tinh chỉnh (ví dụ MedSAM).
+
+Ứng dụng phổ biến nhất hiện nay là **gán nhãn bán tự động**: nhấp một vài điểm thay cho vẽ đa giác (9.10).
+
+### 9.14.4 Phân vùng từ vựng mở (open-vocabulary) là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 11.4.3 CLIP học thế nào và vì sao phân loại được lớp chưa từng thấy (zero-shot)?](qa/ch11_vi?id=_1143-clip-học-thế-nào-và-vì-sao-phân-loại-được-lớp-chưa-từng-thấy-zero-shot) · [Ôn tập · 16.19 Sinh mô tả ảnh (image captioning) là gì? Nguyên lý kỹ thuật?](qa/ch16_vi?id=_1619-sinh-mô-tả-ảnh-image-captioning-là-gì-nguyên-lý-kỹ-thuật)
+
+</div>
+
+Các mô hình ở trên chỉ phân vùng được các lớp có trong tập huấn luyện (21 lớp VOC, 150 lớp ADE20K…). **Phân vùng từ vựng mở** cho phép nêu lớp bằng văn bản tùy ý lúc suy luận, ví dụ "xe đạp màu đỏ", "vết nứt trên tường". Cách làm chung là đưa đặc trưng điểm ảnh hoặc vùng về **cùng không gian embedding với văn bản**, dựa vào mô hình thị giác–ngôn ngữ như CLIP (11.4.3). Phân loại khi đó là so độ tương đồng cosin với embedding của tên lớp.
+
+Các hướng chính:
+- **Hai bước:** đề xuất mặt nạ không theo lớp (MaskFormer hoặc SAM), rồi phân loại từng mặt nạ bằng CLIP. Ví dụ OVSeg, ODISE (dùng đặc trưng của mô hình khuếch tán).
+- **Tinh chỉnh đặc trưng dày của CLIP** cho mức điểm ảnh, ví dụ LSeg, CAT-Seg.
+- **Ghép mô hình có sẵn:** Grounded-SAM dùng Grounding DINO (phát hiện theo câu mô tả) cho hộp, rồi đưa hộp làm gợi ý cho SAM. Cách này không cần huấn luyện thêm.
+
+### 9.14.5 Năm 2026 nên chọn mô hình phân vùng nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 9.3b U-Net](qa/ch09_vi?id=_93b-u-net) · [Ôn tập · 9.12 Các tập dữ liệu phân vùng ảnh thường dùng](qa/ch09_vi?id=_912-các-tập-dữ-liệu-phân-vùng-ảnh-thường-dùng) · [Ôn tập · Chương 17 Nén, tăng tốc mô hình và triển khai trên thiết bị di động](qa/ch17_vi)
+
+</div>
+
+| Tình huống | Gợi ý |
+| --- | --- |
+| Ảnh y tế (CT, MRI, hiển vi), dữ liệu ít | **U-Net** (9.3b), cụ thể là nnU-Net (Isensee và cộng sự 2021), framework tự chọn tiền xử lý, kiến trúc, lịch huấn luyện theo đặc điểm tập dữ liệu. Đánh giá lại năm 2024 cho thấy U-Net CNN chỉnh tốt vẫn ngang hoặc hơn nhiều biến thể Transformer trong y tế |
+| Phân vùng ngữ nghĩa / toàn cảnh tổng quát, có GPU | Mask2Former hoặc OneFormer với mạng nền Swin/ConvNeXt/DINOv2; SegFormer nếu cần gọn |
+| Thời gian thực, thiết bị nhúng (xe tự hành, robot) | mạng hai nhánh nhẹ (BiSeNet, PIDNet), hoặc các mô hình YOLO có đầu phân vùng thể hiện; xuất ONNX/TensorRT (chương 17) |
+| Gán nhãn dữ liệu mới, lớp chưa có trong tập nào | SAM/SAM 2 để tạo mặt nạ nhanh, Grounded-SAM hoặc SAM 3 nếu cần gọi lớp bằng chữ; sau đó huấn luyện một mô hình nhỏ chuyên dụng trên dữ liệu đã gán |
+| Video | SAM 2 để theo dõi mặt nạ, hoặc phân vùng thể hiện video (VIS) dựa trên Mask2Former |
+
+Các chỉ số đánh giá vẫn như cũ: mIoU cho ngữ nghĩa, mAP mặt nạ cho thể hiện, PQ cho toàn cảnh (9.13). Với SAM thường báo mIoU theo số lần nhấp gợi ý.

@@ -4,6 +4,8 @@
 
 > **Biên tập:** phần lớn chương này rút từ *Sổ tay ngắn gọn về học chuyển giao* (迁移学习简明手册) của Vương Tấn Đông (Wang Jindong, Viện Hàn lâm Khoa học Trung Quốc), nên còn sót số hình (Hình 14–36) và số công thức (6.1, 8.1…) của cuốn sổ tay; bản dịch đánh lại số hình theo chương và gõ lại các công thức vốn để dạng ảnh. Người phụ trách chương trong bản gốc: Vương Tấn Đông, Quách Hiểu Phong (Viện Hàn lâm Khoa học Trung Quốc – iQIYI). Bản gốc đánh số mục 11.3 lộn xộn (hai mục 11.3.4, hai mục 11.3.6, mục 11.3.5 đứng sau 11.3.6); bản dịch đánh lại 11.3.5 tới 11.3.12 theo thứ tự xuất hiện. Phần mở đầu hứa có "triển vọng" và "tài nguyên học tập" nhưng bản gốc không viết; kho [transferlearning](https://github.com/jindongwang/transferlearning) của tác giả sổ tay là nơi tổng hợp tài liệu tốt.
 
+> **Biên tập:** mục 11.4 (mô hình nền tảng, LoRA và tinh chỉnh hiệu quả tham số, CLIP, học trong ngữ cảnh, thích nghi lúc kiểm tra) do người biên tập viết thêm, cập nhật tới 2026.
+
 Chương này giới thiệu ngắn gọn khái niệm cơ bản của học chuyển giao (transfer learning), vì sao cần nó, các hướng nghiên cứu và phương pháp cơ bản. Trọng tâm là mấy nhóm phương pháp thường dùng: thích nghi phân phối dữ liệu, chọn đặc trưng, học không gian con, và học chuyển giao sâu đang nóng nhất hiện nay.
 
 ## 11.1 Kiến thức cơ bản về học chuyển giao
@@ -522,6 +524,8 @@ Tinh chỉnh không chỉ có ích cho mạng neuron sâu mà cũng rất hiệu
 
 Ví dụ nghiên cứu ảnh từng dựa vào các đặc trưng truyền thống như SIFT, SURF, cho tới năm 2014 các nhà nghiên cứu Berkeley đề xuất phương pháp trích đặc trưng DeCAF [Donahue và cộng sự, 2014], dùng thẳng mạng neuron tích chập sâu để trích đặc trưng. Thực nghiệm cho thấy so với đặc trưng ảnh truyền thống, phương pháp này có ưu thế áp đảo về độ chính xác. Ngoài ra cũng có nhà nghiên cứu dùng đặc trưng trích bởi mạng tích chập làm đầu vào cho bộ phân loại SVM [Razavian và cộng sự, 2014], tăng rõ rệt độ chính xác phân loại ảnh.
 
+> **Biên tập:** với mô hình lớn hiện nay, ngoài tinh chỉnh toàn bộ còn có tinh chỉnh hiệu quả tham số (LoRA, 11.4.2) và cách làm "huấn luyện bộ phân loại tuyến tính trước rồi mới tinh chỉnh toàn bộ" (LP-FT, 11.4.1) để không làm méo đặc trưng đã học.
+
 ### 11.3.10 Vì sao tinh chỉnh hiệu quả?
 
 <div class="qa-theory">
@@ -645,6 +649,164 @@ $$
 Khi cài đặt, DANN dùng một **tầng đảo gradient** (gradient reversal layer) đặt giữa bộ trích đặc trưng và bộ phân biệt: lan truyền xuôi giữ nguyên, lan truyền ngược nhân gradient với $-\lambda$. Nhờ vậy chỉ cần một lần lan truyền ngược thông thường: bộ phân biệt cực tiểu mất mát phân biệt miền, còn bộ trích đặc trưng nhận gradient ngược dấu nên cực đại mất mát đó, tức học đặc trưng bất biến miền.
 
 > **Biên tập:** (1) bản gốc viết mục tiêu của DANN là "đặc trưng sinh ra giúp phân biệt đặc trưng của hai miền, đồng thời khiến bộ phân biệt không phân biệt được" (tự mâu thuẫn); đúng là đặc trưng phải khiến hai miền *không* phân biệt được. (2) Công thức $\mathcal L_d$ trong bản gốc (ảnh) có số hạng thứ hai là $\log\frac{1}{G_d(\cdot)}$, thiếu "$1-$"; đã sửa. (3) Tầng đảo gradient do người biên tập bổ sung vì đó là điểm cốt lõi khi cài đặt DANN. Bản gốc dừng ở đây; các phương pháp đối kháng sau DANN gồm ADDA, CDAN, và hướng mới hơn là thích nghi miền bằng mô hình nền tảng huấn luyện sẵn trên dữ liệu rất lớn.
+
+## 11.4 Bổ sung: học chuyển giao trong thời mô hình nền tảng (2018–2026)
+
+> **Biên tập:** mục này do người biên tập viết, không có trong bản gốc. Bản gốc trình bày học chuyển giao theo hướng thích nghi miền (domain adaptation): có miền nguồn, miền đích, tìm cách giảm khác biệt phân phối. Từ BERT (2018) và GPT-3 (2020), cách làm chủ đạo đổi sang **huấn luyện trước một mô hình rất lớn trên dữ liệu rất rộng, rồi thích nghi** cho từng việc bằng tinh chỉnh, tinh chỉnh một phần tham số, hoặc chỉ bằng gợi ý (prompt). Code trong mục đã chạy thử với PyTorch 2 trên CPU.
+
+### 11.4.1 Mô hình nền tảng (foundation model) là gì? Nó thay đổi học chuyển giao thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 11.3.9 Tinh chỉnh (fine-tune) là gì?](qa/ch11_vi?id=_1139-tinh-chỉnh-fine-tune-là-gì) · [Ôn tập · 4.8.5 Hiện nay nên chọn mạng nền nào?](qa/ch04_vi?id=_485-hiện-nay-nên-chọn-mạng-nền-nào) · [Ôn tập · 16.19 Sinh mô tả ảnh (image captioning) là gì? Nguyên lý kỹ thuật?](qa/ch16_vi?id=_1619-sinh-mô-tả-ảnh-image-captioning-là-gì-nguyên-lý-kỹ-thuật)
+
+</div>
+
+Thuật ngữ do nhóm Stanford đặt năm 2021 (Bommasani và cộng sự). Đó là mô hình huấn luyện trước trên dữ liệu rộng, thường **tự giám sát** (không cần nhãn), rồi được thích nghi cho rất nhiều bài toán phía sau. Các mục tiêu tự giám sát phổ biến:
+
+| Mục tiêu huấn luyện trước | Ví dụ |
+| --- | --- |
+| dự đoán token tiếp theo | GPT, LLaMA, Qwen |
+| che rồi khôi phục (masked modeling) | BERT (che từ), MAE (che 75% mảnh ảnh) |
+| học tương phản / tự chưng cất | SimCLR, MoCo, DINO, DINOv2 (ảnh); CLIP (ảnh–văn bản, 11.4.3) |
+
+So với học chuyển giao trong bản gốc, có ba khác biệt:
+
+1. **Miền nguồn gần như "mọi thứ".** Không còn chọn một miền nguồn gần miền đích (11.1.4). Mô hình nền đã thấy dữ liệu đủ rộng để miền đích thường nằm trong vùng nó biết.
+2. **Ít cần căn chỉnh phân phối tường minh.** Các phương pháp MMD, CORAL, đối kháng (11.3.1–11.3.12) vẫn có ích khi lệch miền lớn và không có nhãn đích. Nhưng một mạng nền huấn luyện trước tốt, tinh chỉnh đơn giản, thường đã vượt các phương pháp này.
+3. **Phổ thích nghi rộng hơn:**
+
+| Cách thích nghi | Cập nhật gì | Khi nào dùng |
+| --- | --- | --- |
+| dùng đặc trưng đóng băng + bộ phân loại tuyến tính (linear probing) | chỉ tầng cuối | dữ liệu rất ít, cần nhanh |
+| tinh chỉnh toàn bộ (11.3.9) | mọi tham số | dữ liệu đủ, lệch miền lớn, có đủ GPU |
+| tinh chỉnh hiệu quả tham số (PEFT, 11.4.2) | < 1% tham số | mô hình lớn, nhiều tác vụ, ít bộ nhớ |
+| gợi ý / học trong ngữ cảnh (11.4.4) | không cập nhật gì | mô hình ngôn ngữ lớn, ít ví dụ |
+
+Một kết quả thực tế đáng nhớ: tinh chỉnh toàn bộ với bộ phân loại khởi tạo ngẫu nhiên có thể **làm méo** đặc trưng tốt đã học. Khi đó mô hình đúng hơn trên phân phối huấn luyện nhưng kém hơn khi phân phối lệch. Kumar và cộng sự (2022) đề xuất **LP-FT**: huấn luyện bộ phân loại tuyến tính trước (linear probing), rồi mới tinh chỉnh toàn bộ với tốc độ học nhỏ.
+
+### 11.4.2 LoRA và các phương pháp tinh chỉnh hiệu quả tham số (PEFT) là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 11.3.9 Tinh chỉnh (fine-tune) là gì?](qa/ch11_vi?id=_1139-tinh-chỉnh-fine-tune-là-gì) · [Ôn tập · 17.1 Hiểu nén mô hình thế nào?](qa/ch17_vi?id=_171-hiểu-nén-mô-hình-thế-nào) · [Ôn tập · 13.19.4 Không đủ bộ nhớ GPU cho batch lớn hoặc mô hình lớn thì làm gì?](qa/ch13_vi?id=_13194-không-đủ-bộ-nhớ-gpu-cho-batch-lớn-hoặc-mô-hình-lớn-thì-làm-gì)
+
+</div>
+
+Tinh chỉnh toàn bộ một mô hình 7 tỉ tham số cần khoảng 16 byte/tham số cho trọng số, gradient và trạng thái AdamW (13.19.4). Mỗi tác vụ lại phải lưu một bản sao đầy đủ. **PEFT** chỉ học một phần rất nhỏ tham số, giữ mô hình gốc đóng băng.
+
+**LoRA** (Hu và cộng sự 2021) dựa trên giả thuyết rằng phần thay đổi trọng số khi thích nghi có **hạng thấp**. Với một ma trận $W_0\in\mathbb R^{d\times k}$ đóng băng, ta học
+
+$$W = W_0 + \frac{\alpha}{r}BA,\qquad B\in\mathbb R^{d\times r},\ A\in\mathbb R^{r\times k},\ r\ll\min(d,k).$$
+
+- $B$ khởi tạo bằng 0, nên lúc đầu mô hình **y hệt** mô hình gốc; $A$ khởi tạo ngẫu nhiên.
+- Với $d=k=4096$ và $r=8$, số tham số học là $2\cdot4096\cdot8 = 65\,536$, bằng **0,39%** của $16{,}8$ triệu tham số trong $W_0$.
+- Sau khi học có thể **gộp** $BA$ vào $W_0$, nên suy luận không chậm thêm. Cũng có thể giữ riêng nhiều bộ $(A,B)$ nhỏ cho nhiều tác vụ trên cùng một mô hình gốc.
+- Thường áp vào các ma trận chiếu của attention ($W_q, W_k, W_v, W_o$), và ngày càng hay áp cả vào FFN.
+
+```python
+class LoRALinear(nn.Module):
+    def __init__(self, base: nn.Linear, r=8, alpha=16):
+        super().__init__()
+        self.base = base
+        for p in self.base.parameters():
+            p.requires_grad_(False)                       # đóng băng trọng số gốc
+        self.A = nn.Parameter(torch.randn(r, base.in_features) / math.sqrt(base.in_features))
+        self.B = nn.Parameter(torch.zeros(base.out_features, r))   # B = 0: lúc đầu giống hệt bản gốc
+        self.scale = alpha / r
+
+    def forward(self, x):
+        return self.base(x) + (x @ self.A.T @ self.B.T) * self.scale
+
+    @torch.no_grad()
+    def merge(self):                                      # gộp vào W để suy luận không tốn thêm
+        self.base.weight += self.scale * self.B @ self.A
+        return self.base
+```
+
+Đã chạy thử: đầu ra lúc khởi tạo trùng tầng gốc; sau 5 bước AdamW, tầng đã gộp cho cùng đầu ra với tầng LoRA. Trong thực tế dùng thư viện `peft` của Hugging Face.
+
+Các phương pháp liên quan:
+- **QLoRA** (Dettmers và cộng sự 2023): lượng tử hóa mô hình gốc xuống 4 bit (kiểu NF4), chỉ LoRA ở độ chính xác cao. Cách này tinh chỉnh được mô hình 65 tỉ tham số trên một GPU 48 GB.
+- **DoRA** (2024): tách độ lớn và hướng của trọng số, LoRA chỉ học phần hướng.
+- **Adapter** (Houlsby và cộng sự 2019): chèn khối MLP thắt cổ chai nhỏ vào mỗi tầng.
+- **Prefix/prompt tuning:** học một số vector "gợi ý mềm" đặt trước chuỗi đầu vào.
+- **BitFit:** chỉ học bias.
+
+### 11.4.3 CLIP học thế nào và vì sao phân loại được lớp chưa từng thấy (zero-shot)?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 11.1.7 Học chuyển giao khác các khái niệm khác thế nào?](qa/ch11_vi?id=_1117-học-chuyển-giao-khác-các-khái-niệm-khác-thế-nào) · [Ôn tập · 16.19 Sinh mô tả ảnh (image captioning) là gì? Nguyên lý kỹ thuật?](qa/ch16_vi?id=_1619-sinh-mô-tả-ảnh-image-captioning-là-gì-nguyên-lý-kỹ-thuật) · [Ôn tập · 9.14.4 Phân vùng từ vựng mở (open-vocabulary) là gì?](qa/ch09_vi?id=_9144-phân-vùng-từ-vựng-mở-open-vocabulary-là-gì)
+
+</div>
+
+**CLIP** (Radford và cộng sự, OpenAI 2021) học từ 400 triệu cặp (ảnh, chú thích) lấy từ Internet. Mô hình gồm hai bộ mã hóa: $f$ cho ảnh (ResNet hoặc ViT) và $g$ cho văn bản (Transformer). Cả hai đưa về cùng không gian và được chuẩn hóa về độ dài 1. Với một batch $N$ cặp, ma trận tương đồng $S_{ij} = f(x_i)^\top g(t_j)/\tau$ có $N$ cặp đúng trên đường chéo. Mất mát **tương phản đối xứng** (InfoNCE) coi mỗi hàng và mỗi cột là một bài toán phân loại $N$ lớp:
+
+$$\mathcal L = \frac12\Big[\frac1N\sum_i -\log\frac{e^{S_{ii}}}{\sum_j e^{S_{ij}}} + \frac1N\sum_j -\log\frac{e^{S_{jj}}}{\sum_i e^{S_{ij}}}\Big].$$
+
+```python
+def clip_loss(img_emb, txt_emb, t=0.07):
+    img = F.normalize(img_emb, dim=-1)
+    txt = F.normalize(txt_emb, dim=-1)
+    logits = img @ txt.T / t                    # N x N
+    labels = torch.arange(len(img))             # cặp đúng nằm trên đường chéo
+    return (F.cross_entropy(logits, labels) + F.cross_entropy(logits.T, labels)) / 2
+```
+
+(Đã chạy với $N=8$: embedding ngẫu nhiên cho mất mát khoảng $2{,}4$, cùng cỡ $\ln 8\approx2{,}08$; embedding ảnh và văn bản gần trùng nhau cho mất mát gần 0.)
+
+**Phân loại zero-shot.** Với $K$ lớp, viết mỗi lớp thành câu "a photo of a {tên lớp}", mã hóa thành $g(t_1),\dots,g(t_K)$. Mỗi ảnh được gán lớp có độ tương đồng cosin lớn nhất. Không cần ảnh huấn luyện nào của các lớp này. Tên lớp và văn bản lúc này đóng vai "thuộc tính" mô tả lớp, giống học không mẫu cổ điển nhưng ở quy mô lớn hơn rất nhiều.
+
+Kết quả:
+- CLIP ViT-L/14 (ảnh 336 px) đạt 76,2% top-1 zero-shot trên ImageNet, ngang ResNet-50 huấn luyện có giám sát trên 1,28 triệu ảnh của ImageNet.
+- Độ chính xác **giảm ít hơn nhiều** khi phân phối lệch (ImageNet-Sketch, ImageNet-R…).
+- Kết hợp nhiều mẫu câu (prompt ensembling) tăng thêm vài điểm.
+
+Ứng dụng: tìm kiếm ảnh bằng văn bản; bộ mã hóa văn bản cho mô hình sinh ảnh (7.6.3); nền của phân vùng và phát hiện từ vựng mở (9.14.4); bộ mã hóa thị giác cho các mô hình đa phương thức (LLaVA…). Các bản mở và cải tiến: OpenCLIP, SigLIP (thay softmax bằng sigmoid theo từng cặp, không cần batch rất lớn).
+
+### 11.4.4 Học trong ngữ cảnh (in-context learning) có phải là học chuyển giao không?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 16.19 Sinh mô tả ảnh (image captioning) là gì? Nguyên lý kỹ thuật?](qa/ch16_vi?id=_1619-sinh-mô-tả-ảnh-image-captioning-là-gì-nguyên-lý-kỹ-thuật) · [Ôn tập · 11.1.7 Học chuyển giao khác các khái niệm khác thế nào?](qa/ch11_vi?id=_1117-học-chuyển-giao-khác-các-khái-niệm-khác-thế-nào) · [Ôn tập · 10.11.5 RLHF, DPO và GRPO là gì? Học tăng cường được dùng để huấn luyện mô hình ngôn ngữ thế nào?](qa/ch10_vi?id=_10115-rlhf-dpo-và-grpo-là-gì-học-tăng-cường-được-dùng-để-huấn-luyện-mô-hình-ngôn-ngữ-thế-nào)
+
+</div>
+
+GPT-3 (Brown và cộng sự 2020) cho thấy một mô hình ngôn ngữ đủ lớn có thể làm bài toán mới chỉ từ vài ví dụ đặt **trong câu gợi ý**, không cập nhật trọng số nào ("dịch sang tiếng Pháp: cheese → fromage; sea otter → loutre de mer; …"). Có thể coi đây là học chuyển giao với chi phí thích nghi bằng 0: tri thức chuyển từ dữ liệu huấn luyện trước sang tác vụ mới hoàn toàn qua ngữ cảnh. Nhìn từ góc độ học máy, mô hình đã **học cách học** (meta-learning) trong lúc huấn luyện trước.
+
+Các kỹ thuật đi kèm:
+- **Tinh chỉnh theo chỉ dẫn** (instruction tuning): tinh chỉnh trên nhiều tác vụ viết dưới dạng chỉ dẫn, để mô hình làm theo yêu cầu mới tốt hơn.
+- **Căn chỉnh theo ưa thích của người:** RLHF, DPO (10.11.5).
+- **Sinh có tra cứu** (retrieval-augmented generation, RAG): đưa tài liệu liên quan vào ngữ cảnh để bổ sung tri thức mà không cần huấn luyện lại.
+
+Thứ tự thử trong thực tế, từ rẻ tới đắt:
+1. viết gợi ý tốt, thêm vài ví dụ;
+2. RAG nếu thiếu tri thức;
+3. LoRA nếu cần đổi hành vi/định dạng ổn định hoặc mô hình nhỏ hơn rẻ hơn;
+4. tinh chỉnh toàn bộ hoặc huấn luyện trước tiếp trên miền khi miền rất khác (y khoa, pháp lý, ngôn ngữ ít tài nguyên).
+
+### 11.4.5 Thích nghi miền hiện nay còn quan trọng không? Thích nghi lúc kiểm tra (test-time adaptation) là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 11.3.1 Thích nghi phân phối dữ liệu](qa/ch11_vi?id=_1131-thích-nghi-phân-phối-dữ-liệu) · [Ôn tập · 11.3.11 Thích nghi mạng sâu là gì?](qa/ch11_vi?id=_11311-thích-nghi-mạng-sâu-là-gì) · [Ôn tập · 3.15.2 LayerNorm và RMSNorm khác batch normalization thế nào?](qa/ch03_vi?id=_3152-layernorm-và-rmsnorm-khác-batch-normalization-thế-nào)
+
+</div>
+
+Còn, nhất là khi:
+- không có nhãn ở miền đích;
+- dữ liệu thay đổi theo thời gian: cảm biến mới, bệnh viện khác, thời tiết khác;
+- mô hình phải chạy nhỏ trên thiết bị, không dùng được mô hình nền khổng lồ.
+
+Tuy vậy, có hai bài học từ nghiên cứu gần đây:
+
+- **Đường cơ sở mạnh khó thắng.** Gulrajani và Lopez-Paz (2021, "In Search of Lost Domain Generalization", bộ DomainBed) cho thấy: khi chọn siêu tham số công bằng, huấn luyện thông thường (ERM) trên dữ liệu gộp, với tăng cường dữ liệu tốt, ngang hầu hết các phương pháp tổng quát hóa miền đã công bố. Nâng cấp mạng nền huấn luyện trước thường giúp nhiều hơn đổi phương pháp.
+- **Thích nghi lúc kiểm tra** (test-time adaptation, TTA). Mô hình đã triển khai tự điều chỉnh trên chính dữ liệu kiểm tra không nhãn, khi các batch đến. Ví dụ đơn giản và phổ biến là **TENT** (Wang và cộng sự 2021):
+  1. tính lại thống kê BatchNorm trên batch kiểm tra;
+  2. chỉ cập nhật các tham số co giãn/dịch $\gamma,\beta$ của BN để **cực tiểu entropy** của dự đoán.
+  
+  Rủi ro: entropy thấp không đảm bảo đúng, nên nếu chạy lâu mô hình có thể trôi dần. Các phương pháp sau (EATA, CoTTA…) thêm lọc mẫu và chống quên.
 
 ## Tài liệu tham khảo
 
