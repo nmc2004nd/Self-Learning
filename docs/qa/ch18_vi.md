@@ -2015,19 +2015,19 @@ Mô hình gợi ý có đặc điểm riêng: phần lớn tham số nằm ở *
 
 ## Tài liệu tham khảo
 
-1. PaddlePaddle. *Personalized Recommendation* (bộ sách hướng dẫn PaddlePaddle 0.11). http://www.paddlepaddle.org/documentation/book/zh/0.11.0/05.recommender_system/index.cn.html
+1. PaddlePaddle. *Personalized Recommendation* (bộ sách hướng dẫn PaddlePaddle 0.11). https://github.com/PaddlePaddle/book/tree/develop/05.recommender_system (trang tài liệu 0.11 cũ trên paddlepaddle.org đã chết, thay bằng mã nguồn của sách trên GitHub)
 2. Deeplearning4j. *So sánh DL4J với Torch, Theano, Caffe…* https://deeplearning4j.org/cn/compare-dl4j-torch7-pylearn.html
 3. Apache Mahout. http://mahout.apache.org/
-4. Spark MLlib Guide (Spark 1.1.0). http://spark.apache.org/docs/1.1.0/mllib-guide.html
+4. Spark MLlib Guide (Spark 1.1.0). Trang tài liệu 1.1.0 nay không còn; bản hiện hành: https://spark.apache.org/docs/latest/ml-guide.html
 5. Ray documentation. https://ray.readthedocs.io/en/latest/tutorial.html
 6. Spark Streaming. http://spark.apache.org/streaming/
 7. Horovod. https://github.com/uber/horovod
 8. Intel. *BigDL: Distributed Deep Learning on Apache Spark*. https://software.intel.com/en-us/articles/bigdl-distributed-deep-learning-on-apache-spark
-9. Uber Engineering. *Introducing Petastorm*. https://eng.uber.com/petastorm/
+9. Uber Engineering. *Introducing Petastorm*. Blog cũ eng.uber.com đã chết; mã nguồn và tài liệu: https://github.com/uber/petastorm
 10. Yahoo. *TensorFlowOnSpark*. https://yahoo.github.io/TensorFlowOnSpark/
-11. Jane Bromley và cộng sự. *Signature Verification using a "Siamese" Time Delay Neural Network*. NeurIPS 1993. https://papers.nips.cc/paper/769-signature-verification-using-a-siamese-time-delay-neural-network.pdf
+11. Jane Bromley và cộng sự. *Signature Verification using a "Siamese" Time Delay Neural Network*. NeurIPS 1993. https://papers.nips.cc/paper_files/paper/1993/hash/288cc0ff022877bd3df94bc9360b9c5d-Abstract.html
 12. Liang Pang và cộng sự. *Text Matching as Image Recognition* (MatchPyramid). AAAI 2016. https://arxiv.org/pdf/1602.06359.pdf
-13. Ryan McDonald, Georgios-Ioannis Brokos, Ion Androutsopoulos. *Deep Relevance Ranking Using Enhanced Document-Query Interactions*. EMNLP 2018. http://www2.aueb.gr/users/ion/docs/emnlp2018.pdf
+13. Ryan McDonald, Georgios-Ioannis Brokos, Ion Androutsopoulos. *Deep Relevance Ranking Using Enhanced Document-Query Interactions*. EMNLP 2018. https://aclanthology.org/D18-1211/
 14. Paul Covington, Jay Adams, Emre Sargin. *Deep Neural Networks for YouTube Recommendations*. RecSys 2016. https://static.googleusercontent.com/media/research.google.com/ru//pubs/archive/45530.pdf
 15. Xuerui Wang và cộng sự. *Click-Through Rate Estimation for Rare Events in Online Advertising*. http://www.cs.cmu.edu/afs/cs/Web/People/xuerui/papers/ctr.pdf
 16. H. Brendan McMahan và cộng sự. *Ad Click Prediction: a View from the Trenches*. KDD 2013.

@@ -2,7 +2,7 @@
 
 > Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch14_超参数调整), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
 
-> **Biên tập:** bản gốc ghi người biên soạn là Kiều Thành Lỗi (乔成磊, Đại học Đồng Tế) và Vương Siêu Phong (王超锋), bản sửa ngày 25/10/2018. Ví dụ về lập lịch tốc độ học dùng API của TensorFlow 1.x (`tf.train.*_decay`); ở TF2 tương ứng là `tf.keras.optimizers.schedules`, ở PyTorch là `torch.optim.lr_scheduler`. Bản gốc đánh số trùng hai mục 14.4.4; mục thứ hai đánh lại là 14.4.4b. Đường dẫn ảnh trong bản gốc dùng dấu `\` của Windows nên không hiện trên GitHub; bản dịch đã sửa.
+> **Biên tập:** bản gốc ghi người biên soạn là Kiều Thành Lỗi (乔成磊, Đại học Đồng Tế) và Vương Siêu Phong (王超锋), bản sửa ngày 25/10/2018. Ví dụ về lập lịch tốc độ học dùng API của TensorFlow 1.x (`tf.train.*_decay`); ở TF2 tương ứng là `tf.keras.optimizers.schedules`, ở PyTorch là `torch.optim.lr_scheduler`. Bản gốc đánh số trùng hai mục 14.4.4; mục thứ hai đánh lại là 14.4.4b. Mục 14.7 (Hyperband, Optuna, luật tỉ lệ và µP, quy trình chỉnh hiện nay) do người biên tập viết thêm, cập nhật tới 2026. Đường dẫn ảnh trong bản gốc dùng dấu `\` của Windows nên không hiện trên GitHub; bản dịch đã sửa.
 
 ## 14.1 Lời nói đầu
 
@@ -445,6 +445,8 @@ Các mặt này đều có ảnh hưởng then chốt tới kết quả cuối, 
 
 Hiện AutoML đã thành điểm nóng nghiên cứu mới, ai quan tâm có thể tham khảo [AutoML literature](https://www.automl.org/automl/literature-on-neural-architecture-search/).
 
+> **Biên tập:** trang danh sách tài liệu NAS của AutoML.org bản gốc dẫn nay không còn (lỗi 404). Có thể đọc bài tổng quan *Neural Architecture Search: A Survey* (Elsken, Metzen, Hutter, JMLR 2019, https://jmlr.org/papers/v20/18-598.html) của cùng nhóm.
+
 > **Biên tập:** bản gốc ghi Hyperopt là của "Alex Honchar"; tác giả của Hyperopt là James Bergstra (cùng Dan Yamins, David Cox). Công cụ phổ biến hiện nay còn có Optuna, Ray Tune.
 
 ### 14.6.2 Có những phương pháp tìm siêu tham số tự động nào?
@@ -473,7 +475,7 @@ Thuật toán tìm kiếm dựa trên mô hình phổ biến nhất là **tối 
 
 <div class="qa-theory">
 
-**Lý thuyết:** [AutoML.org (tiếng Anh) · Tài liệu về NAS](https://www.automl.org/automl/literature-on-neural-architecture-search/) ↗ · [Tăng cường · Chương 4 Gradient chính sách](chapter4/chapter4_vi)
+**Lý thuyết:** [JMLR (tiếng Anh) · Neural Architecture Search: A Survey](https://jmlr.org/papers/v20/18-598.html) ↗ · [Tăng cường · Chương 4 Gradient chính sách](chapter4/chapter4_vi)
 
 </div>
 
@@ -568,3 +570,126 @@ Chia sẻ trọng số ở mức nào đó tăng liên hệ giữa các tham s�
 Vì vậy một cách chia sẻ trọng số được thiết kế tốt, trong khi giảm khối lượng tính, thường cho kết quả tốt hơn mạng không chia sẻ.
 
 Chia sẻ trọng số không chỉ giúp đơn giản hóa tham số, giảm độ phức tạp trong các cấu trúc mạng do con người thiết kế (human-invented), mà trong cấu trúc mạng của tìm kiếm kiến trúc (NAS) còn giúp tăng hiệu suất tính của các mô hình con (child model), làm quá trình tìm kiếm tái hiện được trên một GPU, xem Efficient NAS ([ENAS](https://arxiv.org/abs/1802.03268)).
+
+## 14.7 Bổ sung: chỉnh siêu tham số từ 2018 tới 2026
+
+> **Biên tập:** mục này do người biên tập viết, không có trong bản gốc. Code Optuna đã chạy thử với Optuna 5.1 và scikit-learn (cài tạm riêng, môi trường chính không có Optuna).
+
+### 14.7.1 Successive halving và Hyperband là gì? Vì sao nhanh hơn tìm ngẫu nhiên?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 14.6.2 Có những phương pháp tìm siêu tham số tự động nào?](qa/ch14_vi?id=_1462-có-những-phương-pháp-tìm-siêu-tham-số-tự-động-nào) · [d2l (tiếng Anh) · 19.4 Multi-Fidelity Hyperparameter Optimization](https://d2l.ai/chapter_hyperparameter-optimization/sh-intro.html) ↗
+
+</div>
+
+Tìm ngẫu nhiên hay tối ưu Bayes (14.6.2) huấn luyện **trọn vẹn** mỗi cấu hình, kể cả những cấu hình rõ ràng tệ ngay sau vài epoch. Các phương pháp **nhiều độ trung thực** (multi-fidelity) tận dụng việc đường học sớm đã cho tín hiệu: dừng sớm cấu hình kém, dồn ngân sách cho cấu hình hứa hẹn.
+
+**Successive halving** (SH), với hệ số $\eta=3$:
+1. Chạy $n$ cấu hình ngẫu nhiên, mỗi cấu hình với ngân sách nhỏ $r$ (ví dụ 1 epoch).
+2. Giữ $1/\eta$ cấu hình tốt nhất, nhân ngân sách với $\eta$, lặp lại tới khi còn một cấu hình.
+
+Ví dụ 27 cấu hình, tối đa 27 epoch:
+
+| Vòng | Số cấu hình | Epoch mỗi cấu hình |
+| --- | --- | --- |
+| 1 | 27 | 1 |
+| 2 | 9 | 3 |
+| 3 | 3 | 9 |
+| 4 | 1 | 27 |
+
+Tổng cộng chỉ tốn $27+27+27+27=108$ epoch, so với $27\times27=729$ epoch nếu chạy hết mọi cấu hình. Như vậy với cùng ngân sách, SH thử được nhiều cấu hình hơn khoảng 7 lần.
+
+Rủi ro của SH là bỏ nhầm cấu hình "khởi động chậm" (ví dụ tốc độ học nhỏ, ban đầu kém nhưng cuối cùng tốt). **Hyperband** (Li và cộng sự 2017) chạy nhiều lượt SH với các mức $n$ và $r$ khác nhau để cân bằng rủi ro đó. Các biến thể sau:
+- **ASHA:** bản bất đồng bộ cho nhiều GPU, không phải chờ cả vòng;
+- **BOHB:** thay việc chọn cấu hình ngẫu nhiên bằng tối ưu Bayes;
+- **PBT** (Population Based Training, DeepMind 2017): huấn luyện một quần thể song song, định kỳ chép trọng số của mô hình tốt sang mô hình kém rồi làm nhiễu siêu tham số. Siêu tham số vì thế đổi được theo thời gian, nên PBT tìm ra được cả *lịch* siêu tham số.
+
+### 14.7.2 Dùng Optuna để tìm siêu tham số thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 14.6.2 Có những phương pháp tìm siêu tham số tự động nào?](qa/ch14_vi?id=_1462-có-những-phương-pháp-tìm-siêu-tham-số-tự-động-nào) · [Ôn tập · 14.2.6 Khoảng giá trị phù hợp của một số siêu tham số](qa/ch14_vi?id=_1426-khoảng-giá-trị-phù-hợp-của-một-số-siêu-tham-số)
+
+</div>
+
+**Optuna** (Preferred Networks, 2019) là thư viện phổ biến nhất hiện nay. Không gian tìm kiếm được khai báo ngay trong hàm mục tiêu (define-by-run), nên có thể có điều kiện, ví dụ chỉ hỏi số tầng khi đã chọn loại mô hình. Mặc định Optuna dùng **TPE** (Tree-structured Parzen Estimator, một dạng tối ưu Bayes), và có bộ **cắt tỉa** (pruner) để dừng sớm các thử nghiệm kém theo kiểu SH.
+
+```python
+import numpy as np
+import optuna
+from sklearn.datasets import load_digits
+from sklearn.linear_model import SGDClassifier
+from sklearn.model_selection import train_test_split
+
+X, y = load_digits(return_X_y=True)
+X_tr, X_va, y_tr, y_va = train_test_split(X / 16.0, y, test_size=0.3, random_state=0)
+classes = np.unique(y)
+
+def objective(trial):
+    alpha = trial.suggest_float("alpha", 1e-6, 1e-1, log=True)      # thang log cho hệ số điều chuẩn
+    eta0 = trial.suggest_float("eta0", 1e-4, 1.0, log=True)         # tốc độ học
+    loss = trial.suggest_categorical("loss", ["hinge", "log_loss", "modified_huber"])
+    clf = SGDClassifier(alpha=alpha, eta0=eta0, loss=loss,
+                        learning_rate="constant", random_state=0)
+    for epoch in range(20):
+        clf.partial_fit(X_tr, y_tr, classes=classes)
+        acc = clf.score(X_va, y_va)
+        trial.report(acc, epoch)               # báo kết quả trung gian
+        if trial.should_prune():               # kém hơn trung vị các thử trước ở cùng epoch: dừng sớm
+            raise optuna.TrialPruned()
+    return acc
+
+study = optuna.create_study(direction="maximize",
+                            sampler=optuna.samplers.TPESampler(seed=0),
+                            pruner=optuna.pruners.MedianPruner(n_warmup_steps=5))
+study.optimize(objective, n_trials=60)
+print(study.best_value, study.best_params)
+```
+
+Kết quả khi chạy: độ chính xác kiểm định tốt nhất $0{,}965$ với `loss="hinge"`, $\alpha\approx1{,}8\times10^{-5}$, $\eta_0\approx0{,}014$. Có 25/60 thử nghiệm bị dừng sớm, tức gần nửa ngân sách được tiết kiệm.
+
+Lưu ý thực tế:
+- Tốc độ học và hệ số điều chuẩn phải tìm theo **thang log** (xem khoảng giá trị ở 14.2.6).
+- Chọn bằng tập kiểm định, báo kết quả cuối trên tập kiểm tra riêng. Nếu dùng tập kiểm tra để chọn siêu tham số, kết quả báo cáo sẽ lạc quan quá mức.
+- `study.trials_dataframe()` và các hàm `optuna.visualization` cho biết siêu tham số nào quan trọng, giúp thu hẹp không gian cho lần tìm sau.
+- Các công cụ khác: Ray Tune (phân tán, có ASHA/PBT), Weights & Biases Sweeps, KerasTuner, Hyperopt (cũ hơn).
+
+### 14.7.3 Mô hình rất lớn chỉ huấn luyện được một lần thì chỉnh siêu tham số thế nào? µP và luật tỉ lệ là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 13.19.1 Sau Adam có những bộ tối ưu nào đáng biết?](qa/ch13_vi?id=_13191-sau-adam-có-những-bộ-tối-ưu-nào-đáng-biết) · [Ôn tập · 3.15.5 Vì sao cần khởi động (warmup) tốc độ học? Lịch cosin hoạt động thế nào?](qa/ch03_vi?id=_3155-vì-sao-cần-khởi-động-warmup-tốc-độ-học-lịch-cosin-hoạt-động-thế-nào)
+
+</div>
+
+Với mô hình hàng tỉ tham số, không thể thử hàng chục cấu hình. Cách làm hiện nay là chỉnh trên mô hình **nhỏ**, rồi suy ra cho mô hình lớn. Có hai công cụ.
+
+**Luật tỉ lệ** (scaling laws). Kaplan và cộng sự (OpenAI 2020) quan sát rằng loss giảm theo **luật lũy thừa** khá đều đặn theo số tham số $N$, số token dữ liệu $D$ và lượng tính toán $C$. Chi phí huấn luyện Transformer xấp xỉ $C\approx6ND$ FLOPs. Hoffmann và cộng sự (DeepMind 2022, "Chinchilla") khớp lại các đường này và kết luận: với một ngân sách tính toán cố định, nên tăng $N$ và $D$ **cùng tỉ lệ**, khoảng **20 token cho mỗi tham số**. Chinchilla (70 tỉ tham số, 1,4 nghìn tỉ token, $C\approx6\times70\cdot10^9\times1{,}4\cdot10^{12}\approx5{,}9\times10^{23}$ FLOPs) tốt hơn Gopher 280 tỉ tham số dùng cùng ngân sách. Nhờ đó có thể chạy một loạt mô hình nhỏ, khớp đường cong, rồi dự đoán loss và chọn kích thước cho lần chạy lớn. Thực tế ngày nay thường huấn luyện **quá** tỉ lệ Chinchilla (nhiều token hơn hẳn) để có mô hình nhỏ, rẻ khi suy luận.
+
+**µP** (Maximal Update Parametrization; Yang và cộng sự 2022, "Tensor Programs V"). Với cách khởi tạo và tốc độ học thông thường, tốc độ học tối ưu **thay đổi** khi mạng rộng ra, nên siêu tham số tìm trên mô hình nhỏ không dùng được cho mô hình lớn. µP đổi cách co giãn khởi tạo, tốc độ học và hệ số đầu ra theo độ rộng. Ví dụ với Adam, tốc độ học của các ma trận ẩn tỉ lệ với $1/\text{độ rộng}$, và đầu ra nhân thêm hệ số $1/\text{độ rộng}$. Mục tiêu là để mỗi tầng cập nhật một lượng "vừa đủ" bất kể độ rộng. Khi đó tốc độ học, khởi tạo… tối ưu gần như **không đổi** theo độ rộng. Quy trình gọi là **µTransfer**: chỉnh trên mạng hẹp (ví dụ 40 triệu tham số), dùng thẳng cho mạng rộng gấp nhiều lần. Bài báo minh họa bằng cách chuyển siêu tham số từ mô hình nhỏ sang GPT-3 6,7 tỉ tham số, với chi phí chỉnh chỉ bằng khoảng 7% chi phí huấn luyện trước một lần.
+
+### 14.7.4 Có quy trình chỉnh siêu tham số nào được khuyến nghị hiện nay?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 14.2.4 Thứ tự quan trọng của siêu tham số](qa/ch14_vi?id=_1424-thứ-tự-quan-trọng-của-siêu-tham-số) · [Ôn tập · 14.3.4 Huấn luyện mạng với kích thước batch cực đoan thế nào?](qa/ch14_vi?id=_1434-huấn-luyện-mạng-với-kích-thước-batch-cực-đoan-thế-nào) · [Ôn tập · 13.15 Có những hướng nào để cải thiện mô hình?](qa/ch13_vi?id=_1315-có-những-hướng-nào-để-cải-thiện-mô-hình)
+
+</div>
+
+*Deep Learning Tuning Playbook* (Google Research và Harvard, 2023, mã nguồn mở trên GitHub) tổng kết quy trình thực tế:
+
+1. **Bắt đầu đơn giản:**
+   - chọn kiến trúc và bộ tối ưu đã được dùng nhiều cho bài toán tương tự (thường AdamW, 3.15.4);
+   - chọn cỡ batch **lớn nhất phần cứng cho phép** mà vẫn tăng tốc. Cỡ batch chủ yếu ảnh hưởng thời gian, không phải chất lượng cuối, *nếu* chỉnh lại tốc độ học cho từng cỡ batch.
+2. **Tăng dần, mỗi vòng một câu hỏi khoa học**, ví dụ "thêm tầng có giúp không?". Siêu tham số chia ba loại:
+   - **khoa học:** cái đang muốn đo ảnh hưởng;
+   - **phiền toái** (nuisance): phải chỉnh lại cho từng giá trị của biến khoa học để so sánh công bằng, điển hình là tốc độ học;
+   - **cố định:** giữ nguyên trong vòng này.
+3. **Khám phá trước, khai thác sau:**
+   - dùng tìm kiếm ngẫu nhiên hoặc chuỗi tựa ngẫu nhiên (quasi-random) để hiểu bài toán;
+   - xem các đồ thị cắt theo trục (siêu tham số so với loss kiểm định) để biết vùng tốt có nằm sát biên không gian tìm không;
+   - chỉ dùng tối ưu Bayes khi đã sẵn sàng chọn cấu hình cuối.
+4. **Luôn nhìn đường cong huấn luyện**, không chỉ con số cuối. Loss dao động mạnh, có đột biến (spike) hoặc quá khớp sớm đều gợi ý nên chỉnh gì: khởi động dài hơn, cắt gradient (13.19.2), điều chuẩn.
+
+Còn **tìm kiếm kiến trúc** (NAS, 14.6.3) nay ít được dùng trực tiếp hơn thời 2017–2019. Những kết quả còn lại của nó là các họ mạng do NAS tìm ra (EfficientNet, MobileNetV3) và NAS có ràng buộc phần cứng cho thiết bị di động. Với mô hình lớn, các quyết định kiến trúc chủ yếu dựa vào luật tỉ lệ và thí nghiệm có hệ thống trên mô hình nhỏ.

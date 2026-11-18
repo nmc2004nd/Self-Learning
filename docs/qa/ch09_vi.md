@@ -1137,11 +1137,11 @@ Hạn chế lớn của FCN và DeepLab (9.3, 9.8) là vùng nhìn hữu hạn. 
   SegFormer cho thấy khi bộ mã hóa đủ mạnh và có ngữ cảnh toàn cục, bộ giải mã không cần phức tạp.
 - Cách phổ biến khác là giữ nguyên bộ giải mã quen thuộc (UPerNet) và thay mạng nền bằng Swin, ConvNeXt (4.8.3–4.8.4) hoặc ViT huấn luyện trước bằng DINOv2.
 
-### 9.14.2 "Phân loại mặt nạ" là gì? MaskFormer và Mask2Former thống nhất các bài toán phân vùng thế nào?
+### 9.14.2 Phân loại mặt nạ là gì? MaskFormer và Mask2Former thống nhất các bài toán phân vùng thế nào?
 
 <div class="qa-theory">
 
-**Lý thuyết:** [Ôn tập · 9.13 Phân vùng toàn cảnh](qa/ch09_vi?id=_913-phân-vùng-toàn-cảnh) · [Ôn tập · 9.9 Mask R-CNN](qa/ch09_vi?id=_99-mask-r-cnn) · [DETR (tiếng Anh) · End-to-End Object Detection with Transformers](https://arxiv.org/abs/2005.12872) ↗
+**Lý thuyết:** [Ôn tập · 9.13 Phân vùng toàn cảnh](qa/ch09_vi?id=_913-phân-vùng-toàn-cảnh) · [Ôn tập · 9.9 Mask R-CNN](qa/ch09_vi?id=_99-mask-r-cnn) · [Ôn tập · 8.9.2 DETR là gì? Vì sao nó không cần hộp neo và NMS?](qa/ch08_vi?id=_892-detr-là-gì-vì-sao-nó-không-cần-hộp-neo-và-nms)
 
 </div>
 

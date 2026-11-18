@@ -2,7 +2,7 @@
 
 > Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch08_目标检测), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
 
-> **Biên tập:** chương này tổng hợp các thuật toán phát hiện đối tượng tới khoảng năm 2019 (R-CNN → Mask R-CNN, SSD, YOLO v1–v3, RetinaNet…). Nhiều đoạn chép từ blog và bản dịch các bài viết tiếng Anh, có chỗ còn giữ giọng ghi chép cá nhân ("tôi thử thấy…"); bản dịch giữ ý, đổi sang giọng trung tính. Ảnh của mục CBNet và mmdetection bị thiếu ngay trong repo gốc nên không hiển thị được; các ảnh chỉ chứa công thức được gõ lại thành công thức. Các mục 8.5.2–8.5.8 bản gốc chỉ có tiêu đề, người biên tập viết bổ sung. Từ sau 2019, lĩnh vực có thêm các hướng lớn: bộ phát hiện không dùng anchor (FCOS, CenterNet), bộ phát hiện dựa trên Transformer (DETR và các biến thể), các phiên bản YOLO mới (v5–v11), và phát hiện từ vựng mở dùng mô hình ngôn ngữ–hình ảnh (OWL-ViT, Grounding DINO).
+> **Biên tập:** chương này tổng hợp các thuật toán phát hiện đối tượng tới khoảng năm 2019 (R-CNN → Mask R-CNN, SSD, YOLO v1–v3, RetinaNet…). Nhiều đoạn chép từ blog và bản dịch các bài viết tiếng Anh, có chỗ còn giữ giọng ghi chép cá nhân ("tôi thử thấy…"); bản dịch giữ ý, đổi sang giọng trung tính. Ảnh của mục CBNet và mmdetection bị thiếu ngay trong repo gốc nên không hiển thị được; các ảnh chỉ chứa công thức được gõ lại thành công thức. Các mục 8.5.2–8.5.8 bản gốc chỉ có tiêu đề, người biên tập viết bổ sung. Từ sau 2019, lĩnh vực có thêm các hướng lớn: bộ phát hiện không dùng anchor (FCOS, CenterNet), bộ phát hiện dựa trên Transformer (DETR và các biến thể), các phiên bản YOLO mới (v5–v11), và phát hiện từ vựng mở dùng mô hình ngôn ngữ–hình ảnh (OWL-ViT, Grounding DINO). Các hướng này được trình bày ở mục 8.9 do người biên tập viết thêm, cập nhật tới 2026.
 
 ## 8.1 Khái niệm cơ bản
 
@@ -1699,7 +1699,7 @@ GAN được dùng trong phát hiện theo vài hướng:
 
 - **Chú ý theo kênh và không gian** trong mạng xương sống hay cổ mạng: khối SE (SENet), CBAM, chú ý theo kênh trong SFAM của M2Det, giúp mạng nhấn đặc trưng có ích và nén nhiễu nền.
 - **Chú ý không cục bộ (non-local)** (Wang và cộng sự, 2018): mỗi vị trí tổng hợp đặc trưng từ mọi vị trí khác, nắm quan hệ xa.
-- **Phát hiện dựa trên Transformer:** DETR (Carion và cộng sự, 2020) dùng bộ mã hóa–giải mã Transformer với một tập "truy vấn đối tượng" cố định, mỗi truy vấn cho ra một hộp; huấn luyện bằng ghép cặp một–một nên không cần hộp neo lẫn NMS. Deformable DETR, DINO cải thiện tốc độ hội tụ và phát hiện vật nhỏ; các bộ phát hiện tốt nhất hiện nay trên COCO phần lớn thuộc họ này.
+- **Phát hiện dựa trên Transformer:** DETR (Carion và cộng sự, 2020) dùng bộ mã hóa–giải mã Transformer với một tập "truy vấn đối tượng" cố định, mỗi truy vấn cho ra một hộp; huấn luyện bằng ghép cặp một–một nên không cần hộp neo lẫn NMS. Deformable DETR, DINO cải thiện tốc độ hội tụ và phát hiện vật nhỏ; các bộ phát hiện tốt nhất hiện nay trên COCO phần lớn thuộc họ này (xem 8.9.2).
 
 ### 8.5.9 Các mẹo huấn luyện (Bag of Freebies)
 
@@ -1951,10 +1951,132 @@ Mã mmdetection mô-đun hóa cao, rất dễ dùng và tiện; tài liệu chi 
 
 Bản mã có chú thích của mmdetection (cập nhật tới v1.0.0): https://github.com/ming71/mmdetection-annotated
 
-Hướng dẫn sử dụng:
+Hướng dẫn sử dụng: xem [tài liệu chính thức của MMDetection](https://mmdetection.readthedocs.io/en/latest/).
 
-- Ghi chép cài đặt (có thể đã lỗi thời, theo tài liệu chính thức là chuẩn): https://ming71.github.io/mmdetection-memo.html
-- Cách dùng (tới ngày cập nhật; nếu lỗi thời thì theo tài liệu chính thức): https://ming71.github.io/mmdetection-instruction.html
+> **Biên tập:** bản gốc dẫn hai trang ghi chép cài đặt và cách dùng trên ming71.github.io; hai trang này nay không còn (lỗi 404), nên thay bằng tài liệu chính thức. Bản mã có chú thích ở trên chỉ ứng với mmdetection v1.0, khác nhiều so với bản 3.x hiện nay.
+
+## 8.9 Bổ sung: phát hiện đối tượng từ 2019 tới 2026
+
+> **Biên tập:** mục này do người biên tập viết, không có trong bản gốc. Các con số ví dụ trong mục đã kiểm bằng `torchvision.ops` và `scipy.optimize.linear_sum_assignment`.
+
+### 8.9.1 Bộ phát hiện không dùng hộp neo (anchor-free) là gì? FCOS và CenterNet hoạt động thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 8.3.7 RetinaNet](qa/ch08_vi?id=_837-retinanet) · [Ôn tập · 8.3.4 YOLOv2](qa/ch08_vi?id=_834-yolov2)
+
+</div>
+
+Hộp neo (8.2.3, YOLOv2, SSD, RetinaNet) có nhiều nhược điểm:
+- phải chọn tay số lượng, tỉ lệ, kích thước neo cho từng tập dữ liệu;
+- mỗi vị trí có nhiều neo, phần lớn là mẫu âm, gây mất cân bằng;
+- phải tính IoU giữa neo và hộp thật để gán nhãn.
+
+Từ 2019, các bộ phát hiện **không dùng neo** đạt độ chính xác ngang hoặc hơn, và nay là mặc định.
+
+- **FCOS** (Tian và cộng sự 2019) làm việc theo từng điểm trên bản đồ đặc trưng. Mỗi điểm nằm trong một hộp thật trực tiếp hồi quy 4 khoảng cách $(l, t, r, b)$ tới 4 cạnh hộp, cộng điểm phân loại. Để bỏ các dự đoán kém từ điểm nằm sát mép vật, FCOS học thêm **độ gần tâm** (centerness)
+  $$\text{centerness}=\sqrt{\frac{\min(l,r)}{\max(l,r)}\cdot\frac{\min(t,b)}{\max(t,b)}}\in[0,1],$$
+  bằng 1 ở chính tâm. Ví dụ điểm có $(l,t,r,b)=(10,20,30,20)$ có độ gần tâm $\sqrt{1/3}\approx0{,}577$. Khi suy luận, điểm phân loại được nhân với độ gần tâm trước NMS. Vật lớn nhỏ khác nhau được chia cho các tầng FPN khác nhau theo kích thước.
+- **CenterNet** ("Objects as Points", Zhou và cộng sự 2019) coi mỗi vật là **một điểm tâm**. Mạng dự đoán:
+  - một bản đồ nhiệt (heatmap) cho mỗi lớp, đỉnh nằm ở tâm vật, huấn luyện bằng nhãn Gauss quanh tâm;
+  - kích thước hộp và độ lệch tâm tại mỗi điểm.
+  
+  Khi suy luận chỉ cần lấy các cực đại địa phương của bản đồ nhiệt (một phép max-pool $3\times3$) thay cho NMS. Cùng khung đó mở rộng được sang ước lượng tư thế người và phát hiện 3D.
+
+Cũng trong giai đoạn này, cách **gán nhãn** (vị trí nào là mẫu dương cho vật nào) được nhận ra là yếu tố quan trọng ngang kiến trúc. ATSS (2020) chọn ngưỡng IoU thích nghi theo thống kê; OTA/SimOTA (YOLOX, 2021) và TAL (YOLOv8) gán động theo chính chất lượng dự đoán.
+
+### 8.9.2 DETR là gì? Vì sao nó không cần hộp neo và NMS?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 9.14.2 Phân loại mặt nạ là gì? MaskFormer và Mask2Former thống nhất các bài toán phân vùng thế nào?](qa/ch09_vi?id=_9142-phân-loại-mặt-nạ-là-gì-maskformer-và-mask2former-thống-nhất-các-bài-toán-phân-vùng-thế-nào) · [Ôn tập · 4.8.2 Vision Transformer (ViT) xử lý ảnh thế nào?](qa/ch04_vi?id=_482-vision-transformer-vit-xử-lý-ảnh-thế-nào) · [DETR (tiếng Anh) · End-to-End Object Detection with Transformers](https://arxiv.org/abs/2005.12872) ↗
+
+</div>
+
+**DETR** (Carion và cộng sự, Facebook AI 2020) coi phát hiện là bài toán **dự đoán tập hợp**:
+
+1. CNN trích đặc trưng, bộ mã hóa Transformer cho mọi vị trí trao đổi thông tin toàn ảnh.
+2. Bộ giải mã nhận $N$ **truy vấn đối tượng** học được ($N=100$, lớn hơn số vật trong một ảnh). Mỗi truy vấn cho ra một hộp và một lớp, hoặc lớp "không có vật" $\varnothing$.
+3. Khi huấn luyện, **ghép một–một** $N$ dự đoán với $M$ hộp thật bằng **thuật toán Hungary**, cực tiểu tổng chi phí. Chi phí ghép dự đoán $i$ với hộp thật $j$ là
+   $$C_{ij}=-\hat p_i(c_j)+\lambda_{L1}\lVert b_j-\hat b_i\rVert_1+\lambda_{\text{giou}}\big(1-\mathrm{GIoU}(b_j,\hat b_i)\big).$$
+   Dự đoán được ghép học khớp hộp thật; các dự đoán còn lại học nhãn $\varnothing$.
+
+Vì mỗi vật thật chỉ được ghép với **một** dự đoán, mô hình tự học không sinh hộp trùng (các truy vấn "nhìn nhau" qua self-attention). Do đó không cần NMS, cũng không cần hộp neo.
+
+Ví dụ ghép: ma trận chi phí $4\times3$ (4 dự đoán, 3 vật) với các hàng $(0{,}9;\ 0{,}1;\ 0{,}8)$, $(0{,}2;\ 0{,}7;\ 0{,}6)$, $(0{,}5;\ 0{,}4;\ 0{,}3)$, $(0{,}95;\ 0{,}9;\ 0{,}85)$. Thuật toán Hungary ghép dự đoán 0→vật 1, 1→vật 0, 2→vật 2 với tổng chi phí $0{,}6$. Dự đoán 3 thành "không có vật".
+
+**GIoU** (Rezatofighi và cộng sự 2019) mở rộng IoU (mục bổ sung IoU và mAP ở 8.1) để vẫn có gradient khi hai hộp không chồng nhau. Gọi $C$ là hộp nhỏ nhất bao cả hai hộp:
+$$\mathrm{GIoU}=\mathrm{IoU}-\frac{|C|-|A\cup B|}{|C|}\in(-1,1].$$
+Ví dụ: hộp $[0,0,2,2]$ và $[1,1,3,3]$ có IoU $=1/7\approx0{,}143$, GIoU $\approx-0{,}079$. Hộp $[0,0,2,2]$ và $[3,3,4,4]$ có IoU $=0$ nhưng GIoU $=-0{,}6875$, nên vẫn có tín hiệu kéo hai hộp lại gần nhau. Các biến thể DIoU, CIoU (YOLOv4) thêm khoảng cách tâm và tỉ lệ cạnh.
+
+Nhược điểm của DETR gốc:
+- hội tụ rất chậm (500 epoch trên COCO, so với 36 epoch của Faster R-CNN theo lịch 3x);
+- kém với vật nhỏ.
+
+Các cải tiến:
+- **Deformable DETR** (2021): attention chỉ lấy mẫu vài điểm quanh điểm tham chiếu, dùng nhiều tỉ lệ. Hội tụ trong khoảng 50 epoch.
+- **DN-DETR, DINO** (2022): thêm truy vấn "khử nhiễu" (hộp thật bị làm nhiễu, mạng học sửa lại) để ổn định việc ghép. DINO là một trong các bộ phát hiện chính xác nhất trên COCO.
+- **RT-DETR** (2023): phiên bản thời gian thực, cạnh tranh trực tiếp với YOLO.
+
+### 8.9.3 Sau YOLOv3 các phiên bản YOLO thay đổi những gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 8.3.6 YOLOv3](qa/ch08_vi?id=_836-yolov3) · [Ôn tập · 8.5.9 Các mẹo huấn luyện (Bag of Freebies)](qa/ch08_vi?id=_859-các-mẹo-huấn-luyện-bag-of-freebies)
+
+</div>
+
+Tên "YOLO" sau v3 không còn là một dòng duy nhất của tác giả gốc (Joseph Redmon dừng nghiên cứu thị giác năm 2020). Mỗi bản do một nhóm khác nhau phát triển, nên số phiên bản không phản ánh thứ tự chất lượng. Những thay đổi chính:
+
+| Phiên bản | Năm, nhóm | Điểm mới chính |
+| --- | --- | --- |
+| YOLOv4 | 2020, Bochkovskiy và cộng sự | tổng hợp "bag of freebies/specials" (8.5.9): mạng nền CSPDarknet, tăng cường Mosaic, mất mát CIoU, kích hoạt Mish |
+| YOLOv5 | 2020, Ultralytics | cài đặt PyTorch dễ dùng, xuất ONNX/TensorRT/di động; không có bài báo |
+| YOLOX | 2021, Megvii | **không dùng neo**, đầu tách rời (phân loại và hồi quy riêng), gán nhãn SimOTA |
+| YOLOv6, YOLOv7 | 2022, Meituan; nhóm tác giả YOLOv4 | tái tham số hóa (nhiều nhánh khi huấn luyện, gộp thành một nhánh khi suy luận), tối ưu cho phần cứng công nghiệp |
+| YOLOv8 | 2023, Ultralytics | không dùng neo, đầu tách rời, gán nhãn TAL, mất mát DFL; một thư viện cho phát hiện, phân vùng, tư thế, hộp xoay |
+| YOLOv9 | 2024, nhóm YOLOv7 | thông tin gradient lập trình được (PGI), mạng nền GELAN |
+| YOLOv10 | 2024, Đại học Thanh Hoa | **bỏ NMS**: huấn luyện song song nhánh ghép một–nhiều và nhánh ghép một–một (ý của DETR), suy luận chỉ dùng nhánh một–một |
+| YOLO11, YOLOv12 | 2024–2025, Ultralytics; nhóm học thuật | khối attention hiệu quả hơn, xu hướng đưa attention vào YOLO |
+
+Ba xu hướng chung: bỏ neo, gán nhãn động, và gần đây bỏ NMS để thời gian suy luận ổn định hơn.
+
+**Khi so sánh các bản YOLO** cần xét đồng thời AP trên COCO, độ trễ trên đúng phần cứng đích (GPU với TensorRT, CPU, NPU di động) và giấy phép. Các bản của Ultralytics dùng giấy phép AGPL-3.0, sản phẩm đóng mã cần mua giấy phép thương mại.
+
+### 8.9.4 Phát hiện từ vựng mở (open-vocabulary detection) là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 11.4.3 CLIP học thế nào và vì sao phân loại được lớp chưa từng thấy (zero-shot)?](qa/ch11_vi?id=_1143-clip-học-thế-nào-và-vì-sao-phân-loại-được-lớp-chưa-từng-thấy-zero-shot) · [Ôn tập · 9.14.4 Phân vùng từ vựng mở (open-vocabulary) là gì?](qa/ch09_vi?id=_9144-phân-vùng-từ-vựng-mở-open-vocabulary-là-gì)
+
+</div>
+
+Bộ phát hiện truyền thống chỉ nhận ra các lớp cố định của tập huấn luyện (80 lớp COCO). **Phát hiện từ vựng mở** nhận danh sách lớp, hoặc cả một câu mô tả, bằng văn bản lúc suy luận. Ý tưởng chung giống CLIP (11.4.3): đưa đặc trưng của mỗi vùng/truy vấn và embedding của văn bản về cùng không gian. Điểm phân loại khi đó là độ tương đồng giữa vùng và tên lớp, thay cho một tầng phân loại cố định.
+
+- **OWL-ViT** (Google 2022): ViT kiểu CLIP, mỗi token đầu ra cho một hộp và một embedding so với embedding văn bản. Truy vấn được cả bằng ảnh mẫu.
+- **GLIP** (Microsoft 2022): coi phát hiện là **định vị cụm từ** (phrase grounding), huấn luyện trên cả dữ liệu phát hiện lẫn cặp ảnh–chú thích.
+- **Grounding DINO** (2023): ghép DINO (8.9.2) với bộ mã hóa văn bản, trộn hai luồng ở nhiều tầng. Đây là mô hình phổ biến để "tìm vật theo câu mô tả", hay ghép với SAM thành Grounded-SAM (9.14.4).
+- **YOLO-World** (2024): đưa ý tưởng này vào khung YOLO để chạy thời gian thực. Có thể "nướng" sẵn embedding của danh sách lớp vào mô hình khi triển khai.
+
+Các mô hình thị giác–ngôn ngữ lớn (Florence-2, Qwen-VL, Gemini…) cũng trả lời được hộp bao theo yêu cầu bằng lời, nhưng chậm hơn bộ phát hiện chuyên dụng nhiều.
+
+### 8.9.5 Năm 2026 nên chọn bộ phát hiện nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · Bổ sung: IoU và mAP là gì?](qa/ch08_vi?id=bổ-sung-iou-và-map-là-gì) · [Ôn tập · Chương 17 Nén, tăng tốc mô hình và triển khai trên thiết bị di động](qa/ch17_vi)
+
+</div>
+
+| Tình huống | Gợi ý |
+| --- | --- |
+| Thời gian thực trên GPU/thiết bị biên, lớp cố định | một bản YOLO gần đây hoặc RT-DETR; xuất ONNX/TensorRT, lượng tử hóa INT8 (chương 17) |
+| Độ chính xác cao nhất, không gấp thời gian | họ DETR (DINO, Co-DETR) với mạng nền lớn (Swin, ViT huấn luyện trước) |
+| Cần mặt nạ hoặc tư thế cùng lúc | Mask R-CNN vẫn là đường cơ sở tốt; YOLO có đầu phân vùng/tư thế; Mask2Former (9.14.2) |
+| Lớp mới, ít hoặc không có dữ liệu gán nhãn | Grounding DINO, OWL-ViT, YOLO-World để phát hiện theo chữ; dùng kết quả gán nhãn sơ bộ rồi huấn luyện mô hình nhỏ |
+| Vật nhỏ, ảnh rất lớn (viễn thám, kiểm tra lỗi) | chia ảnh thành ô chồng nhau khi suy luận (SAHI), tăng độ phân giải đầu vào, hộp xoay cho DOTA (8.6.5) |
+
+Thư viện hiện nay: Ultralytics (YOLO, RT-DETR), MMDetection 3.x, Detectron2, và mô hình phát hiện trong Hugging Face Transformers (8.8). Chỉ số chuẩn vẫn là COCO AP (trung bình trên ngưỡng IoU 0,50–0,95), báo kèm độ trễ và số FLOPs.
 
 ## Tài liệu tham khảo
 

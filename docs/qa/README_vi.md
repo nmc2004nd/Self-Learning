@@ -40,6 +40,23 @@ Nội dung dịch từ *Deep Learning 500 câu hỏi* (深度学习500问, [scut
 | 16 | [Xử lý ngôn ngữ tự nhiên (NLP)](qa/ch16_vi) | [Ôn tập](qa/ch06_vi) chương 6 (RNN); [d2l](https://d2l.ai/chapter_natural-language-processing-pretraining/index.html) chương 15–16 (tiếng Anh) |
 | 17 | [Nén, tăng tốc mô hình và triển khai trên thiết bị di động](qa/ch17_vi) | [Ôn tập](qa/ch05_vi) chương 5 (CNN), [chương 15](qa/ch15_vi) |
 | 18 | [Chọn kiến trúc backend và kịch bản ứng dụng](qa/ch18_vi) | [Ôn tập](qa/ch15_vi) chương 15 (phân tán), [chương 16](qa/ch16_vi) (NLP); [Học máy](ml/eval_vi) đánh giá mô hình |
-| 19 | Đăng ký bằng sáng chế phần mềm và bảo hộ quyền *(đang dịch)* | |
+| 19 | Đăng ký bằng sáng chế phần mềm và bảo hộ quyền *(không dịch: chương nói về thủ tục pháp lý ở Trung Quốc, ít liên quan tới ôn tập kỹ thuật)* | |
 
 Một số chủ đề (GAN, phát hiện đối tượng, phân vùng ảnh, học chuyển giao, NLP, nén mô hình) chưa có bài lý thuyết riêng trên site; ô **Lý thuyết** của các chương này sẽ dẫn sang mục d2l tương ứng khi khoá Học sâu dịch tới.
+
+**Cập nhật kiến thức (2026).** Bản gốc viết khoảng 2018–2020, nên một số chương thiếu các hướng quan trọng xuất hiện về sau. Phần thiếu được bổ sung thành một mục "Bổ sung" ở cuối chương, do người biên tập viết và ghi rõ như vậy; phần dịch giữ nguyên, chỗ lỗi thời có thêm ô **Biên tập**:
+
+| Chương | Mục bổ sung |
+| --- | --- |
+| 2 | [2.22](qa/ch02_vi) bagging/boosting, tăng cường gradient, XGBoost/LightGBM/CatBoost |
+| 3 | [3.15](qa/ch03_vi) GELU/SwiGLU, LayerNorm/RMSNorm, pre-norm, AdamW, khởi động và lịch cosin |
+| 4 | [4.8](qa/ch04_vi) EfficientNet, ViT, Swin, ConvNeXt, chọn mạng nền |
+| 6 | [6.15](qa/ch06_vi) Transformer thay RNN, mô hình không gian trạng thái (Mamba) |
+| 7 | [7.6](qa/ch07_vi) mô hình khuếch tán, sinh ảnh từ văn bản |
+| 8 | [8.9](qa/ch08_vi) FCOS/CenterNet, DETR, YOLOv4–v12, phát hiện từ vựng mở |
+| 9 | [9.14](qa/ch09_vi) SegFormer, Mask2Former, SAM, phân vùng từ vựng mở |
+| 10 | [10.11](qa/ch10_vi) PPO/SAC, MuZero/Dreamer, học tăng cường ngoại tuyến, RLHF/DPO/GRPO |
+| 11 | [11.4](qa/ch11_vi) mô hình nền tảng, LoRA, CLIP, học trong ngữ cảnh |
+| 12 | [12.7](qa/ch12_vi) TensorFlow 2/Keras 3, PyTorch 2, JAX |
+| 13 | [13.19](qa/ch13_vi) bộ tối ưu sau Adam, cắt gradient, độ chính xác hỗn hợp, tiết kiệm bộ nhớ |
+| 14 | [14.7](qa/ch14_vi) Hyperband, Optuna, luật tỉ lệ và µP |
