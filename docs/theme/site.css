@@ -174,7 +174,8 @@ body:not(.is-home) .bar-cta { display: none; }
 .bar-brand { align-items: center; gap: 12px; padding-right: 18px; margin-right: 10px; border-right: 1px solid var(--border); color: var(--text); text-decoration: none; flex: none; }
 .bar-brand .logo-cycle { width: 50px; height: 50px; }
 .bar-brand b { font-size: 21px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
-.bar-nav { align-items: center; gap: 4px; min-width: 0; }
+/* Menu không bao giờ co: phần thiếu chỗ do ô tìm kiếm nhường (tránh menu chui xuống dưới ô tìm kiếm khi phóng to) */
+.bar-nav { align-items: center; gap: 4px; flex: none; }
 .bar-nav > a, .bar-menu > button {
   display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 14px; border: 0; border-radius: 12px;
   font: 600 14.5px var(--sans); color: var(--text); text-decoration: none; background: none; cursor: pointer; white-space: nowrap;
@@ -197,7 +198,7 @@ body:not(.is-home) .bar-cta { display: none; }
 .bar-pop i svg { width: 19px; height: 19px; }
 
 /* Ô tìm kiếm (plugin search của docsify): trên thanh trên, hoặc giữa phần đầu trang chủ */
-.bar-search { position: relative; flex: 0 1 500px; min-width: 0; }
+.bar-search { position: relative; flex: 1 1 500px; max-width: 500px; min-width: 0; }
 .search-host .search { margin: 0; padding: 0; border: 0; background: none; }
 .bar-search .search .input-wrap {
   display: flex; align-items: center; height: 48px; padding: 0 6px 0 46px;
@@ -920,14 +921,16 @@ body.is-hub #bar-find { display: inline-flex; }
   .bar-brand, .bar-nav { display: flex; }
 }
 /* Trang bài học/tài liệu: thanh có thêm ô tìm kiếm, nên rút gọn thương hiệu và menu */
-@media (min-width: 901px) and (max-width: 1439px) {
+@media (min-width: 901px) and (max-width: 1679px) {
   body:not(.is-hub) .bar-brand b, body:not(.is-hub) .bar-nav .opt { display: none; }
   body:not(.is-hub) .bar-brand { padding-right: 10px; margin-right: 4px; }
-  body:not(.is-hub) .bar-nav { flex: none; }
 }
-@media (min-width: 901px) and (max-width: 1100px) {
+@media (min-width: 901px) and (max-width: 1279px) {
   body:not(.is-hub) .bar-nav > a, body:not(.is-hub) .bar-menu > button { padding: 0 10px; }
   body:not(.is-hub) .bar-nav > a .lbl-long, body:not(.is-hub) .bar-kbd { display: none; }
+}
+@media (min-width: 901px) and (max-width: 1100px) {
+  body:not(.is-hub) .bar-nav > a > svg:first-child, body:not(.is-hub) .bar-menu > button > svg:first-child { display: none; }
 }
 
 /* ===== Thông báo nhỏ (toast) và pháo giấy ===== */
