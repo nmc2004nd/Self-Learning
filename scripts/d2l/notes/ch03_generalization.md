@@ -1,0 +1,2 @@
+- Mục 3.6.2: khoảng cách tổng quát hóa được viết là $R_\textrm{emp} - R$. Vì lỗi tổng quát hóa $R$ thường lớn hơn lỗi huấn luyện $R_\textrm{emp}$, viết $R - R_\textrm{emp}$ thì khoảng cách mới là số dương; ý của đoạn văn không đổi.
+- Mục 3.6.2.2 mở đầu bằng "như cận ở trên đã cho thấy", nhưng mục này không đưa ra cận nào. Câu đó còn sót lại từ một phiên bản cũ của sách.

@@ -1,0 +1,2 @@
+- Bản gốc viết chung cho nhiều framework nên vài câu còn nhắc MXNet và Gluon dù code bên dưới là PyTorch: "bộ máy MXNet" (mục 12.5.1) nên hiểu là bộ máy của framework đang dùng; "lớp `Trainer` của Gluon" (mục 12.5.5) tương ứng với `torch.optim` trong PyTorch; bài tập 2 tương ứng với việc chỉnh `param_groups[...]['lr']` của bộ tối ưu PyTorch hoặc dùng `torch.optim.lr_scheduler`.
+- Mục 12.5.2 nhắc đến chuẩn hóa theo batch ở :numref:`sec_batch_norm` như đã học; trong khoá này, chương 8 (chứa mục đó) được soạn sau chương 12.

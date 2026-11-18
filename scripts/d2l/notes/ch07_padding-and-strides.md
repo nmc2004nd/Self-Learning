@@ -1,0 +1,1 @@
+- Mục 7.3.3, đoạn thứ hai: bản gốc viết "sải bước ngang $s_\textrm{h}$ và sải bước dọc $s_\textrm{w}$". Theo ký hiệu của chính mục này, $s_\textrm{h}$ là sải bước theo chiều cao (chiều **dọc**) và $s_\textrm{w}$ là sải bước theo chiều rộng (chiều **ngang**). Bản dịch giữ nguyên văn; ý của câu không đổi vì chỉ xét trường hợp hai sải bước bằng nhau.

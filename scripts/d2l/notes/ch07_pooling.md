@@ -1,0 +1,1 @@
+- Mục 7.5.1, đoạn về phát hiện cạnh: bản gốc gọi `X` là "đầu vào của tầng tích chập" nhưng câu sau lại xét `X[i, j]`... như các giá trị đi vào tầng gộp. Đọc đúng ý là: `X` là **đầu ra của tầng tích chập** (cũng là đầu vào của tầng gộp), và `Y[i, j] = 1` chỉ đúng khi trong cửa sổ $2\times 2$ có ít nhất một phần tử bằng 1 (tức là cạnh nằm trong cửa sổ).

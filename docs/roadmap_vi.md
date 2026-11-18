@@ -25,12 +25,13 @@
 <div class="rm-foot"><div class="pbar"><i></i></div><span class="ptext"></span><a class="btn btn-primary btn-sm rm-go" href="#/ml/README_vi">Vào khoá</a></div>
 </div>
 </li>
-<li class="rm-stage is-soon">
+<li class="rm-stage" data-course="dl">
 <div class="rm-num">3</div>
 <div class="rm-card">
-<div class="rm-card-head"><img class="brand-img" src="img/brand/whale-sleep.png" alt="" data-no-zoom><div><h2>Học sâu</h2><p>Mạng tích chập, mạng hồi quy, cơ chế chú ý và Transformer, kỹ thuật huấn luyện với PyTorch.</p></div><span class="rm-status is-soon">Sắp có</span></div>
-<div class="rm-meta"><span>Cần: chặng 2 (chương 12–16)</span></div>
-<div class="rm-note">Trong lúc chờ, chương 12–16 của khoá Học máy đã đủ nền mạng neuron để đọc tiếp chặng 4.</div>
+<div class="rm-card-head"><img class="brand-img" src="img/brand/illu-practice.png" alt="" data-no-zoom><div><h2>Học sâu</h2><p>Bản dịch nguyên văn sách Dive into Deep Learning (d2l.ai): mạng tích chập, mạng hồi tiếp, cơ chế tập trung và Transformer, kỹ thuật huấn luyện với PyTorch. Mỗi chương có thêm code từ đầu, dùng thư viện, ví dụ áp dụng và mô phỏng.</p></div><span class="rm-status"></span></div>
+<div class="rm-meta"><span>Đang soạn: chương 1–7, 12</span><span>3 mô phỏng</span><span>Cần: chặng 2 (chương 12–16)</span></div>
+<div class="rm-topics"><a href="#/dl/ch01_vi">Giới thiệu</a><a href="#/dl/ch02_s5_vi">Tính vi phân tự động</a><a href="#/dl/ch06_vi">Xây dựng mô hình</a><a href="#/dl/ch05_s6_vi">Dropout</a><a href="#/dl/ch07_vi">Mạng neuron tích chập</a><a href="#/dl/ch12_vi">SGD, Adam, lịch tốc độ học</a><a href="#/dl/ch07_s5_vi">Gộp</a><a href="#/dl/ch07_s6_vi">LeNet</a><a href="#/dl/ch07_bwd_vi">Lan truyền ngược qua tích chập</a></div>
+<div class="rm-foot"><div class="pbar"><i></i></div><span class="ptext"></span><a class="btn btn-primary btn-sm rm-go" href="#/dl/README_vi">Vào khoá</a></div>
 </div>
 </li>
 <li class="rm-stage" data-course="rl">

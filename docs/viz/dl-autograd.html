@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đồ thị tính toán · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .graph { width: 100%; max-width: 760px; margin: 8px auto 0; display: block; }
+  .g-edge { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+  .g-edge.back { stroke: var(--s2); stroke-width: 2.4; }
+  .g-node rect { fill: var(--surface-2); stroke: var(--border); stroke-width: 1.5; }
+  .g-node.done rect { fill: var(--accent-soft); stroke: var(--s1); }
+  .g-node.cur rect { stroke: var(--hl); stroke-width: 3; }
+  .g-node .op { font: 700 13px 'Plus Jakarta Sans', system-ui, sans-serif; fill: var(--text); text-anchor: middle; }
+  .g-node .val { font: 600 11.5px 'Plus Jakarta Sans', system-ui, sans-serif; fill: var(--s1); text-anchor: middle; }
+  .g-node .adj { font: 700 11.5px 'Plus Jakarta Sans', system-ui, sans-serif; fill: var(--s2); text-anchor: middle; }
+  .g-lbl { font: 600 11px 'Plus Jakarta Sans', system-ui, sans-serif; fill: var(--muted); text-anchor: middle; }
+  .step-txt { min-height: 3.2em; text-align: center; font-size: .95rem; padding: 6px 0; }
+  .legend-row { display: flex; gap: 16px; justify-content: center; font-size: .82rem; color: var(--muted); flex-wrap: wrap; }
+  .legend-row b.v { color: var(--s1); } .legend-row b.a { color: var(--s2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Đồ thị tính toán và lan truyền ngược</h1>
+      <div class="crumbs"><a href="../#/dl/ch02_vi">← Chương 2 Kiến thức chuẩn bị</a></div>
+    </div>
+    <p class="lead">Hàm $f(x) = (\log x^2)\cdot \sin x + x^{-1}$ của bài tập 5–7 mục 2.5. Bấm từng bước để thấy lần tính xuôi ghi giá trị vào mỗi nút, rồi lần đi ngược nhân dồn đạo hàm cục bộ theo quy tắc dây chuyền.</p>
+  </div>
+  <div class="only-embed open-full"><a href="dl-autograd.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <label for="x">$x$</label><input id="x" type="range" min="0.2" max="6" step="0.05" value="1.7"><span class="val" id="x-v"></span>
+    </div>
+    <div class="ctrl">
+      <button type="button" class="btn" id="reset">Làm lại</button>
+      <button type="button" class="btn pri" id="next">Bước tiếp ▸</button>
+      <button type="button" class="btn" id="all">Chạy hết</button>
+      <span class="note" id="phase"></span>
+    </div>
+    <svg class="graph" id="g" viewBox="0 0 760 300" role="img" aria-label="Đồ thị tính toán của f(x)"></svg>
+    <div class="legend-row"><span><b class="v">xanh</b>: giá trị khi tính xuôi</span><span><b class="a">cam</b>: gradient $\bar v = \partial f/\partial v$ khi đi ngược</span></div>
+    <div class="step-txt" id="step"></div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, NS = 'http://www.w3.org/2000/svg';
+  // Nút: tên, nhãn phép toán (TeX), vị trí, đầu vào, hàm tính xuôi, đạo hàm cục bộ theo từng đầu vào (TeX + giá trị)
+  var N = [
+    { id: 'x', op: 'x', x: 70, y: 150, ins: [] },
+    { id: 'a', op: 'a = x^2', x: 230, y: 70, ins: ['x'], f: function (v) { return v.x * v.x; },
+      d: [function (v) { return { tex: '\\partial a/\\partial x = 2x', val: 2 * v.x }; }] },
+    { id: 'b', op: 'b = \\log a', x: 390, y: 70, ins: ['a'], f: function (v) { return Math.log(v.a); },
+      d: [function (v) { return { tex: '\\partial b/\\partial a = 1/a', val: 1 / v.a }; }] },
+    { id: 'c', op: 'c = \\sin x', x: 390, y: 150, ins: ['x'], f: function (v) { return Math.sin(v.x); },
+      d: [function (v) { return { tex: '\\partial c/\\partial x = \\cos x', val: Math.cos(v.x) }; }] },
+    { id: 'e', op: 'e = 1/x', x: 390, y: 235, ins: ['x'], f: function (v) { return 1 / v.x; },
+      d: [function (v) { return { tex: '\\partial e/\\partial x = -1/x^2', val: -1 / (v.x * v.x) }; }] },
+    { id: 'm', op: 'm = b\\cdot c', x: 545, y: 110, ins: ['b', 'c'], f: function (v) { return v.b * v.c; },
+      d: [function (v) { return { tex: '\\partial m/\\partial b = c', val: v.c }; },
+          function (v) { return { tex: '\\partial m/\\partial c = b', val: v.b }; }] },
+    { id: 'f', op: 'f = m + e', x: 690, y: 170, ins: ['m', 'e'], f: function (v) { return v.m + v.e; },
+      d: [function () { return { tex: '\\partial f/\\partial m = 1', val: 1 }; },
+          function () { return { tex: '\\partial f/\\partial e = 1', val: 1 }; }] }
+  ];
+  var byId = {}; N.forEach(function (n) { byId[n.id] = n; });
+  // Kịch bản: tính xuôi theo thứ tự topo, rồi đi ngược theo thứ tự ngược lại (mỗi cạnh một bước)
+  var FWD = N.map(function (n) { return n.id; });
+  var BWD = [];
+  N.slice().reverse().forEach(function (n) { n.ins.forEach(function (p, k) { BWD.push([n.id, p, k]); }); });
+  var step = 0;
+
+  function fmt(v) { return V_.fmt(v, 4); }
+  function compute(xv) {
+    var v = { x: xv };
+    N.forEach(function (n) { if (n.f) v[n.id] = n.f(v); });
+    return v;
+  }
+  function el(name, attrs, parent) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    parent.appendChild(e); return e;
+  }
+  function texSvg(parent, x, y, tex) {
+    var fo = el('foreignObject', { x: x - 70, y: y - 30, width: 140, height: 24 }, parent);
+    var d = document.createElement('div');
+    d.style.cssText = 'text-align:center;font-size:13px;color:var(--text)';
+    fo.appendChild(d); V_.tex(d, tex);
+  }
+
+  function render() {
+    var xv = +V_.$('#x').value; V_.$('#x-v').textContent = V_.fmt(xv, 2);
+    var v = compute(xv);
+    var nf = Math.min(step, FWD.length), nb = Math.max(0, step - FWD.length);
+    var known = {}; FWD.slice(0, nf).forEach(function (id) { known[id] = true; });
+    var adj = {}, curEdge = null;
+    if (nf === FWD.length) adj.f = 1;
+    for (var i = 0; i < nb; i++) {
+      var e = BWD[i], n = byId[e[0]], loc = n.d[e[2]](v);
+      adj[e[1]] = (adj[e[1]] || 0) + adj[e[0]] * loc.val;
+      curEdge = e;
+    }
+    var svg = V_.$('#g'); svg.innerHTML = '';
+    var defs = el('defs', {}, svg), mk = el('marker', { id: 'ar', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, defs);
+    el('path', { d: 'M0,0 L10,5 L0,10 z', fill: 'var(--muted)' }, mk);
+    var done = {}; BWD.slice(0, nb).forEach(function (e) { done[e[1] + '>' + e[0]] = true; });
+    N.forEach(function (n) {
+      n.ins.forEach(function (p) {
+        var a = byId[p];
+        var cls = 'g-edge' + (done[p + '>' + n.id] ? ' back' : '');
+        el('line', { x1: a.x + 52, y1: a.y, x2: n.x - 54, y2: n.y, class: cls, 'marker-end': 'url(#ar)' }, svg);
+      });
+    });
+    var curNode = nb > 0 ? curEdge[1] : (nf > 0 ? FWD[nf - 1] : null);
+    N.forEach(function (n) {
+      var g = el('g', { class: 'g-node' + (known[n.id] ? ' done' : '') + (curNode === n.id ? ' cur' : '') }, svg);
+      el('rect', { x: n.x - 52, y: n.y - 34, width: 104, height: 68, rx: 12 }, g);
+      texSvg(g, n.x, n.y + 2, n.op);
+      if (known[n.id]) el('text', { x: n.x, y: n.y + 12, class: 'val' }, g).textContent = '= ' + fmt(v[n.id]);
+      if (adj[n.id] !== undefined) el('text', { x: n.x, y: n.y + 28, class: 'adj' }, g).textContent = 'v̄ = ' + fmt(adj[n.id]);
+    });
+
+    var txt = V_.$('#step'), phase = V_.$('#phase'), ins = V_.$('#insight');
+    var exact = 2 / xv * Math.sin(xv) + Math.log(xv * xv) * Math.cos(xv) - 1 / (xv * xv);
+    if (step === 0) {
+      phase.textContent = 'Chưa chạy';
+      V_.tex(txt, '\\text{Bấm “Bước tiếp” để bắt đầu tính xuôi từ } x = ' + V_.fmt(xv, 2));
+    } else if (nb === 0) {
+      phase.textContent = 'Tính xuôi: bước ' + nf + '/' + FWD.length;
+      var n = byId[FWD[nf - 1]];
+      V_.tex(txt, n.op + (n.id === 'x' ? '' : '') + ' = ' + fmt(v[n.id]).replace('−', '-'));
+    } else {
+      phase.textContent = 'Đi ngược: bước ' + nb + '/' + BWD.length;
+      var e = curEdge, loc = byId[e[0]].d[e[2]](v);
+      V_.tex(txt, '\\bar{' + e[1] + '} \\mathrel{+}= \\bar{' + e[0] + '}\\cdot\\big(' + loc.tex + '\\big) = ' +
+        fmt(adj[e[0]]).replace('−', '-') + ' \\times ' + fmt(loc.val).replace('−', '-') + '\\;\\Rightarrow\\; \\bar{' + e[1] + '} = ' + fmt(adj[e[1]]).replace('−', '-'));
+    }
+    var msg;
+    if (nb === BWD.length) msg = 'Xong: $\\bar x = ' + fmt(adj.x).replace('−', '-') + '$, đúng bằng đạo hàm tính tay $\\frac{2}{x}\\sin x + \\log(x^2)\\cos x - \\frac{1}{x^2} = ' + fmt(exact).replace('−', '-') + '$. Nút $x$ nhận gradient từ <b>ba</b> nhánh ($a$, $c$, $e$) và cộng dồn chúng: đây là lý do PyTorch cộng dồn vào <code>x.grad</code>.';
+    else if (nb > 0) msg = 'Đi ngược theo thứ tự ngược với lúc tính xuôi. Mỗi bước chỉ cần đạo hàm <b>cục bộ</b> của một phép toán và giá trị đã lưu khi tính xuôi (vì vậy lan truyền ngược phải giữ lại các giá trị trung gian).';
+    else if (nf === FWD.length) msg = 'Tính xuôi xong, mỗi nút đã lưu giá trị của mình. Lan truyền ngược bắt đầu từ $\\bar f = \\partial f/\\partial f = 1$.';
+    else msg = 'Tính xuôi lần lượt từng nút theo thứ tự topo: một nút chỉ được tính khi mọi đầu vào của nó đã có giá trị.';
+    ins.innerHTML = msg; V_.texAll(ins);
+    V_.$('#next').disabled = nb === BWD.length;
+  }
+  V_.$('#next').addEventListener('click', function () { step++; render(); });
+  V_.$('#all').addEventListener('click', function () { step = FWD.length + BWD.length; render(); });
+  V_.$('#reset').addEventListener('click', function () { step = 0; render(); });
+  V_.$('#x').addEventListener('input', render);
+  V_.texAll(document.body);
+  render();
+  V_.onTheme(render);
+})();
+</script>
+</body>
+</html>

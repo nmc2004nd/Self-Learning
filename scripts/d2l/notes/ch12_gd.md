@@ -1,0 +1,1 @@
+- Mục 12.3.3.2: bản gốc gọi $\left|e^{(k+1)}\right| \leq c (e^{(k)})^2$ là hội tụ "tuyến tính" và $\left|e^{(k+1)}\right| \leq \alpha \left|e^{(k)}\right|$ là tốc độ "hằng số". Theo thuật ngữ thông dụng trong tối ưu, cái thứ nhất là hội tụ **bậc hai** (quadratic), cái thứ hai là hội tụ **tuyến tính** (linear). Bản dịch giữ nguyên văn.

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đua các bộ tối ưu · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .stage { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; align-items: start; margin-top: 8px; }
+  @media (max-width: 720px) { .stage { grid-template-columns: 1fr; } }
+  .surf { position: relative; width: 100%; aspect-ratio: 1 / 0.8; border-radius: 10px; overflow: hidden; cursor: crosshair; border: 1px solid var(--border); }
+  .surf canvas, .surf svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .loss svg { width: 100%; height: auto; display: block; }
+  .opts { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .opts label { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; font-size: .88rem; cursor: pointer; }
+  .opts i { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
+  .ax { stroke: var(--muted); stroke-width: 1; }
+  .axt { font: 500 10.5px 'Plus Jakarta Sans', system-ui, sans-serif; fill: var(--muted); }
+  .res { font-size: .85rem; font-variant-numeric: tabular-nums; }
+  .res td, .res th { padding: 3px 8px; text-align: right; border-bottom: 1px solid var(--border); }
+  .res td:first-child, .res th:first-child { text-align: left; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Đua các bộ tối ưu</h1>
+      <div class="crumbs"><a href="../#/dl/ch12_vi">← Chương 12 Thuật toán tối ưu</a></div>
+    </div>
+    <p class="lead">SGD, động lượng, Adagrad, RMSProp và Adam chạy cùng lúc trên một mặt hàm hai chiều, cùng điểm xuất phát và cùng tốc độ học. Bấm lên bản đồ để đổi điểm xuất phát.</p>
+  </div>
+  <div class="only-embed open-full"><a href="dl-optim.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <div class="ctrl">
+      <span class="lb">Mặt hàm</span>
+      <div class="seg" id="fn">
+        <button type="button" data-v="ellipse" aria-pressed="true">Elip kém điều kiện</button>
+        <button type="button" data-v="rosen" aria-pressed="false">Rosenbrock</button>
+        <button type="button" data-v="saddle" aria-pressed="false">Yên ngựa</button>
+        <button type="button" data-v="bumpy" aria-pressed="false">Nhiều cực tiểu</button>
+      </div>
+    </div>
+    <div class="ctrl opts" id="opts"></div>
+    <div class="ctrl">
+      <label for="lr">Tốc độ học $\eta$</label><input id="lr" type="range" min="-3" max="0" step="0.05" value="-1"><span class="val" id="lr-v"></span>
+      <label for="beta">$\beta$ (động lượng)</label><input id="beta" type="range" min="0" max="0.99" step="0.01" value="0.9"><span class="val" id="beta-v"></span>
+    </div>
+    <div class="ctrl">
+      <label for="steps">Số bước</label><input id="steps" type="range" min="10" max="400" step="10" value="100"><span class="val" id="steps-v"></span>
+      <label for="noise">Nhiễu gradient $\sigma$</label><input id="noise" type="range" min="0" max="2" step="0.1" value="0"><span class="val" id="noise-v"></span>
+      <button type="button" class="btn" id="reseed">Gieo nhiễu khác</button>
+    </div>
+    <div class="stage">
+      <div class="surf" id="surf"><canvas id="cv"></canvas><svg id="sv" preserveAspectRatio="none"></svg></div>
+      <div>
+        <div class="loss"><svg id="lv" viewBox="0 0 320 220" role="img" aria-label="Khoảng cách giá trị hàm đến cực tiểu theo số bước"></svg></div>
+        <table class="res" id="res"></table>
+      </div>
+    </div>
+    <div class="insight" id="insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, NS = 'http://www.w3.org/2000/svg';
+  // Mỗi mặt hàm: f, gradient, miền vẽ, điểm xuất phát mặc định, giá trị nhỏ nhất
+  var FN = {
+    ellipse: { f: function (x, y) { return 0.1 * x * x + 2 * y * y; }, g: function (x, y) { return [0.2 * x, 4 * y]; },
+      box: [-5.5, 1.5, -2.5, 2.5], start: [-5, -2], fmin: 0, lr: -0.4 },
+    rosen: { f: function (x, y) { return (1 - x) * (1 - x) + 100 * (y - x * x) * (y - x * x); },
+      g: function (x, y) { return [-2 * (1 - x) - 400 * x * (y - x * x), 200 * (y - x * x)]; },
+      box: [-2, 2, -1, 3], start: [-1.5, 2], fmin: 0, lr: -2.5 },
+    saddle: { f: function (x, y) { return x * x - y * y + y * y * y * y / 4; }, g: function (x, y) { return [2 * x, -2 * y + y * y * y]; },
+      box: [-2.5, 2.5, -2.5, 2.5], start: [-2, 0.01], fmin: -1, lr: -1 },
+    bumpy: { f: function (x, y) { return 0.05 * (x * x + y * y) + Math.sin(2 * x) * Math.cos(2 * y) + 1; },
+      g: function (x, y) { return [0.1 * x + 2 * Math.cos(2 * x) * Math.cos(2 * y), 0.1 * y - 2 * Math.sin(2 * x) * Math.sin(2 * y)]; },
+      box: [-5, 5, -4, 4], start: [3.5, 3], fmin: null, lr: -1.3 }
+  };
+  var OPTS = [
+    { id: 'sgd', name: 'SGD', col: '#7a8599' },
+    { id: 'mom', name: 'Động lượng', col: '#2a78d6' },
+    { id: 'adagrad', name: 'Adagrad', col: '#1a9e77' },
+    { id: 'rms', name: 'RMSProp', col: '#c98a12' },
+    { id: 'adam', name: 'Adam', col: '#d6452a' }
+  ];
+  var on = { sgd: true, mom: true, adagrad: true, rms: true, adam: true };
+  V_.$('#opts').innerHTML = OPTS.map(function (o) {
+    return '<label><input type="checkbox" data-id="' + o.id + '" checked><i style="background:' + o.col + '"></i>' + o.name + '</label>';
+  }).join('');
+  var fnKey = 'ellipse', start = FN.ellipse.start.slice(), seed = 1;
+
+  function rng(s) { return function () { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
+  function gauss(r) { var u = 1 - r(), v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // Một bước của từng thuật toán, viết đúng như các mục 12.4–12.10 (trạng thái cho 2 tọa độ)
+  function run(id, F, lr, beta, steps, sigma) {
+    var x = start[0], y = start[1], path = [[x, y]], st = { v: [0, 0], s: [0, 0], m: [0, 0] }, r = rng(seed * 7 + id.length);
+    var eps = 1e-8;
+    for (var t = 1; t <= steps; t++) {
+      var g = F.g(x, y);
+      if (sigma > 0) { g[0] += sigma * gauss(r); g[1] += sigma * gauss(r); }
+      var d = [0, 0];
+      for (var i = 0; i < 2; i++) {
+        if (id === 'sgd') d[i] = lr * g[i];
+        else if (id === 'mom') { st.v[i] = beta * st.v[i] + g[i]; d[i] = lr * st.v[i]; }
+        else if (id === 'adagrad') { st.s[i] += g[i] * g[i]; d[i] = lr * g[i] / (Math.sqrt(st.s[i]) + eps); }
+        else if (id === 'rms') { st.s[i] = 0.9 * st.s[i] + 0.1 * g[i] * g[i]; d[i] = lr * g[i] / (Math.sqrt(st.s[i]) + eps); }
+        else { st.m[i] = 0.9 * st.m[i] + 0.1 * g[i]; st.s[i] = 0.999 * st.s[i] + 0.001 * g[i] * g[i];
+               d[i] = lr * (st.m[i] / (1 - Math.pow(0.9, t))) / (Math.sqrt(st.s[i] / (1 - Math.pow(0.999, t))) + eps); }
+      }
+      x -= d[0]; y -= d[1];
+      if (!isFinite(x) || !isFinite(y) || Math.abs(x) > 1e6 || Math.abs(y) > 1e6) { path.diverged = true; break; }
+      path.push([x, y]);
+    }
+    return path;
+  }
+
+  var heatKey = null;
+  function drawHeat(F, W, H) {
+    var cv = V_.$('#cv'), key = fnKey + W + 'x' + H + document.documentElement.dataset.theme;
+    if (heatKey === key) return;
+    heatKey = key;
+    cv.width = W; cv.height = H;
+    var ctx = cv.getContext('2d'), img = ctx.createImageData(W, H), b = F.box, vals = [], lo = Infinity, hi = -Infinity;
+    for (var j = 0; j < H; j++) for (var i = 0; i < W; i++) {
+      var v = F.f(b[0] + (b[1] - b[0]) * i / W, b[3] - (b[3] - b[2]) * j / H);
+      vals.push(v); if (v < lo) lo = v; if (v > hi) hi = v;
+    }
+    var c0 = V_.cssVar('--surface').match(/\w\w/g) ? hexOf(V_.cssVar('--surface')) : [255, 255, 255];
+    var c1 = hexOf(V_.cssVar('--pos'));
+    for (var k = 0; k < vals.length; k++) {
+      var tt = Math.log1p(vals[k] - lo) / Math.log1p(hi - lo);
+      var band = (Math.floor(tt * 24) % 2) ? 0.06 : 0;                   // vân đồng mức
+      var w = Math.min(1, 0.08 + 0.72 * (1 - tt) + band);
+      img.data[4 * k] = c0[0] + (c1[0] - c0[0]) * w; img.data[4 * k + 1] = c0[1] + (c1[1] - c0[1]) * w;
+      img.data[4 * k + 2] = c0[2] + (c1[2] - c0[2]) * w; img.data[4 * k + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  function hexOf(h) { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
+  function el(n, a, p) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; }
+
+  function render() {
+    var F = FN[fnKey], lr = Math.pow(10, +V_.$('#lr').value), beta = +V_.$('#beta').value,
+        steps = +V_.$('#steps').value, sigma = +V_.$('#noise').value;
+    V_.$('#lr-v').textContent = lr < 0.01 ? lr.toExponential(1) : V_.fmt(lr, 3);
+    V_.$('#beta-v').textContent = V_.fmt(beta, 2); V_.$('#steps-v').textContent = steps; V_.$('#noise-v').textContent = V_.fmt(sigma, 1);
+    var box = V_.$('#surf').getBoundingClientRect(), W = Math.max(200, Math.round(box.width)), H = Math.max(160, Math.round(box.height));
+    drawHeat(F, W, H);
+    var sv = V_.$('#sv'); sv.setAttribute('viewBox', '0 0 ' + W + ' ' + H); sv.innerHTML = '';
+    var b = F.box, sx = function (x) { return (x - b[0]) / (b[1] - b[0]) * W; }, sy = function (y) { return (b[3] - y) / (b[3] - b[2]) * H; };
+    var results = [];
+    OPTS.forEach(function (o) {
+      if (!on[o.id]) return;
+      var p = run(o.id, F, lr, beta, steps, sigma);
+      results.push({ o: o, p: p });
+      el('polyline', { points: p.map(function (q) { return sx(q[0]).toFixed(1) + ',' + sy(q[1]).toFixed(1); }).join(' '),
+        fill: 'none', stroke: o.col, 'stroke-width': 2, 'stroke-linejoin': 'round', opacity: 0.9 }, sv);
+      var last = p[p.length - 1];
+      el('circle', { cx: sx(last[0]), cy: sy(last[1]), r: 4.5, fill: o.col, stroke: '#fff', 'stroke-width': 1.5 }, sv);
+    });
+    el('circle', { cx: sx(start[0]), cy: sy(start[1]), r: 5, fill: 'none', stroke: 'var(--text)', 'stroke-width': 2 }, sv);
+
+    // biểu đồ f(x_t) - f* theo bước (thang log)
+    var lv = V_.$('#lv'); lv.innerHTML = '';
+    var fmin = F.fmin;
+    if (fmin === null) { fmin = Infinity; results.forEach(function (r) { r.p.forEach(function (q) { fmin = Math.min(fmin, F.f(q[0], q[1])); }); }); }
+    var L = 40, R = 312, T = 26, B = 190, lo = -6, hi = 3;
+    el('line', { x1: L, y1: B, x2: R, y2: B, class: 'ax' }, lv); el('line', { x1: L, y1: T, x2: L, y2: B, class: 'ax' }, lv);
+    for (var e = lo; e <= hi; e += 3) {
+      var yy = B - (e - lo) / (hi - lo) * (B - T);
+      el('text', { x: L - 4, y: yy + 3, class: 'axt', 'text-anchor': 'end' }, lv).textContent = '1e' + e;
+    }
+    el('text', { x: (L + R) / 2, y: 212, class: 'axt', 'text-anchor': 'middle' }, lv).textContent = 'bước (0 → ' + steps + ')';
+    el('text', { x: L, y: 12, class: 'axt', 'text-anchor': 'middle' }, lv).textContent = 'f − f*';
+    var rows = '<tr><th>Thuật toán</th><th>f cuối − f*</th></tr>';
+    results.forEach(function (r) {
+      var pts = r.p.map(function (q, k) {
+        var v = Math.log10(Math.max(1e-6, F.f(q[0], q[1]) - fmin + 1e-12));
+        v = Math.max(lo, Math.min(hi, v));
+        return (L + k / steps * (R - L)).toFixed(1) + ',' + (B - (v - lo) / (hi - lo) * (B - T)).toFixed(1);
+      });
+      el('polyline', { points: pts.join(' '), fill: 'none', stroke: r.o.col, 'stroke-width': 1.8 }, lv);
+      var q = r.p[r.p.length - 1], gap = F.f(q[0], q[1]) - fmin;
+      rows += '<tr><td><span style="color:' + r.o.col + '">●</span> ' + r.o.name + '</td><td>' +
+        (r.p.diverged ? 'phân kỳ' : gap < 1e-4 ? '< 1e-4' : V_.fmt(gap, 4)) + '</td></tr>';
+    });
+    V_.$('#res').innerHTML = rows;
+
+    var msg = {
+      ellipse: 'Hàm của mục 12.6: theo $x_2$ dốc gấp 20 lần theo $x_1$. Với SGD, mỗi bước nhân $x_1$ với $1 - 0.2\\eta$ và $x_2$ với $1 - 4\\eta$: hướng dốc giới hạn tốc độ học ($\\eta < 0.5$), còn hướng phẳng thì đi chậm. Thử tăng $\\eta$ quá 0.5 để thấy SGD phân kỳ theo $x_2$. Các thuật toán thích ứng không bị giới hạn này nhưng có tật riêng: tốc độ học hiệu dụng của Adagrad giảm dần nên về sau đi chậm; RMSProp với $\\eta$ cố định cứ dao động quanh cực tiểu với biên độ cỡ $\\eta$.',
+      rosen: 'Thung lũng cong hẹp của Rosenbrock (cực tiểu tại $(1, 1)$). Tốc độ học lớn làm các thuật toán bật ra khỏi thành thung lũng, tốc độ học nhỏ thì đi rất chậm dọc đáy: đây là kiểu địa hình khiến tối ưu khó (mục 12.1).',
+      saddle: 'Điểm xuất phát gần như nằm trên điểm yên ngựa $(0, 0)$. Theo $x_2$ độ cong âm nên thành phần nhỏ của $x_2$ lớn dần và thuật toán trượt xuống một trong hai cực tiểu $(0, \\pm\\sqrt 2)$. Với thiết lập mặc định, RMSProp thoát nhanh nhất (gradient nhỏ theo $x_2$ được chia cho chính độ lớn của nó nên bước không còn nhỏ), Adam và động lượng theo sau, SGD chậm nhất. Bật nhiễu để thấy nhiễu cũng giúp thoát khỏi điểm yên ngựa (mục 12.1).',
+      bumpy: 'Nhiều cực tiểu địa phương. Mỗi thuật toán có thể rơi vào một hố khác nhau tùy điểm xuất phát và tốc độ học; động lượng đôi khi đủ "đà" để vượt qua gờ thấp. Biểu đồ bên phải đo so với giá trị thấp nhất mà các thuật toán tìm được, không phải cực tiểu toàn cục.'
+    }[fnKey];
+    var ins = V_.$('#insight'); ins.innerHTML = msg; V_.texAll(ins);
+  }
+
+  V_.$$('#fn button').forEach(function (bt) {
+    bt.addEventListener('click', function () {
+      V_.$$('#fn button').forEach(function (o) { o.setAttribute('aria-pressed', o === bt ? 'true' : 'false'); });
+      fnKey = bt.dataset.v; start = FN[fnKey].start.slice(); V_.$('#lr').value = FN[fnKey].lr; heatKey = null; render();
+    });
+  });
+  V_.$$('#opts input').forEach(function (c) { c.addEventListener('change', function () { on[c.dataset.id] = c.checked; render(); }); });
+  ['#lr', '#beta', '#steps', '#noise'].forEach(function (q) { V_.$(q).addEventListener('input', render); });
+  V_.$('#reseed').addEventListener('click', function () { seed++; render(); });
+  V_.$('#surf').addEventListener('click', function (e) {
+    var r = V_.$('#surf').getBoundingClientRect(), b = FN[fnKey].box;
+    start = [b[0] + (b[1] - b[0]) * (e.clientX - r.left) / r.width, b[3] - (b[3] - b[2]) * (e.clientY - r.top) / r.height];
+    render();
+  });
+  window.addEventListener('resize', function () { heatKey = null; render(); });
+  V_.onTheme(function () { heatKey = null; render(); });
+  V_.texAll(document.body);
+  V_.$('#lr').value = FN.ellipse.lr;
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+- Các khối dùng `X.cuda(1)` (mục 6.7.2.2) cần **ít nhất hai GPU**, nên trên trang này chúng chỉ được hiển thị, không chạy. Trên máy chỉ có một GPU, thay `cuda(1)` bằng `cuda(0)` để thử.
+- Các khối có nhãn GPU chạy bình thường trên CPU (hàm `try_gpu` tự lùi về CPU), nhưng kết quả chỉ có ý nghĩa khi máy có GPU, nên chúng sẽ được chạy trên máy có GPU.

@@ -46,6 +46,9 @@
     { id: 'ml', name: 'Học máy', tab: 'Học máy', short: 'ML', home: '/ml/README_vi', icon: 'chart-spline', prefix: /^\/ml\//, blurb: 'Hồi quy, phân loại, phân cụm',
       desc: 'Từ hồi quy tuyến tính đến máy vector hỗ trợ',
       links: [['Machine Learning cơ bản', 'https://machinelearningcoban.com'], ['scikit-learn User Guide', 'https://scikit-learn.org/stable/user_guide.html'], ['NumPy Documentation', 'https://numpy.org/doc/stable/']] },
+    { id: 'dl', name: 'Học sâu', tab: 'Học sâu', short: 'DL', home: '/dl/README_vi', icon: 'brain-circuit', prefix: /^\/dl\//, blurb: 'CNN, RNN, Transformer',
+      desc: 'Mạng tích chập, mạng hồi tiếp, cơ chế tập trung với PyTorch',
+      links: [['Dive into Deep Learning', 'https://d2l.ai'], ['Đắm mình vào Học Sâu (d2l-vn)', 'https://github.com/aivivn/d2l-vn'], ['PyTorch Documentation', 'https://pytorch.org/docs/stable/']] },
     { id: 'rl', name: 'Học tăng cường', tab: 'Tăng cường', short: 'RL', home: '/rl_vi', icon: 'target', start: '/chapter1/chapter1_vi', blurb: 'Từ MDP đến PPO, DDPG',
       desc: 'Tác tử học từ phần thưởng: MDP, DQN, PPO, DDPG',
       links: [['EasyRL (Datawhale)', 'https://github.com/datawhalechina/easy-rl'], ['Sách của Shiyu Zhao', 'https://github.com/MathFoundationRL/Book-Mathematical-Foundation-of-Reinforcement-Learning'], ['Gymnasium', 'https://gymnasium.farama.org'], ['OpenAI Spinning Up', 'https://spinningup.openai.com']] }
@@ -79,6 +82,9 @@
     'Giảm chiều dữ liệu': ['policy', 'layers'],
     'Support vector machine': ['adv', 'shield-check'],
     'Chủ đề bổ sung': ['math', 'sparkles'],
+    'Kiến thức nền tảng': ['base', 'blocks'],
+    'Thuật toán tối ưu': ['policy', 'mountain'],
+    'Mạng neuron tích chập': ['adv', 'layout-grid'],
     'Bắt đầu': ['start', 'flag'],
     'Nền tảng': ['base', 'blocks'],
     'Dựa trên chính sách': ['policy', 'target'],
@@ -93,10 +99,11 @@
     'rl:math': ['Sách của Shiyu Zhao', 'Mathematical Foundations of RL'],
     'ml:base': ['Machine Learning cơ bản', 'Vũ Hữu Tiệp · CC BY-SA 4.0'],
     'math:base': ['Machine Learning cơ bản', 'Vũ Hữu Tiệp · CC BY-SA 4.0'],
-    'ml:math': ['Chủ đề bổ sung', 'Người biên soạn viết thêm']
+    'ml:math': ['Chủ đề bổ sung', 'Người biên soạn viết thêm'],
+    'dl:base': ['Dive into Deep Learning', 'Zhang, Lipton, Li, Smola · CC BY-SA 4.0']
   };
   var PAGE_ICON = {
-    '/': 'house', '/ml/README_vi': 'chart-spline', '/math/README_vi': 'sigma', '/ml/ch07_vi': 'trending-up', '/ml/ch08_vi': 'chart-spline', '/ml/ch09_vi': 'network',
+    '/': 'house', '/ml/README_vi': 'chart-spline', '/dl/README_vi': 'brain-circuit', '/dl/ch07_vi': 'eye', '/dl/notation_vi': 'whole-word', '/dl/ch01_vi': 'sprout', '/dl/ch02_vi': 'terminal', '/dl/ch06_vi': 'blocks', '/dl/ch03_vi': 'trending-up', '/dl/ch04_vi': 'layers', '/dl/ch05_vi': 'brain', '/dl/ch12_vi': 'mountain', '/math/README_vi': 'sigma', '/ml/ch07_vi': 'trending-up', '/ml/ch08_vi': 'chart-spline', '/ml/ch09_vi': 'network',
     '/ml/ch10_vi': 'chart-scatter', '/ml/ch12_vi': 'mountain', '/ml/ch13_vi': 'sliders-horizontal', '/ml/ch14_vi': 'gauge',
     '/ml/ch15_vi': 'layers', '/ml/ch16_vi': 'brain',
     '/ml/ch00_vi': 'book-open', '/ml/ch05_vi': 'blocks', '/ml/ch06_vi': 'sliders-horizontal', '/ml/ch11_vi': 'dices', '/ml/appendix_b_vi': 'eye',
@@ -118,7 +125,7 @@
   var SUB_ICON = [
     [/_notes_vi$/, 'notebook-pen'], [/_questions&keywords_vi$/, 'circle-help'], [/_review_vi$/, 'layers'],
     [/_viz_vi$/, 'monitor-play'], [/_code_vi$/, 'terminal'], [/\/project\d+_vi$/, 'code-xml'],
-    [/_lib_vi$/, 'library'], [/_app_vi$/, 'rocket']
+    [/_lib_vi$/, 'library'], [/_app_vi$/, 'rocket'], [/_s\d+_vi$/, 'book-open'], [/_bwd_vi$/, 'repeat']
   ];
   function navIcon(name, cls) {
     var paths = (window.NAV_ICONS || {})[name];
@@ -470,7 +477,7 @@
       return '<a data-path="' + path + '" href="#' + path + '">' + icon + '<span>' + label + '</span>' + (extra || '') + '</a>';
     }
     var courses = [
-      { id: 'math' }, { id: 'ml' }, { soon: 'Học sâu' }, { id: 'rl' }, { soon: 'LLM và ứng dụng' }
+      { id: 'math' }, { id: 'ml' }, { id: 'dl' }, { id: 'rl' }, { soon: 'LLM và ứng dụng' }
     ].map(function (c) {
       if (c.soon) return '<span class="is-soon">' + ICON.lock + '<span>' + c.soon + '</span><small>Sắp có</small></span>';
       var co = courseById(c.id);
@@ -1268,7 +1275,7 @@
     enhanceSidebar();
     var course = courseOf(currentPath);
     if (course) setCourseView(course, true);
-    if (course === 'ml' || course === 'math') renderStrayMath(section);
+    if (course === 'ml' || course === 'math' || course === 'dl') renderStrayMath(section);
     var landing = !!section.querySelector('.home-hero, .hub-hero, .rm-page');
     document.body.classList.toggle('is-home', landing);
     document.body.classList.toggle('is-hub', !!section.querySelector('.hub-hero'));

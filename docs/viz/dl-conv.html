@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tích chập và gộp · Mô phỏng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="viz.css?v=20261114b">
+<style>
+  .panels { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-start; justify-content: center; margin: 10px 0 4px; }
+  .panel { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
+  .panel .cap { font-size: .82rem; font-weight: 700; color: var(--muted); }
+  .panel svg { display: block; max-width: 100%; height: auto; }
+  .cv-cell { stroke: var(--border); stroke-width: 1; }
+  .cv-pad { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 3 3; stroke-opacity: .6; }
+  .cv-txt { font: 600 12px 'Plus Jakarta Sans', system-ui, sans-serif; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+  .cv-win { fill: none; stroke: var(--hl); stroke-width: 3; rx: 3; }
+  .cv-click { cursor: pointer; }
+  .calc { font-size: .92rem; overflow-x: auto; padding: 4px 0; text-align: center; }
+  .layers .panel .cap { font-weight: 600; }
+  .rf { fill: var(--hl-soft); }
+  .rf-edge { fill: none; stroke: var(--hl); stroke-width: 2.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-embed">
+    <div class="top">
+      <h1>Tích chập và gộp</h1>
+      <div class="crumbs"><a href="../#/dl/ch07_vi">← Chương 7 Mạng neuron tích chập</a></div>
+    </div>
+    <p class="lead">Cửa sổ trượt của phép tương quan chéo và phép gộp, với đệm và sải bước. Bên dưới: vùng tiếp nhận lớn dần khi xếp chồng nhiều tầng.</p>
+  </div>
+  <div class="only-embed open-full"><a href="dl-conv.html" target="_blank" rel="noopener">Mở trang riêng ↗</a></div>
+
+  <div class="blk">
+    <h2>1. Cửa sổ trượt</h2>
+    <div class="ctrl">
+      <span class="lb">Đầu vào</span>
+      <div class="seg" id="inp">
+        <button type="button" data-v="book" aria-pressed="true">Hình 7.2.1</button>
+        <button type="button" data-v="edge" aria-pressed="false">Biên (mục 7.2.4)</button>
+        <button type="button" data-v="seven" aria-pressed="false">Chữ số 7</button>
+        <button type="button" data-v="rand" aria-pressed="false">Ngẫu nhiên</button>
+      </div>
+    </div>
+    <div class="ctrl">
+      <span class="lb">Phép toán</span>
+      <div class="seg" id="op">
+        <button type="button" data-v="corr" aria-pressed="true">Tương quan chéo</button>
+        <button type="button" data-v="max" aria-pressed="false">Gộp cực đại</button>
+        <button type="button" data-v="avg" aria-pressed="false">Gộp trung bình</button>
+      </div>
+    </div>
+    <div class="ctrl" id="kern-row">
+      <span class="lb">Kernel</span>
+      <div class="seg" id="kern">
+        <button type="button" data-v="book" aria-pressed="true">Hình 7.2.1</button>
+        <button type="button" data-v="vedge" aria-pressed="false">[1, −1]</button>
+        <button type="button" data-v="sobel" aria-pressed="false">Sobel dọc</button>
+        <button type="button" data-v="blur" aria-pressed="false">Làm mờ</button>
+        <button type="button" data-v="sharp" aria-pressed="false">Làm sắc nét</button>
+      </div>
+    </div>
+    <div class="ctrl" id="pool-row" style="display:none">
+      <span class="lb">Cửa sổ gộp</span>
+      <div class="seg" id="psize">
+        <button type="button" data-v="2" aria-pressed="true">2 × 2</button>
+        <button type="button" data-v="3" aria-pressed="false">3 × 3</button>
+      </div>
+    </div>
+    <div class="ctrl">
+      <label for="pad">Đệm $p$</label><input id="pad" type="range" min="0" max="2" step="1" value="0"><span class="val" id="pad-v"></span>
+      <label for="str">Sải bước $s$</label><input id="str" type="range" min="1" max="3" step="1" value="1"><span class="val" id="str-v"></span>
+    </div>
+    <div class="ctrl">
+      <button type="button" class="btn pri" id="play">▶ Phát</button>
+      <button type="button" class="btn" id="step">Bước tiếp</button>
+      <label for="speed">Tốc độ</label><input id="speed" type="range" min="1" max="5" step="1" value="3">
+      <span class="note">hoặc bấm vào một ô của đầu ra</span>
+    </div>
+    <div class="panels">
+      <div class="panel"><span class="cap" id="cap-x">Đầu vào</span><svg id="sx"></svg></div>
+      <div class="panel" id="panel-k"><span class="cap">Kernel</span><svg id="sk"></svg></div>
+      <div class="panel"><span class="cap" id="cap-y">Đầu ra</span><svg id="sy"></svg></div>
+    </div>
+    <div class="calc" id="calc"></div>
+    <div class="insight" id="insight"></div>
+  </div>
+
+  <div class="blk">
+    <h2>2. Vùng tiếp nhận qua nhiều tầng</h2>
+    <p class="note">Mỗi tầng là một phép tích chập $k \times k$ (không đệm) với sải bước $s$. Bấm vào một ô của tầng cuối (bên phải): các ô tô màu ở mỗi tầng trước đó là những phần tử có thể ảnh hưởng đến nó (mục 7.2.7).</p>
+    <div class="ctrl">
+      <label for="nl">Số tầng</label><input id="nl" type="range" min="1" max="4" step="1" value="2"><span class="val" id="nl-v"></span>
+      <span class="lb">Kernel $k$</span>
+      <div class="seg" id="rk"><button type="button" data-v="2" aria-pressed="false">2</button><button type="button" data-v="3" aria-pressed="true">3</button><button type="button" data-v="5" aria-pressed="false">5</button></div>
+      <span class="lb">Sải bước $s$</span>
+      <div class="seg" id="rs"><button type="button" data-v="1" aria-pressed="true">1</button><button type="button" data-v="2" aria-pressed="false">2</button></div>
+    </div>
+    <div class="panels layers" id="layers"></div>
+    <div class="insight" id="rf-insight"></div>
+  </div>
+</div>
+<script src="viz.js"></script>
+<script>
+(function () {
+  'use strict';
+  var V_ = Viz, NS = 'http://www.w3.org/2000/svg';
+  var INPUTS = {
+    book: [[0, 1, 2], [3, 4, 5], [6, 7, 8]],
+    edge: [0, 1, 2, 3, 4, 5].map(function () { return [1, 1, 0, 0, 0, 0, 1, 1]; }),
+    seven: ['0000000000', '0111111110', '0000000110', '0000001100', '0000011000', '0000110000', '0001100000', '0001100000', '0001100000', '0000000000']
+      .map(function (r) { return r.split('').map(Number); }),
+    rand: null
+  };
+  var KERNELS = {
+    book: [[0, 1], [2, 3]],
+    vedge: [[1, -1]],
+    sobel: [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]],
+    blur: [[1, 1, 1], [1, 1, 1], [1, 1, 1]].map(function (r) { return r.map(function (v) { return v / 9; }); }),
+    sharp: [[0, -1, 0], [-1, 5, -1], [0, -1, 0]]
+  };
+  function randGrid() {
+    var g = [];
+    for (var i = 0; i < 6; i++) { g.push([]); for (var j = 0; j < 6; j++) g[i].push(Math.floor(Math.random() * 10)); }
+    return g;
+  }
+  INPUTS.rand = randGrid();
+
+  function seg(id) { return V_.$('#' + id + ' [aria-pressed=true]').dataset.v; }
+  function el(name, attrs, parent) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function num(v) {
+    if (v === -Infinity) return '−∞';
+    var r = Math.round(v * 100) / 100;
+    return String(r).replace('-', '−');
+  }
+
+  var cur = 0, timer = null;
+
+  function setup() {
+    var X = INPUTS[seg('inp')], op = seg('op'), p = +V_.$('#pad').value, s = +V_.$('#str').value;
+    var K;
+    if (op === 'corr') K = KERNELS[seg('kern')];
+    else { var w = +seg('psize'); K = []; for (var i = 0; i < w; i++) { K.push([]); for (var j = 0; j < w; j++) K[i].push(1); } }
+    var nh = X.length, nw = X[0].length, kh = K.length, kw = K[0].length;
+    var oh = Math.floor((nh - kh + 2 * p + s) / s), ow = Math.floor((nw - kw + 2 * p + s) / s);
+    var padVal = op === 'max' ? -Infinity : 0;
+    function xp(i, j) { var a = i - p, b = j - p; return a < 0 || b < 0 || a >= nh || b >= nw ? padVal : X[a][b]; }
+    var Y = [];
+    for (var i2 = 0; i2 < oh; i2++) {
+      Y.push([]);
+      for (var j2 = 0; j2 < ow; j2++) {
+        var acc = op === 'max' ? -Infinity : 0;
+        for (var a = 0; a < kh; a++) for (var b = 0; b < kw; b++) {
+          var v = xp(i2 * s + a, j2 * s + b);
+          if (op === 'corr') acc += v * K[a][b]; else if (op === 'max') acc = Math.max(acc, v); else acc += v / (kh * kw);
+        }
+        Y[i2].push(acc);
+      }
+    }
+    return { X: X, K: K, Y: Y, op: op, p: p, s: s, nh: nh, nw: nw, kh: kh, kw: kw, oh: oh, ow: ow, xp: xp };
+  }
+
+  function maxAbs(G) {
+    var m = 0;
+    G.forEach(function (r) { r.forEach(function (v) { if (isFinite(v)) m = Math.max(m, Math.abs(v)); }); });
+    return m || 1;
+  }
+
+  function drawGrid(svg, rows, cols, cellFn, cs) {
+    svg.innerHTML = '';
+    svg.setAttribute('viewBox', '0 0 ' + (cols * cs + 2) + ' ' + (rows * cs + 2));
+    svg.setAttribute('width', cols * cs + 2);
+    svg.setAttribute('height', rows * cs + 2);
+    for (var i = 0; i < rows; i++) for (var j = 0; j < cols; j++) {
+      var c = cellFn(i, j), x = 1 + j * cs, y = 1 + i * cs;
+      var r = el('rect', { x: x, y: y, width: cs, height: cs, class: c.pad ? 'cv-pad' : 'cv-cell' }, svg);
+      if (!c.pad) r.style.fill = c.bg;
+      if (c.onClick) { r.classList.add('cv-click'); r.addEventListener('click', c.onClick); }
+      var t = el('text', { x: x + cs / 2, y: y + cs / 2, class: 'cv-txt' }, svg);
+      t.style.fill = c.pad ? 'var(--muted)' : c.fg;
+      t.textContent = c.text;
+    }
+  }
+
+  function render() {
+    var S = setup();
+    V_.$('#pad-v').textContent = S.p; V_.$('#str-v').textContent = S.s;
+    V_.$('#kern-row').style.display = S.op === 'corr' ? '' : 'none'; V_.$('#pool-row').style.display = S.op === 'corr' ? 'none' : '';
+    V_.$('#panel-k').style.display = S.op === 'corr' ? '' : 'none';
+    var calc = V_.$('#calc'), ins = V_.$('#insight');
+    if (S.oh < 1 || S.ow < 1) {
+      ['#sx', '#sk', '#sy'].forEach(function (q) { V_.$(q).innerHTML = ''; });
+      calc.innerHTML = 'Cửa sổ lớn hơn đầu vào đã đệm: không có đầu ra nào. Hãy tăng đệm hoặc chọn kernel nhỏ hơn.';
+      ins.innerHTML = ''; return;
+    }
+    var total = S.oh * S.ow;
+    cur = ((cur % total) + total) % total;
+    var ci = Math.floor(cur / S.ow), cj = cur % S.ow;
+    var big = Math.max(S.nh + 2 * S.p, S.nw + 2 * S.p);
+    var cs = big > 10 ? 26 : 34;
+    var mx = maxAbs(S.X), my = maxAbs(S.Y), mk = maxAbs(S.K);
+
+    drawGrid(V_.$('#sx'), S.nh + 2 * S.p, S.nw + 2 * S.p, function (i, j) {
+      var pad = i < S.p || j < S.p || i >= S.nh + S.p || j >= S.nw + S.p;
+      var v = S.xp(i, j);
+      if (pad) return { pad: true, text: S.op === 'max' ? '' : '0' };
+      var c = V_.valueColor(v, mx);
+      return { bg: c.bg, fg: c.fg, text: num(v) };
+    }, cs);
+    el('rect', { x: 1 + cj * S.s * cs, y: 1 + ci * S.s * cs, width: S.kw * cs, height: S.kh * cs, class: 'cv-win' }, V_.$('#sx'));
+
+    if (S.op === 'corr') drawGrid(V_.$('#sk'), S.kh, S.kw, function (i, j) {
+      var c = V_.valueColor(S.K[i][j], mk); return { bg: c.bg, fg: c.fg, text: num(S.K[i][j]) };
+    }, cs);
+
+    drawGrid(V_.$('#sy'), S.oh, S.ow, function (i, j) {
+      var idx = i * S.ow + j, done = idx <= cur;
+      var c = V_.valueColor(S.Y[i][j], my);
+      return { bg: done ? c.bg : 'var(--surface)', fg: done ? c.fg : 'var(--muted)', text: done ? num(S.Y[i][j]) : '',
+               onClick: function () { stop(); cur = idx; render(); } };
+    }, cs);
+    el('rect', { x: 1 + cj * cs, y: 1 + ci * cs, width: cs, height: cs, class: 'cv-win' }, V_.$('#sy'));
+
+    V_.$('#cap-x').textContent = 'Đầu vào ' + S.nh + ' × ' + S.nw + (S.p ? ' (đệm ' + S.p + ')' : '');
+    V_.$('#cap-y').textContent = 'Đầu ra ' + S.oh + ' × ' + S.ow;
+
+    var terms = [];
+    for (var a = 0; a < S.kh; a++) for (var b = 0; b < S.kw; b++) {
+      var v = S.xp(ci * S.s + a, cj * S.s + b);
+      var par = function (t) { return t.charAt(0) === '−' ? '(' + t + ')' : t; };
+      terms.push(S.op === 'corr' ? par(num(v)) + '\\times ' + par(num(S.K[a][b])) : num(v).replace('−∞', '-\\infty'));
+    }
+    var val = num(S.Y[ci][cj]).replace('−', '-');
+    var lhs = 'Y_{' + ci + ',' + cj + '} = ';
+    var expr = S.op === 'corr' ? terms.join(' + ') : S.op === 'max' ? '\\max(' + terms.join(', ') + ')' : '\\tfrac{1}{' + (S.kh * S.kw) + '}(' + terms.join(' + ') + ')';
+    if (terms.length > 9) expr = S.op === 'corr' ? '\\sum_{a,b} K_{a,b}\\, X_{' + ci * S.s + '+a,\\,' + cj * S.s + '+b}' : (S.op === 'max' ? '\\max' : '\\operatorname{mean}') + '(\\text{cửa sổ})';
+    V_.tex(calc, lhs + expr.replace(/−/g, '-') + ' = ' + val, true);
+
+    var f = '\\lfloor (n - k + 2p + s)/s \\rfloor';
+    var msg = 'Kích thước đầu ra theo công thức mục 7.3.2: chiều cao $\\lfloor(' + S.nh + ' - ' + S.kh + ' + ' + 2 * S.p + ' + ' + S.s + ')/' + S.s + '\\rfloor = ' + S.oh +
+      '$, chiều rộng $\\lfloor(' + S.nw + ' - ' + S.kw + ' + ' + 2 * S.p + ' + ' + S.s + ')/' + S.s + '\\rfloor = ' + S.ow + '$. ';
+    var inp = seg('inp'), k = seg('kern');
+    if (S.op === 'corr' && inp === 'edge' && k === 'vedge') msg += 'Kernel $[1, -1]$ cho $1$ ở biên trắng → đen, $-1$ ở biên đen → trắng, và $0$ ở mọi chỗ khác, đúng như mục 7.2.4.';
+    else if (S.op === 'corr' && k === 'sobel') msg += 'Bộ lọc Sobel là một bộ phát hiện biên dọc "mượt" hơn $[1, -1]$: nó lấy hiệu giữa cột phải và cột trái, có trọng số cho hàng giữa.';
+    else if (S.op === 'corr' && k === 'blur') msg += 'Làm mờ: mỗi đầu ra là trung bình 9 điểm ảnh lân cận, giống gộp trung bình $3 \\times 3$ với sải bước 1.';
+    else if (S.op === 'max') msg += 'Gộp cực đại không có tham số. Phần đệm mang giá trị $-\\infty$ nên không bao giờ được chọn. Với cửa sổ $2\\times 2$, sải bước 2, kích thước giảm một nửa.';
+    else if (S.op === 'avg') msg += 'Gộp trung bình chia cho số ô của cửa sổ, kể cả các ô đệm bằng 0 (mặc định của PyTorch).';
+    else if (S.p === 0) msg += 'Không có đệm, các điểm ảnh ở biên ít được dùng hơn ở giữa (hình 7.3.1). Thử tăng đệm.';
+    else msg += 'Với kernel lẻ $k$ và đệm $(k-1)/2$, sải bước 1, đầu ra cùng kích thước với đầu vào.';
+    ins.innerHTML = msg; V_.texAll(ins);
+  }
+
+  // ---------- phát từng bước ----------
+  var DELAYS = [1400, 900, 550, 300, 140];
+  function tick() {
+    var S = setup();
+    if (S.oh < 1 || S.ow < 1) { stop(); return; }
+    cur = (cur + 1) % (S.oh * S.ow);
+    render();
+    timer = setTimeout(tick, DELAYS[+V_.$('#speed').value - 1]);
+  }
+  function label() { V_.$('#play').textContent = timer ? '❚❚ Tạm dừng' : '▶ Phát'; }
+  function stop() { if (timer) clearTimeout(timer); timer = null; label(); }
+  V_.$('#play').addEventListener('click', function () {
+    if (timer) stop(); else { timer = setTimeout(tick, 0); label(); }
+  });
+  V_.$('#step').addEventListener('click', function () { stop(); cur++; render(); });
+
+  ['inp', 'op', 'kern', 'psize'].forEach(function (id) {
+    V_.$$('#' + id + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$('#' + id + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        if (id === 'inp' && b.dataset.v === 'rand') INPUTS.rand = randGrid();
+        if (id === 'op' && b.dataset.v !== 'corr' && +V_.$('#str').value === 1) {
+          V_.$('#str').value = +seg('psize');   // sải bước mặc định của gộp = kích thước cửa sổ
+        }
+        cur = 0; render();
+      });
+    });
+  });
+  ['#pad', '#str'].forEach(function (q) { V_.$(q).addEventListener('input', function () { cur = 0; render(); }); });
+
+  // ---------- vùng tiếp nhận ----------
+  var sel = null;
+  function rfRender() {
+    var L = +V_.$('#nl').value, k = +seg('rk'), s = +seg('rs');
+    V_.$('#nl-v').textContent = L;
+    var sizes = [16];
+    for (var l = 0; l < L; l++) sizes.push(Math.floor((sizes[l] - k) / s) + 1);
+    var box = V_.$('#layers'), ins = V_.$('#rf-insight');
+    box.innerHTML = '';
+    if (sizes[L] < 1) { ins.innerHTML = 'Với các tham số này, ảnh $16 \\times 16$ bị thu nhỏ hết trước tầng cuối. Giảm số tầng, kích thước kernel hoặc sải bước.'; V_.texAll(ins); return; }
+    if (!sel || sel[0] >= sizes[L] || sel[1] >= sizes[L]) sel = [Math.floor((sizes[L] - 1) / 2), Math.floor((sizes[L] - 1) / 2)];
+    // vùng ảnh hưởng ở mỗi tầng, đi từ trên xuống: [hàng đầu, hàng cuối, cột đầu, cột cuối]
+    var reg = []; reg[L] = [sel[0], sel[0], sel[1], sel[1]];
+    for (var l2 = L; l2 > 0; l2--) {
+      var r = reg[l2];
+      reg[l2 - 1] = [r[0] * s, r[1] * s + k - 1, r[2] * s, r[3] * s + k - 1];
+    }
+    for (var l3 = 0; l3 <= L; l3++) {
+      var n = sizes[l3], cs = Math.max(7, Math.min(18, Math.floor(200 / n)));
+      var panel = document.createElement('div'); panel.className = 'panel';
+      var cap = document.createElement('span'); cap.className = 'cap';
+      cap.textContent = (l3 === 0 ? 'Đầu vào' : 'Tầng ' + l3) + ' (' + n + ' × ' + n + ')';
+      var svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 ' + (n * cs + 2) + ' ' + (n * cs + 2));
+      svg.setAttribute('width', n * cs + 2); svg.setAttribute('height', n * cs + 2);
+      var R = reg[l3];
+      for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) {
+        var inR = i >= R[0] && i <= R[1] && j >= R[2] && j <= R[3];
+        var rect = el('rect', { x: 1 + j * cs, y: 1 + i * cs, width: cs, height: cs, class: 'cv-cell' + (inR ? ' rf' : '') }, svg);
+        if (!inR) rect.style.fill = 'var(--surface-2)';
+        if (l3 === L) {
+          rect.classList.add('cv-click');
+          (function (a, b) { rect.addEventListener('click', function () { sel = [a, b]; rfRender(); }); })(i, j);
+        }
+      }
+      el('rect', { x: 1 + R[2] * cs, y: 1 + R[0] * cs, width: (R[3] - R[2] + 1) * cs, height: (R[1] - R[0] + 1) * cs, class: 'rf-edge' }, svg);
+      panel.appendChild(cap); panel.appendChild(svg);
+      box.appendChild(panel);
+    }
+    var size = reg[0][1] - reg[0][0] + 1;
+    ins.innerHTML = 'Một phần tử ở tầng ' + L + ' có vùng tiếp nhận $' + size + ' \\times ' + size + '$ trên đầu vào. Mỗi tầng $k \\times k$ với sải bước $s$ nới vùng tiếp nhận thêm $(k-1)$ nhân với tích các sải bước của những tầng phía dưới nó: ' +
+      'xếp chồng hai tầng $3 \\times 3$ đã cho vùng $5 \\times 5$, ba tầng cho $7 \\times 7$. Sải bước 2 làm vùng tiếp nhận lớn nhanh hơn nhiều.';
+    V_.texAll(ins);
+  }
+  V_.$('#nl').addEventListener('input', function () { sel = null; rfRender(); });
+  ['rk', 'rs'].forEach(function (id) {
+    V_.$$('#' + id + ' button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        V_.$$('#' + id + ' button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        sel = null; rfRender();
+      });
+    });
+  });
+
+  V_.texAll(document.body);
+  render();
+  rfRender();
+  V_.onTheme(function () { render(); rfRender(); });
+})();
+</script>
+</body>
+</html>

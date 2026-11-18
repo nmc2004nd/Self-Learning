@@ -1,0 +1,3 @@
+- Mục 12.8.1, khai triển của $\mathbf{s}_t$: số hạng thứ ba phải là $\gamma^2 \mathbf{g}_{t-2}^2$ (thiếu bình phương).
+- Cùng mục: "chu kỳ bán rã $\gamma^{-1}$" không chính xác. Trọng số của một quan sát giảm theo $\gamma^k$, nên số quan sát hiệu dụng là $\frac{1}{1-\gamma}$ (10 với $\gamma = 0.9$, đúng như sách tính ở mục 12.8.2), còn chu kỳ bán rã theo nghĩa thông thường là $\ln 2 / \ln(1/\gamma) \approx 6.6$ bước.
+- Mục 12.8.3: `gamma1` là tên tham số trong MXNet. Trong PyTorch, tham số tương ứng của `torch.optim.RMSprop` tên là `alpha`, đúng như code bên dưới dùng.

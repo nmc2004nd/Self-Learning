@@ -1,0 +1,2 @@
+- Code `d2l.Trainer(max_epochs=10, num_gpus=1)`: trên máy không có GPU, `d2l` tự huấn luyện trên CPU (danh sách GPU rỗng), không báo lỗi.
+- Bài tập 1b, "thay tầng softmax bằng ReLU": ý của tác giả là thay các hàm kích hoạt **sigmoid** bằng ReLU; tầng softmax ở đầu ra vẫn giữ nguyên.

@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500;1,600;1,800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="theme/site.css?v=20261116d">
+  <link rel="stylesheet" href="theme/site.css?v=20261118k">
   <script>
     // Đặt nền sáng/tối trước khi vẽ trang để không bị chớp.
     try { var t = localStorage.getItem('easyrl-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
@@ -65,9 +65,9 @@
       ],
     }
   </script>
-  <script src="theme/agent.js?v=20261116d"></script>
-  <script src="theme/nav-icons.js?v=20261116d"></script>
-  <script src="theme/site.js?v=20261116d"></script>
+  <script src="theme/agent.js?v=20261118k"></script>
+  <script src="theme/nav-icons.js?v=20261118k"></script>
+  <script src="theme/site.js?v=20261118k"></script>
   <!-- Công thức -->
   <!-- <script type="text/x-mathjax-config">
     MathJax.Hub.Config({
@@ -99,12 +99,35 @@
   <!-- Put them above docsify.min.js -->
   <script src="//cdn.jsdelivr.net/npm/docsify@4.13.1/lib/docsify.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/docsify-copy-code@3.0.2"></script>
+  <!-- Chỉ mục tìm kiếm của docsify (toàn bộ nội dung site) đã vượt hạn mức ~5 triệu ký tự của
+       localStorage: nén bằng lz-string khi lưu, giải nén khi đọc. Hỏng thì bỏ qua, không làm vỡ trang. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+  <script>
+    (function () {
+      if (!window.LZString || !window.Storage) return;
+      var P = Storage.prototype, set = P.setItem, get = P.getItem, TAG = '\u0001lz:';
+      function packed(k) { return typeof k === 'string' && k.indexOf('docsify.search.index') === 0; }
+      P.setItem = function (k, v) {
+        if (packed(k) && typeof v === 'string') v = TAG + LZString.compressToUTF16(v);
+        try { return set.call(this, k, v); } catch (e) {
+          if (!packed(k)) throw e;  // chỉ nuốt lỗi của chỉ mục: lần sau dựng lại là được
+        }
+      };
+      P.getItem = function (k) {
+        var v = get.call(this, k);
+        if (packed(k) && v && v.indexOf(TAG) === 0) {
+          try { v = LZString.decompressFromUTF16(v.slice(TAG.length)); } catch (e) { v = null; }
+        }
+        return v;
+      };
+    })();
+  </script>
   <script src="//cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/search.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/zoom-image.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-python.min.js"></script>
   <!-- Thu gọn mã nguồn nhúng trên các trang Code -->
-  <script src="theme/code-include.js?v=20261116d"></script>
+  <script src="theme/code-include.js?v=20261118k"></script>
 
   <!-- Đã gỡ Gitalk: khóa OAuth thuộc về repo gốc của Datawhale, không dùng cho bản dịch này -->
 

@@ -1,0 +1,2 @@
+- Mục 6.1.2: bản gốc viết "phương thức `add_modules`", nhưng tên đúng (như trong code) là `add_module`, không có chữ *s*.
+- Mục 6.1.3: công thức $f(\mathbf{x},\mathbf{w}) = c \cdot \mathbf{w}^\top \mathbf{x}$ chỉ là ví dụ minh họa cho khái niệm tham số hằng. Lớp `FixedHiddenMLP` bên dưới không tính đúng công thức này: "hằng số" ở đây là ma trận ngẫu nhiên `rand_weight`.
