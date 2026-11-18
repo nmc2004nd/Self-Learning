@@ -1,0 +1,588 @@
+# Chương 5 Mạng neuron tích chập (CNN)
+
+> Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch05_卷积神经网络(CNN)), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
+
+Mạng neuron tích chập là một cấu trúc mạng tính toán để xử lý quan hệ giữa cục bộ và tổng thể, được dùng trong nhận dạng ảnh, xử lý ngôn ngữ tự nhiên, thậm chí nhận dạng giọng nói. Vì dữ liệu ảnh có quan hệ cục bộ–tổng thể rất rõ, CNN đạt thành công lớn trong nhận dạng ảnh.
+
+## 5.1 Mạng neuron tích chập gồm những tầng nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · Chương 7 Mạng Neuron Tích chập](dl/ch07_vi) · [Học sâu · 7.1 Từ Tầng Kết nối Đầy đủ đến Tích chập](dl/ch07_s1_vi)
+
+</div>
+
+Lấy bài toán phân loại ảnh làm ví dụ, mạng neuron tích chập ở Bảng 5.1 thường gồm 5 loại tầng:
+
+Bảng 5.1 Các thành phần của mạng neuron tích chập
+
+| Tầng | Kích thước đầu ra | Vai trò |
+| :-: | :-: | :- |
+| Tầng đầu vào | $W_1\times H_1\times 3$ | Đầu vào gốc của mạng tích chập, có thể là ma trận điểm ảnh gốc hoặc đã tiền xử lý |
+| Tầng tích chập | $W_1\times H_1\times K$ | Chia sẻ tham số, kết nối cục bộ, tận dụng tính bất biến tịnh tiến để trích đặc trưng cục bộ trên toàn ánh xạ đặc trưng |
+| Tầng kích hoạt | $W_1\times H_1\times K$ | Ánh xạ phi tuyến đầu ra của tầng tích chập |
+| Tầng gộp | $W_2\times H_2\times K$ | Sàng lọc thêm đặc trưng, giảm hiệu quả số tham số cần cho các tầng sau |
+| Tầng kết nối đầy đủ | $C$ (ma trận trọng số $(W_2 \cdot H_2 \cdot K)\times C$) | Duỗi đặc trưng nhiều chiều thành vector; đầu ra thường ứng với mục tiêu học (lớp hoặc giá trị hồi quy) |
+
+> $W_1\times H_1\times 3$ là ma trận điểm ảnh gốc hoặc đã tiền xử lý, 3 là số kênh của ảnh RGB; $K$ là số kernel (bộ lọc) trong tầng tích chập; $W_2\times H_2$ là kích thước ánh xạ đặc trưng sau gộp, với gộp toàn cục thì là $1\times 1$; $(W_2 \cdot H_2 \cdot K)$ là kích thước sau khi nén đặc trưng nhiều chiều thành 1 chiều, $C$ là số lớp ảnh. (Ở đây giả sử tích chập có đệm để giữ kích thước.)
+
+### 5.1.1 Tầng đầu vào
+
+Tầng đầu vào (Input Layer) thường là dữ liệu gốc hoặc đã tiền xử lý đưa vào mạng: có thể là ảnh màu ba chiều trong nhận dạng ảnh, dữ liệu dạng sóng hai chiều sau biến đổi Fourier (phổ) trong nhận dạng âm thanh, thậm chí vector câu một chiều trong xử lý ngôn ngữ tự nhiên. Với phân loại ảnh, ảnh đầu vào thường có ba kênh RGB, là ma trận điểm ảnh 3 chiều $H\times W \times 3$ với chiều cao $H$ và chiều rộng $W$. Mạng tích chập đưa dữ liệu từ tầng đầu vào qua một chuỗi các phép tích chập, gộp… để trích xuất và biến đổi đặc trưng, cuối cùng tầng kết nối đầy đủ tổng hợp đặc trưng và đưa ra kết quả. Tùy năng lực tính toán, bộ nhớ và cấu trúc mô hình, số ảnh mạng xử lý mỗi lần (một batch) khác nhau; nếu tầng đầu vào nhận $N$ ảnh thì dữ liệu ra của nó có kích thước $N\times H\times W\times 3$.
+
+### 5.1.2 Tầng tích chập
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.2.2 Tầng Tích chập](dl/ch07_s2_vi?id=_722-tầng-tích-chập) · [Học sâu · 7.3 Đệm và Sải bước](dl/ch07_s3_vi)
+
+</div>
+
+Tầng tích chập (Convolution Layer) thường dùng để trích xuất đặc trưng từ dữ liệu đầu vào; nó là một sự trừu tượng hóa các quan hệ ẩn trong dữ liệu gốc thông qua ma trận kernel. Về nguyên lý, tích chập là phép nhân từng phần tử rồi cộng giữa hai ma trận điểm ảnh: một là ma trận dữ liệu đầu vào, một là kernel (bộ lọc, ma trận đặc trưng); kết quả là một đặc trưng cục bộ cụ thể trích từ ảnh gốc. Hình 5.1 cho thấy các chiến lược đệm khác nhau khi tích chập: nửa trên dùng đệm 0, nửa dưới dùng tích chập hợp lệ (valid, bỏ phần biên không tính trọn được).
+
+<img src="../img/qa/ch05/convolution.png" alt="conv-same"/>
+
+Hình 5.1 Minh họa phép tích chập
+
+### 5.1.3 Tầng kích hoạt
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · 16.3 Hàm kích hoạt](ml/ch16_vi?id=_163-hàm-kích-hoạt)
+
+</div>
+
+Tầng kích hoạt (Activation Layer) kích hoạt các đặc trưng mà tầng tích chập trích ra. Vì phép tích chập là phép nhân–cộng tuyến tính giữa ma trận đầu vào và ma trận kernel, cần tầng kích hoạt để ánh xạ phi tuyến. Tầng kích hoạt chủ yếu gồm hàm kích hoạt, tức lồng một hàm phi tuyến lên đầu ra của tầng tích chập, để ánh xạ đặc trưng đầu ra có quan hệ phi tuyến. Mạng tích chập thường dùng ReLU làm hàm kích hoạt (ngoài ra có tanh, sigmoid…). ReLU có dạng như công thức (5.1), đưa các giá trị nhỏ hơn 0 về 0, giữ nguyên các giá trị lớn hơn hoặc bằng 0.
+
+$$
+f(x)=\begin{cases}
+   0 &\text{nếu } x<0 \\
+   x &\text{nếu } x\ge 0
+\end{cases}
+\tag{5.1}
+$$
+
+### 5.1.4 Tầng gộp
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.5 Gộp](dl/ch07_s5_vi)
+
+</div>
+
+Tầng gộp còn gọi là tầng giảm mẫu (Downsampling Layer); vai trò là sàng lọc đặc trưng trong vùng tiếp nhận, chọn ra đặc trưng đại diện nhất trong vùng, giảm hiệu quả kích thước đặc trưng đầu ra, từ đó giảm số tham số của mô hình (ở các tầng sau). Theo kiểu thao tác thường chia thành gộp cực đại (Max Pooling), gộp trung bình (Average Pooling) và gộp tổng (Sum Pooling), lần lượt lấy giá trị lớn nhất, trung bình và tổng của các đặc trưng trong vùng tiếp nhận làm đầu ra; hay dùng nhất là gộp cực đại.
+
+### 5.1.5 Tầng kết nối đầy đủ
+
+Tầng kết nối đầy đủ (Fully Connected Layer) tổng hợp các đặc trưng mà mạng tích chập đã học được, ánh xạ đầu vào đặc trưng nhiều chiều thành đầu ra hai chiều (số mẫu trong batch × số chiều đầu ra), trong đó chiều thứ nhất là batch, chiều thứ hai thường ứng với mục tiêu của bài toán.
+
+## 5.2 Tích chập có tác dụng trực quan gì trên ảnh?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.2.3 Phát hiện Biên của Vật thể trong Ảnh](dl/ch07_s2_vi?id=_723-phát-hiện-biên-của-vật-thể-trong-Ảnh)
+
+</div>
+
+Trong mạng neuron tích chập, tích chập thường dùng để trích đặc trưng của ảnh, nhưng các tầng tích chập ở mức khác nhau trích ra loại đặc trưng khác nhau; có thể chia đại khái như Bảng 5.2.
+
+Bảng 5.2 Loại đặc trưng mà tích chập trích ra
+
+| Tầng tích chập | Loại đặc trưng |
+| :-: | :-: |
+| Tầng nông | Đặc trưng cạnh |
+| Tầng giữa | Đặc trưng cục bộ |
+| Tầng sâu | Đặc trưng toàn cục |
+
+Tích chập ảnh với các kernel khác nhau có thể dùng để phát hiện cạnh, làm sắc nét, làm mờ… Bảng 5.3 cho ảnh sau khi áp dụng các loại kernel (bộ lọc) khác nhau.
+
+Bảng 5.3 Tác dụng của một số kernel thường gặp
+
+| Tác dụng | Kernel | Ảnh sau tích chập |
+| :-: | :-: | :-: |
+| Giữ nguyên ảnh | $\begin{bmatrix} 0 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 0 \end{bmatrix}$ | <img src="../img/qa/ch05/cat.jpg" alt="origin_img"/> |
+| Phát hiện cạnh (làm nổi khác biệt ở cạnh) | $\begin{bmatrix} 1 & 0 & -1 \\ 0 & 0 & 0 \\ -1 & 0 & 1 \end{bmatrix}$ | <img src="../img/qa/ch05/cat-edgeDetect.jpg" alt="edgeDetect-1"/> |
+| Phát hiện cạnh (làm nổi giá trị ở giữa) | $\begin{bmatrix} -1 & -1 & -1 \\ -1 & 8 & -1 \\ -1 & -1 & -1 \end{bmatrix}$ | <img src="../img/qa/ch05/cat-edgeDetect-2.jpg" alt="edgeDetect-2"/> |
+| Làm sắc nét | $\begin{bmatrix} 0 & -1 & 0 \\ -1 & 5 & -1 \\ 0 & -1 & 0 \end{bmatrix}$ | <img src="../img/qa/ch05/cat-sharpen.jpg" alt="sharpen_img"/> |
+| Làm mờ hộp | $\begin{bmatrix} 1 & 1 & 1 \\ 1 & 1 & 1 \\ 1 & 1 & 1 \end{bmatrix} \times \frac{1}{9}$ | <img src="../img/qa/ch05/cat-boxblur.jpg" alt="box_blur"/> |
+| Làm mờ Gauss | $\begin{bmatrix} 1 & 2 & 1 \\ 2 & 4 & 2 \\ 1 & 2 & 1 \end{bmatrix} \times \frac{1}{16}$ | <img src="../img/qa/ch05/cat-blur-gaussian.jpg" alt="gaussian_blur"/> |
+
+## 5.3 Tầng tích chập có những tham số cơ bản nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.3 Đệm và Sải bước](dl/ch07_s3_vi) · [Học sâu · 7.4 Nhiều Kênh Đầu vào và Nhiều Kênh Đầu ra](dl/ch07_s4_vi)
+
+</div>
+
+Tầng tích chập dùng kernel (bộ lọc, bộ dò đặc trưng) nhân từng phần tử với ma trận đặc trưng ảnh. Khi trượt kernel trên các vùng tiếp nhận tương ứng, cần đặt kích thước, sải bước, số lượng kernel và cách đệm, như Bảng 5.4.
+
+Bảng 5.4 Các tham số cơ bản của tầng tích chập
+
+| Tham số | Vai trò | Thiết lập thường gặp |
+| :-: | :- | :- |
+| Kích thước kernel (Kernel Size) | Kích thước kernel quyết định vùng tiếp nhận của phép tích chập | Trước đây hay đặt 5, như LeNet-5; nay hay đặt 3, chồng nhiều kernel $3\times3$ để có vùng tiếp nhận lớn hơn |
+| Sải bước (Stride) | Bước nhảy của kernel khi tích chập | Thường đặt 1, tức trượt từng ô một, phủ được mọi tổ hợp đặc trưng ở các vị trí kề nhau; giá trị lớn hơn tương đương giảm mẫu các tổ hợp đặc trưng |
+| Cách đệm (Padding) | Khi kích thước kernel không khớp hoàn toàn với ma trận ảnh đầu vào thì cần một chiến lược đệm | 'SAME': đệm (thường là 0) ở vùng biên không đủ kích thước kernel, để kích thước đầu ra bằng đầu vào (khi sải bước 1); 'VALID': bỏ phần không đủ kích thước kernel, đầu ra không nhất thiết bằng đầu vào |
+| Số kênh vào (In Channels) | Quy định độ sâu của kernel | Mặc định bằng số kênh (độ sâu) của ma trận đặc trưng đầu vào; một số mô hình nén dùng tích chập tách theo kênh |
+| Số kênh ra (Out Channels) | Quy định số kernel | Đặt bằng số kênh vào thì giữ được kích thước vào–ra như nhau; đặt nhỏ hơn thì giảm số tham số của cả mạng |
+
+> Công thức biến đổi kích thước của tích chập (theo cách TensorFlow định nghĩa):
+>
+> $O_d =\begin{cases} \left\lceil \frac{I_d - k_{size} + 1}{s}\right\rceil, & \text{padding=VALID}\\ \left\lceil \frac{I_d}{s}\right\rceil, & \text{padding=SAME} \end{cases}$
+>
+> trong đó $I_d$ là kích thước vào, $O_d$ là kích thước ra, $k_{size}$ là kích thước kernel, $s$ là sải bước.
+
+## 5.4 Có những loại kernel tích chập nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.4 Nhiều Kênh Đầu vào và Nhiều Kênh Đầu ra](dl/ch07_s4_vi)
+
+</div>
+
+Tích chập thường gặp là dùng kernel liên tục, đặc khít trượt trên đặc trưng ảnh đầu vào, nhân từng phần tử rồi cộng. Ngoài ra còn các loại kernel khác dùng trong các nhiệm vụ khác nhau, phân loại như Bảng 5.5.
+
+Bảng 5.5 Phân loại kernel tích chập
+
+| Loại tích chập | Minh họa | Vai trò |
+| :-: | :-: | :- |
+| Tích chập chuẩn | <img src="../img/qa/ch05/img7.png" alt="image"/> | Loại hay dùng nhất; dạng ma trận liên tục đặc khít trích được quan hệ giữa các điểm ảnh kề nhau trong vùng ảnh; kernel $3\times3$ có vùng tiếp nhận $3\times3$ điểm ảnh |
+| Tích chập giãn (tích chập có lỗ, atrous) | <img src="../img/qa/ch05/img8.png" alt="image"/> | Thêm tham số tỉ lệ giãn (Dilation Rate) để kernel cùng kích thước có vùng tiếp nhận lớn hơn; tương ứng, với cùng vùng tiếp nhận thì dùng ít tham số hơn tích chập thường. Cùng là kernel $3\times3$, tích chập giãn (tỉ lệ 2) trích được đặc trưng trong vùng $5\times5$; được dùng rộng rãi trong phân vùng ảnh thời gian thực |
+| Tích chập chuyển vị | <img src="../img/qa/ch05/img10.png" alt="image"/> | Đệm ma trận đặc trưng gốc để mở rộng kích thước tới mức phù hợp với kích thước đầu ra mong muốn, rồi làm tích chập thường. Quan hệ kích thước vào–ra của nó đúng ngược với tích chập thường, nhưng đây không phải phép nghịch đảo thật sự, nên thường gọi là tích chập chuyển vị (Transposed Convolution) chứ không phải giải chập (Deconvolution). Hay gặp trong phát hiện đối tượng nhỏ và trong phân vùng ảnh để khôi phục kích thước ảnh đầu vào |
+| Tích chập tách được | <img src="../img/qa/ch05/img11.png" alt="image"/> | Tích chập chuẩn với đầu vào $H\times W\times C$ dùng $K$ kernel $k\times k\times C$, cần $k\times k\times C\times K$ tham số. Tích chập tách theo chiều sâu (depthwise separable) tách thành hai bước: tích chập $k\times k$ riêng cho từng kênh ($k\times k\times C$ tham số), rồi tích chập $1\times1$ trộn kênh ($C\times K$ tham số), tổng cộng $(k\times k + K)\times C$ tham số, cho cùng kích thước đầu ra. Tích chập tách được (Separable Convolution) thường dùng trong nén mô hình và các mạng nhẹ như MobileNet $^{[1]}$, Xception $^{[2]}$ |
+
+> **Biên tập:** công thức số tham số của bản gốc dùng $H\times W$ (kích thước *ảnh*) thay cho kích thước *kernel*, và ghi số tham số của tích chập tách được là $(H\times W + C)\times K$. Đúng là $k^2CK$ cho tích chập chuẩn và $k^2C + CK$ cho tích chập tách theo chiều sâu.
+
+## 5.5 Tích chập hai chiều và tích chập ba chiều khác nhau thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.4.1 Nhiều Kênh Đầu vào](dl/ch07_s4_vi?id=_741-nhiều-kênh-Đầu-vào)
+
+</div>
+
+- **Tích chập hai chiều**
+  Phép tích chập hai chiều như Hình 5.2. Để trực quan, hình lần lượt minh họa trường hợp đầu vào một kênh và nhiều kênh, với một kênh đầu ra. Với đầu vào một kênh, kernel có kích thước $(k_h, k_w, 1)$, trượt trên chiều không gian của ảnh đầu vào; mỗi vị trí tích chập với các giá trị trong cửa sổ $(k_h, k_w)$, cho một giá trị của ảnh đầu ra. Với đầu vào nhiều kênh, giả sử ảnh đầu vào có 3 kênh, kernel có kích thước $(k_h, k_w, 3)$; mỗi vị trí tích chập với mọi giá trị trong cửa sổ $(k_h, k_w)$ trên cả 3 kênh, cho một giá trị của ảnh đầu ra.
+
+<img src="../img/qa/ch05/5.6.1.png" alt="image"/>
+
+- **Tích chập ba chiều**
+  Phép tích chập 3D như hình dưới, cũng chia thành một kênh và nhiều kênh, giả sử chỉ dùng 1 kernel, tức ảnh đầu ra chỉ có một kênh. Với đầu vào một kênh, khác tích chập 2D ở chỗ ảnh đầu vào có thêm chiều sâu (depth), kernel cũng có thêm chiều $k_d$, nên kích thước kernel 3D là $(k_h, k_w, k_d)$; mỗi vị trí trượt tính tương quan với các giá trị trong cửa sổ $(k_h, k_w, k_d)$, cho một giá trị của ảnh 3D đầu ra. Với đầu vào nhiều kênh thì giống tích chập 2D: mỗi vị trí trượt tính tương quan với mọi giá trị trong cửa sổ $(k_h, k_w, k_d)$ trên cả 3 kênh, cho một giá trị của ảnh 3D đầu ra. Khác biệt cốt lõi: kernel 2D chỉ trượt theo hai chiều không gian, còn kernel 3D trượt theo cả chiều sâu (ví dụ chiều thời gian của video).
+
+<img src="../img/qa/ch05/5.6.2.png" alt="image"/>
+
+## 5.7 Có những phương pháp gộp nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.5 Gộp](dl/ch07_s5_vi)
+
+</div>
+
+> **Biên tập:** bản gốc không có mục 5.6; số mục được giữ nguyên.
+
+Phép gộp còn gọi là lấy mẫu con (Subsampling) hay giảm mẫu (Downsampling); khi xây mạng tích chập, nó thường đặt sau tầng tích chập để giảm kích thước đặc trưng đầu ra, vừa giảm tham số của mạng vừa góp phần chống quá khớp. Gộp giảm được kích thước ảnh vì về bản chất ảnh có tính "tĩnh": một đặc trưng hữu ích ở một vùng rất có thể cũng hữu ích ở vùng khác. Vì vậy, để mô tả một ảnh lớn, ý tưởng trực quan là thống kê tổng hợp đặc trưng ở các vị trí khác nhau, ví dụ lấy trung bình (hoặc cực đại) của đặc trưng trên một vùng cố định để đại diện cho vùng đó.
+
+Bảng 5.6 Phân loại phép gộp
+
+| Loại gộp | Minh họa | Vai trò |
+| :-: | :-: | :- |
+| Gộp thông thường (General Pooling) | <img src="../img/qa/ch05/general_pooling.png" alt="max_pooling"/> | Thường gồm gộp cực đại (Max Pooling) và gộp trung bình (Mean Pooling). Với gộp cực đại, vùng gộp $(2\times2)$ bằng sải bước $(stride=2)$, mỗi vùng chỉ được trích đặc trưng một lần. |
+| Gộp chồng lấn (Overlapping Pooling) | <img src="../img/qa/ch05/overlap_pooling.png" alt="overlap_pooling"/> | Giống gộp thông thường, nhưng kích thước vùng gộp $P_{size}$ và sải bước $stride$ thỏa $P_{size}>stride$; một điểm ảnh có thể tham gia nhiều cửa sổ, đặc trưng biểu diễn tốt hơn nhưng tính toán nhiều hơn. |
+| Gộp kim tự tháp không gian $^*$ (Spatial Pyramid Pooling) | <img src="../img/qa/ch05/spatial_pooling.png" alt="spatial_pooling"/> | Khi huấn luyện với đối tượng nhiều tỉ lệ, tầng tích chập cho phép đầu vào có kích thước thay đổi; tầng gộp thông thường ngay sau đó sẽ cho đầu ra kích thước thay đổi theo, trong khi tầng kết nối đầy đủ cuối mạng không xử lý được kích thước thay đổi. Vì vậy cần gộp các đặc trưng kích thước khác nhau về cùng một kích thước đầu ra. |
+
+> SPPNet $^{[3]}$ đưa vào tổ hợp gộp không gian: với mỗi kích thước đầu ra, dùng kích thước cửa sổ và sải bước khác nhau để đảm bảo đầu ra cố định ($win_{size}=\lceil \frac{in}{out}\rceil$, $stride=\lfloor \frac{in}{out}\rfloor$), đồng thời chồng nhiều mức gộp theo dạng kim tự tháp để trích đặc trưng phong phú hơn. Thường dùng trong huấn luyện đa tỉ lệ và trong phát hiện đối tượng để trích đặc trưng cho các vùng quan tâm (Region of Interest); RoI Pooling của Fast R-CNN chính là SPP một mức.
+
+> **Biên tập:** bản gốc gắn SPP với "mạng đề xuất vùng (RPN)"; thực ra SPP/RoI pooling dùng để trích đặc trưng cho các vùng đề xuất (trong SPPNet, Fast R-CNN), còn RPN là mạng sinh ra các vùng đề xuất.
+
+## 5.8 Tích chập $1\times1$ có tác dụng gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.4 Nhiều Kênh Đầu vào và Nhiều Kênh Đầu ra](dl/ch07_s4_vi)
+
+</div>
+
+NIN (Network in Network) $^{[4]}$ là bài báo đầu tiên khảo sát kernel $1\times1$. Bài báo dùng MLP thay kernel tuyến tính truyền thống trong tầng tích chập, để một tầng tích chập có khả năng ánh xạ phi tuyến; vì cấu trúc lồng mạng con MLP nên có tên NIN. NIN đưa đặc trưng của các kênh vào mạng con MLP, để đặc trưng giữa các kênh tương tác, tổng hợp, thông tin giữa các kênh được lưu thông; và mạng con MLP đó có thể thay bằng tích chập $1\times1$.
+
+GoogLeNet $^{[5]}$ dùng kernel $1\times1$ để giảm số tham số. Trong mô-đun Inception nguyên thủy, mỗi tầng dùng nhiều kernel hơn, làm số tham số tăng mạnh. Đặt tích chập $1\times1$ trước mỗi tầng tích chập có kernel lớn sẽ giảm số kênh đầu vào của tích chập lớn, từ đó giảm tham số. Lấy Hình 5.3 làm ví dụ, không tính hệ số điều chỉnh: nếu đầu vào và đầu ra mỗi nhánh đều có $C_1=16$ kênh, mô-đun bên trái cần $(1\times1+3\times3+5\times5+0)\times C_1\times C_1=8960$ tham số. Giả sử mô-đun bên phải dùng tích chập $1\times1$ giảm xuống $C_2=8$ kênh ($C_1>C_2$) trước các tích chập $3\times3$ và $5\times5$, các nhánh vẫn ra $C_1$ kênh, thì số tham số là $1\times1\times C_1\times C_1$ (nhánh $1\times1$) $+\ 2\times(1\times1\times C_1\times C_2)$ (hai tầng giảm kênh) $+\ (3\times3+5\times5)\times C_2\times C_1$ $+\ 1\times1\times C_1\times C_1$ (nhánh sau gộp) $=256+256+4352+256=5120$, giảm đáng kể số tham số mà gần như giữ nguyên năng lực biểu diễn.
+
+<img src="../img/qa/ch05/5.8-1.png" alt="image"/>
+
+Hình 5.3 Mô-đun Inception
+
+Tóm lại, tích chập $1\times 1$ chủ yếu có hai tác dụng:
+
+- Cho thông tin giữa các kênh tương tác và tổng hợp với nhau.
+- Giảm hoặc tăng số kênh, giảm số tham số.
+
+> **Biên tập:** phép tính của bản gốc cho mô-đun bên phải, $(1\times1\times (3C_1+C_2)+3\times3\times C_2 +5\times5\times C_2)\times C_1=5248$, không khớp với hình (hai tầng giảm kênh ra $C_2$, hai tầng $1\times1$ còn lại ra $C_1$). Tính đúng theo hình là 5120. Bản gốc cũng nói "không thay đổi năng lực biểu diễn", điều này quá mạnh vì việc giảm kênh có làm mất một phần thông tin.
+
+## 5.9 Tầng tích chập và tầng gộp khác nhau thế nào?
+
+Tầng tích chập và tầng gộp có cấu trúc khá giống nhau: đều trích đặc trưng trong vùng tiếp nhận, và tùy sải bước mà cho đầu ra kích thước khác nhau; nhưng thao tác bên trong khác nhau về bản chất, như Bảng 5.7.
+
+Bảng 5.7 So sánh tầng tích chập và tầng gộp
+
+| | Tầng tích chập | Tầng gộp |
+| :-: | :-: | :-: |
+| **Cấu trúc** | Có đệm 0 thì kích thước không gian giữ nguyên, số kênh thay đổi | Thường giảm kích thước không gian, số kênh giữ nguyên |
+| **Độ ổn định** | Đầu vào thay đổi nhỏ thì đầu ra cũng thay đổi | Thay đổi nhỏ trong vùng tiếp nhận không ảnh hưởng đầu ra |
+| **Vai trò** | Trích đặc trưng tương quan cục bộ trong vùng tiếp nhận | Trích đặc trưng khái quát trong vùng tiếp nhận, giảm kích thước |
+| **Số tham số** | Phụ thuộc kích thước và số lượng kernel | Không có tham số |
+
+## 5.10 Kernel tích chập càng lớn có càng tốt không?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 4.5.3 Đặc điểm của mô hình](qa/ch04_vi?id=_453-Đặc-điểm-của-mô-hình)
+
+</div>
+
+Các CNN đời đầu (như LeNet-5, AlexNet) dùng một số kernel lớn ($11\times11$ và $5\times 5$). Vì hạn chế về năng lực tính toán và thiết kế mô hình thời đó, không thể chồng mạng thật sâu, nên tầng tích chập cần kernel lớn để có vùng tiếp nhận lớn. Nhưng kernel lớn lại làm khối lượng tính toán tăng mạnh, khó huấn luyện mô hình sâu hơn, hiệu năng tính toán cũng giảm. Các CNN sau này (VGG, GoogLeNet…) nhận ra chồng 2 kernel $3\times 3$ cho vùng tiếp nhận bằng một kernel $5\times 5$ mà số tham số ít hơn ($2\times3\times3=18 < 5\times5=25$ cho mỗi cặp kênh vào–ra), nên kernel $3\times 3$ được dùng rộng rãi. Vì vậy có thể coi rằng trong đa số trường hợp, chồng nhiều kernel nhỏ hiệu quả hơn dùng một kernel lớn.
+
+Tuy vậy, không có nghĩa kernel lớn vô dụng; trong một số lĩnh vực vẫn có thể dùng kernel lớn. Ví dụ trong xử lý ngôn ngữ tự nhiên, văn bản không thể trừu tượng hóa đặc trưng qua thật nhiều tầng như ảnh, nên thường chỉ cần mạng nông để trích đặc trưng. Khi dùng CNN cho xử lý ngôn ngữ tự nhiên, mạng thường gồm khá ít tầng tích chập, nhưng đặc trưng văn bản đôi khi cần vùng tiếp nhận rộng để mô hình tổ hợp được nhiều đặc trưng hơn (như cụm từ, ký tự); khi đó dùng trực tiếp kernel lớn là lựa chọn tốt hơn. (Gần đây, một số mạng ảnh như ConvNeXt, RepLKNet cũng quay lại dùng kernel lớn $7\times7$ tới $31\times31$ dạng depthwise.)
+
+Tóm lại, kích thước kernel không có tốt xấu tuyệt đối, phải tùy tình huống ứng dụng; nhưng kernel cực lớn hay cực nhỏ đều không phù hợp: kernel $1\times 1$ đơn lẻ chỉ dùng được để trộn kênh, không tổ hợp được đặc trưng không gian của đầu vào; kernel cực lớn thường tổ hợp quá nhiều đặc trưng vô nghĩa, lãng phí nhiều tài nguyên tính toán.
+
+> **Biên tập:** bản gốc so sánh số tham số bằng biểu thức "$3×3×2+1 < 5×5×1+1$" (lẫn số hạng chệch); đã viết lại rõ ràng.
+
+## 5.11 Mỗi tầng tích chập có buộc chỉ dùng một kích thước kernel không?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 4.6.2 Cấu trúc mô hình](qa/ch04_vi?id=_462-cấu-trúc-mô-hình)
+
+</div>
+
+Các mạng kinh điển thường là mạng xếp tầng, mỗi tầng chỉ dùng một kích thước kernel, như VGG dùng rất nhiều tầng $3×3$. Thực ra cùng một tầng có thể dùng nhiều kernel kích thước khác nhau để có đặc trưng ở nhiều tỉ lệ, rồi kết hợp lại; đặc trưng thu được thường tốt hơn dùng một kích thước, như GoogLeNet và họ Inception đều dùng nhiều loại kernel trong mỗi tầng. Như Hình 5.4, đặc trưng đầu vào cùng lúc đi qua ba kernel $1×1$, $3×3$ và $5×5$, rồi các đặc trưng thu được được ghép lại; đặc trưng mới có thể coi là tổ hợp đặc trưng từ các vùng tiếp nhận khác nhau, biểu diễn mạnh hơn so với chỉ dùng một kích thước.
+
+<img src="../img/qa/ch05/5.11-1.png" alt="image"/>
+
+Hình 5.4 Cấu trúc mô-đun Inception
+
+## 5.12 Làm sao giảm số tham số của tầng tích chập?
+
+Có thể tóm tắt các cách giảm số tham số của tầng tích chập:
+
+- Chồng kernel nhỏ thay cho kernel lớn: trong VGG, 2 kernel $3\times 3$ thay được 1 kernel $5\times 5$
+- Dùng tích chập tách được: tách tích chập $K\times K\times C$ thành hai phần $K\times K\times 1$ (từng kênh) và $1\times1\times C$
+- Thêm tích chập $1\times 1$: giống tích chập tách được nhưng số kênh thay đổi được: thêm kernel $1\times1\times C_2$ trước tích chập $K\times K\times C_1$ (với $C_2 <C_1$)
+- Dùng gộp trước tầng tích chập: gộp làm giảm kích thước đặc trưng đầu vào của tầng tích chập (giảm khối lượng tính, dù không giảm tham số của chính tầng tích chập)
+
+## 5.13 Khi tích chập, có bắt buộc xét cùng lúc kênh và vùng không gian không?
+
+
+Tích chập chuẩn xử lý vùng không gian và kênh cùng lúc, như hình dưới:
+
+<img src="../img/qa/ch05/5.13-1.png" alt="image"/>
+
+Làm vậy giúp cấu trúc bên trong tầng tích chập đơn giản: mỗi điểm đặc trưng đầu ra được trích từ cùng một vùng trên mọi kênh.
+
+Nhưng cách này kém linh hoạt, và trong mạng sâu khiến tính toán kém hiệu quả. Cách linh hoạt hơn là tách tích chập theo vùng và theo kênh; từ đó ra đời mạng tích chập tách theo kênh (tách theo chiều sâu). Như hình dưới, mạng Xception giải quyết vấn đề trên.
+
+<img src="../img/qa/ch05/5.13-2.png" alt="image"/>
+
+Trước hết tích chập riêng trên từng kênh, có bao nhiêu kênh thì có bấy nhiêu bộ lọc. Có ma trận đặc trưng mới của các kênh rồi, lại làm tích chập chuẩn $1×1$ qua các kênh với chúng.
+
+## 5.14 Dùng tích chập rộng có lợi gì?
+
+Tích chập rộng (wide convolution) là khái niệm đối lập với tích chập hẹp; thực ra nó không phải một loại tích chập mà là cách đệm khi tích chập, ứng với đệm 'SAME' và 'VALID'. Đệm 'SAME' thường đệm 0 để bù cho phần đặc trưng đầu vào không chia hết theo kernel, giữ kích thước đầu ra bằng kích thước đầu vào; đệm 'VALID' thì ngược lại, không đệm gì, ở biên nếu không đủ chỗ cho kernel thì bỏ thông tin biên, nên với sải bước 1 đầu ra có thể nhỏ hơn đầu vào một chút. Ngoài ra, vì cách thứ nhất đệm 0 để tích chập trọn vẹn, nó giữ được thông tin ở biên của đặc trưng đầu vào tốt hơn.
+
+Ví dụ phần trái hình dưới là tích chập hẹp. Chú ý càng ở biên thì càng được tích chập ít lần. Tích chập rộng có thể coi là đệm 0 ở biên trước khi tích chập, thường có hai trường hợp: một là đệm đầy đủ (full), như phần phải hình dưới, khi đó đầu ra lớn hơn đầu vào; hai là đệm một phần 0 để đầu ra bằng đầu vào.
+
+<img src="../img/qa/ch05/5.14.1.png" alt="image"/>
+
+## 5.15 Hiểu tích chập chuyển vị và hiệu ứng bàn cờ
+
+### 5.15.1 Tích chập chuẩn
+
+Trước khi hiểu tích chập chuyển vị, cần hiểu cách tính của tích chập chuẩn.
+
+Trước hết là một ví dụ đầu vào và kết quả:
+
+<img src="../img/qa/ch05/img32.png" alt="image"/>
+
+Kết quả được tính thế nào?
+
+Theo định nghĩa toán học, khi tích chập cần xoay kernel 180 độ, đặt tâm kernel trùng với điểm ảnh cần tính; đầu ra là giá trị điểm ảnh mới tại vị trí trùng tâm đó. Ví dụ tính như sau:
+
+<img src="../img/qa/ch05/5.19.1-2.png" alt="image"/>
+
+Như vậy tính được giá trị sau tích chập của điểm ảnh góc trên bên trái (hàng 1 cột 1).
+
+Một ví dụ trực quan hơn, nhìn từ trái sang phải: điểm ảnh ban đầu qua tích chập từ 1 thành $-8$.
+
+<img src="../img/qa/ch05/5.19.1-3.png" alt="image"/>
+
+Trượt kernel sẽ được kết quả tích chập của cả ảnh.
+
+> **Biên tập:** việc xoay kernel 180 độ là theo định nghĩa tích chập trong toán và xử lý ảnh. Các framework học sâu (PyTorch `nn.Conv2d`, TensorFlow) thực chất tính tương quan chéo (cross-correlation), không xoay kernel; vì kernel được học nên hai cách tương đương.
+
+### 5.15.2 Tích chập chuyển vị
+
+Quá trình "giải chập" (deconvolution, đúng hơn là tích chập chuyển vị) của ảnh như sau:
+
+<img src="../img/qa/ch05/5.19.2-5.png" alt="image"/>
+
+Đầu vào: $2\times2$, kernel: $4\times4$, sải bước: 3, đầu ra: $7\times7$.
+
+Quá trình:
+
+1. Mỗi điểm ảnh đầu vào được tích chập đầy đủ (full) một lần với kernel; theo công thức tích chập đầy đủ, mỗi điểm ảnh sau tích chập có kích thước $1+4-1=4$, tức ánh xạ đặc trưng $4\times4$; đầu vào có 4 điểm ảnh nên được 4 ánh xạ đặc trưng $4\times4$.
+
+2. Cộng 4 ánh xạ đặc trưng với bước dịch 3; vị trí đầu ra tương ứng với vị trí đầu vào. Bước 3 nghĩa là cách 3 điểm ảnh mới đặt ánh xạ tiếp theo, phần chồng lấn thì cộng lại: ví dụ hàng 1 cột 4 của đầu ra bằng hàng 1 cột 4 của ánh xạ màu đỏ cộng hàng 1 cột 1 của ánh xạ màu xanh lá, các vị trí khác tương tự.
+
+   Có thể thấy kích thước của tích chập chuyển vị do kích thước kernel và sải bước quyết định; với $in$ là kích thước vào, $k$ là kích thước kernel, $s$ là sải bước, $out$ là kích thước ra: $out = (in - 1) \times s + k$. Ở hình trên, $(2 - 1) \times 3 + 4 = 7$. (Nếu có đệm $p$ thì $out = (in-1)\times s - 2p + k$.)
+
+### 5.15.3 Hiệu ứng bàn cờ
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Odena và cộng sự, "Deconvolution and Checkerboard Artifacts" (Distill)](https://distill.pub/2016/deconv-checkerboard/) ↗
+
+</div>
+
+Hiệu ứng bàn cờ (checkerboard artifacts) là các vệt sáng tối xen kẽ dạng ô bàn cờ trong ảnh do tích chập chuyển vị sinh ra (hay gặp ở GAN, siêu phân giải, phân vùng). Nguyên nhân là *chồng lấn không đều*: khi kích thước kernel $k$ không chia hết cho sải bước $s$ (ví dụ $k=3, s=2$), có điểm đầu ra nhận đóng góp từ nhiều vị trí đầu vào hơn điểm bên cạnh, nên một số điểm "đậm" hơn một cách có hệ thống. Ví dụ trên ($k=4, s=3$) cũng thấy rõ: chỉ những cột chồng lấn mới là tổng của hai ánh xạ. Chồng nhiều tầng tích chập chuyển vị càng làm hiện tượng rõ hơn.
+
+Cách giảm:
+
+1. Chọn $k$ chia hết cho $s$ (ví dụ $k=4, s=2$) để chồng lấn đều (vẫn có thể bị bàn cờ nếu trọng số học không cân).
+2. Thay tích chập chuyển vị bằng phóng to (nội suy láng giềng gần nhất hoặc song tuyến tính) rồi tích chập thường; đây là cách được khuyên dùng.
+3. Dùng sub-pixel convolution (pixel shuffle) với khởi tạo phù hợp.
+
+> **Biên tập:** bản gốc chỉ có tiêu đề mục này, không có nội dung; phần trên do người biên soạn viết thêm theo bài của Odena, Dumoulin và Olah (Distill, 2016).
+
+## 5.16 Thiết lập tham số của mạng neuron tích chập
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 12.11 Lập lịch Tốc độ học](dl/ch12_s11_vi) · [Ôn tập · 3.5.5 Rốt cuộc điều chỉnh batch size ảnh hưởng thế nào tới kết quả huấn luyện?](qa/ch03_vi?id=_355-rốt-cuộc-điều-chỉnh-batch-size-ảnh-hưởng-thế-nào-tới-kết-quả-huấn-luyện)
+
+</div>
+
+Các tham số thường gặp của mạng tích chập cũng tương tự ở các loại mạng khác, nhưng thiết lập cụ thể phải dựa vào nhiệm vụ để chọn trong phạm vi hợp lý; danh sách tham số như Bảng 5.8.
+
+Bảng 5.8 Các tham số thường gặp của mạng neuron tích chập
+
+| Tham số | Thiết lập thường gặp | Giải thích |
+| :-: | :-: | :- |
+| Tốc độ học (Learning Rate) | $0$–$1$ | Bước cập nhật ma trận trọng số trong lan truyền ngược. Nhiều mạng giảm tốc độ học theo cấp số nhân sau một số vòng lặp cố định hoặc khi mô hình ngừng tiến bộ (như $lr=lr\times 0.1$). Tốc độ học càng lớn, sai số ảnh hưởng tới trọng số càng mạnh, dễ dao động quanh một cực tiểu cục bộ; tốc độ học càng nhỏ, trọng số cập nhật càng tinh, nhưng cần nhiều thời gian lặp hơn |
+| Kích thước batch (Batch Size) | $1$–$N$ | Số mẫu đưa vào mô hình mỗi lần, chọn theo nhiệm vụ và giới hạn tính toán; nhiều bài toán ảnh chỉ chọn được giá trị nhỏ vì giới hạn tính toán và bộ nhớ. Batch lớn hơn cho gradient ít nhiễu hơn, đường mất mát mượt hơn, tận dụng phần cứng tốt hơn, nhưng mỗi vòng lặp tốn thời gian hơn; batch quá lớn có thể làm khả năng tổng quát hóa kém đi nếu không chỉnh lại tốc độ học |
+| Số epoch (Epoch) | $1$–$N$ | Số lần toàn bộ dữ liệu huấn luyện đi qua mô hình, tùy quy mô và phân phối dữ liệu. Khi mô hình đơn giản hoặc dữ liệu ít, số epoch không nên quá cao, nếu không dễ quá khớp; mô hình phức tạp hoặc dữ liệu đủ lớn thì có thể tăng số epoch |
+| Hệ số suy giảm trọng số (Weight Decay) | $0$–$0.001$ | Hệ số phạt độ lớn trọng số khi cập nhật bằng lan truyền ngược |
+
+> **Biên tập:** bản gốc nói batch càng lớn thì "khả năng tổng quát hóa càng mạnh" (với cùng số vòng lặp). Nhiều nghiên cứu (ví dụ Keskar và cộng sự, 2017) cho thấy batch rất lớn thường hội tụ về cực tiểu "nhọn" và tổng quát hóa kém hơn, trừ khi chỉnh tốc độ học tương ứng; đã sửa.
+
+## 5.17 Nâng cao khả năng tổng quát hóa của mạng neuron tích chập
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 5.5 Tổng quát hóa trong Học sâu](dl/ch05_s5_vi) · [Học sâu · 5.6 Dropout](dl/ch05_s6_vi) · [Học sâu · 3.7 Suy giảm Trọng số](dl/ch03_s7_vi)
+
+</div>
+
+Giống các mạng neuron khác, khi huấn luyện bằng lan truyền ngược, mạng tích chập phụ thuộc khá nhiều vào phân phối dữ liệu đầu vào; khi phân phối dữ liệu quá lệch, mô hình dễ dưới khớp hoặc quá khớp. Bảng 5.9 ghi các cách nâng cao khả năng tổng quát hóa của mạng tích chập.
+
+Bảng 5.9 Các cách nâng cao khả năng tổng quát hóa của mạng tích chập
+
+| Cách làm | Giải thích |
+| :-: | :- |
+| Dùng nhiều dữ liệu hơn | Nếu có điều kiện, thu thập càng nhiều dữ liệu huấn luyện càng tốt là cách lý tưởng nhất; nhiều dữ liệu giúp mô hình học đầy đủ, dễ tổng quát hóa hơn |
+| Dùng batch lớn hơn (có chừng mực) | Với cùng số vòng lặp và tốc độ học, mỗi batch có nhiều dữ liệu hơn giúp gradient ổn định hơn, đầu ra mô hình ổn định hơn (xem lưu ý ở 5.16) |
+| Điều chỉnh phân phối dữ liệu | Phần lớn dữ liệu thực tế phân phối không đều; mô hình học quá nhiều một loại dữ liệu dễ thiên về loại đó; điều chỉnh phân phối dữ liệu đầu vào (lấy mẫu lại, gán trọng số) giúp tổng quát hóa tốt hơn phần nào |
+| Điều chỉnh hàm mục tiêu | Đôi khi việc chọn hàm mục tiêu ảnh hưởng tới khả năng tổng quát hóa. Ví dụ với $f(y,y')=\vert y-y'\vert$, khi một số mẫu đã được dự đoán khá chính xác còn mẫu khác sai số lớn, mọi mẫu có gradient cùng độ lớn; đổi thành $f(y,y')=(y-y')^2$ thì gradient của mẫu sai số nhỏ nhỏ hơn mẫu sai số lớn, giúp cân bằng vai trò các mẫu (đổi lại nhạy với ngoại lai hơn) |
+| Điều chỉnh kiến trúc mạng | Mạng tích chập nông có ít tham số, năng lực biểu diễn có thể không đủ, gây dưới khớp; chồng thêm tầng tích chập tăng tham số, tăng năng lực biểu diễn. Mạng sâu mà không đủ dữ liệu thì dễ quá khớp; đơn giản hóa kiến trúc, giảm số tầng giúp tổng quát hóa tốt hơn |
+| Tăng cường dữ liệu | Còn gọi là mở rộng dữ liệu: với dữ liệu có hạn, dùng các phép biến đổi như dịch, xoay, thêm nhiễu… để tăng dữ liệu huấn luyện, dữ liệu cùng lớp có nhiều dạng biểu hiện hơn, giúp tổng quát hóa. Chú ý biến đổi không được phá hủy đặc trưng chính của dữ liệu gốc (ví dụ khi cắt ảnh trong phân loại không được cắt mất đối tượng chính) |
+| Điều chuẩn trọng số | Là điều chuẩn theo nghĩa thông thường: thêm vào hàm mất mát một số hạng phạt theo ma trận trọng số, phạt trường hợp mất mát nhỏ nhưng trọng số quá lớn (thường là trọng số đã khớp quá sát dữ liệu), ví dụ $Loss=f(WX+b,y')+\lambda\sum{\vert W\vert}$ |
+| Tắt ngẫu nhiên neuron | Có thể coi là điều chuẩn ở mức cấu trúc mạng: tắt ngẫu nhiên đầu ra của một số neuron, để các neuron còn lại phát huy tác dụng, làm mô hình chịu lỗi tốt hơn (dropout) |
+
+> Các cách trên dùng chung được cho phần lớn mô hình mạng neuron.
+
+## 5.18 Ứng dụng của mạng neuron tích chập trong các lĩnh vực
+
+Phép tích chập là thành phần then chốt của mạng tích chập, mà tích chập chỉ là một phép toán, áp dụng được cho mọi loại dữ liệu biểu diễn bằng số, dù các số đó là giá trị điểm ảnh, ký tự trong chuỗi văn bản hay đoạn âm thanh của một từ. Chỉ cần dữ liệu gốc được biểu diễn bằng số một cách hiệu quả, mạng tích chập dùng được trong nhiều lĩnh vực; điều cần quan tâm là áp dụng các đặc tính của tích chập vào từng lĩnh vực sao cho tốt, như Bảng 5.10.
+
+Bảng 5.10 Ứng dụng của mạng neuron tích chập trong các lĩnh vực
+
+| Lĩnh vực | Minh họa dữ liệu đầu vào | Giải thích |
+| :-: | :-: | :- |
+| Xử lý ảnh | <img src="../img/qa/ch05/Image-process.png" alt="image_process"/> | CNN được dùng rất rộng rãi trong xử lý ảnh, vì dữ liệu ảnh có tính cục bộ và tính bất biến tịnh tiến rất rõ: điểm ảnh gần nhau tương quan mạnh, và một mẫu (cạnh, góc) có ý nghĩa như nhau ở mọi vị trí |
+| Xử lý ngôn ngữ tự nhiên | <img src="../img/qa/ch05/NLP.png" alt="NLP"/> | Câu được biểu diễn thành ma trận (số từ × số chiều embedding); kernel trượt theo chiều chuỗi, mỗi kernel có chiều rộng bằng số chiều embedding, giống một bộ dò n-gram (ví dụ TextCNN) |
+| Xử lý giọng nói | <img src="../img/qa/ch05/audio-recognition.png" alt="audio_process"/> | Âm thanh được biến đổi thành phổ (spectrogram, thời gian × tần số) rồi dùng tích chập 2D như ảnh, hoặc tích chập 1D trực tiếp trên dạng sóng (như WaveNet) |
+
+> **Biên tập:** hai ô giải thích cho xử lý ngôn ngữ tự nhiên và xử lý giọng nói trong bản gốc bị bỏ trống, còn ô xử lý ảnh thì dở dang; đã viết bổ sung.
+
+### 5.18.1 Liên hệ
+
+Xử lý ngôn ngữ tự nhiên thao tác trên tín hiệu một chiều (chuỗi từ).
+Thị giác máy tính thao tác trên tín hiệu hai chiều (ảnh) hoặc ba chiều (video).
+
+### 5.18.2 Khác biệt
+
+Dữ liệu đầu vào của xử lý ngôn ngữ tự nhiên thường là giá trị rời rạc (ví dụ một từ hay chữ cái thường là vector one-hot trong từ điển), còn của thị giác máy tính là giá trị liên tục (ví dụ mức xám chuẩn hóa về khoảng 0–1). CNN có hai đặc điểm chính: bất biến vị trí (location invariance) và tính tổ hợp (compositionality).
+
+1. Bất biến vị trí: bộ lọc trượt trên vector (ảnh) đầu vào của mỗi tầng, phát hiện thông tin cục bộ, rồi gộp lấy cực đại hoặc trung bình. Bước gộp tổng hợp đặc trưng cục bộ nhưng mất thông tin vị trí của từng đặc trưng. Điều này rất hợp với các bài toán ảnh, ví dụ để xem ảnh có con mèo không, bạn có thể không quan tâm con mèo ở vùng nào. Nhưng trong ngôn ngữ, vị trí và thứ tự của từ trong câu hay đoạn văn là thông tin rất quan trọng.
+2. Tính tổ hợp cục bộ: trong CNN, mỗi bộ lọc tổ hợp đặc trưng cục bộ mức thấp thành đặc trưng toàn cục hơn ở mức cao. Trong thị giác máy tính điều này rất dễ hiểu: điểm ảnh tổ hợp thành cạnh, cạnh thành hình dạng, cuối cùng các hình dạng tổ hợp thành biểu diễn vật thể phức tạp. Trong ngôn ngữ dĩ nhiên cũng có quan hệ tổ hợp tương tự, nhưng không trực tiếp bằng ảnh. Hơn nữa trong ảnh, các điểm ảnh kề nhau gần như luôn tương quan, còn các từ kề nhau thì chưa chắc.
+
+## 5.19 Mạng neuron tích chập làm nổi bật tính chung bằng những cách nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.1 Từ Tầng Kết nối Đầy đủ đến Tích chập](dl/ch07_s1_vi)
+
+</div>
+
+### 5.19.1 Kết nối cục bộ
+
+Trước hết là khái niệm vùng tiếp nhận (receptive field): vùng của đầu vào mà mỗi neuron được nối tới.
+Trong tích chập ảnh, neuron kết nối cục bộ theo chiều không gian nhưng kết nối đầy đủ theo chiều sâu (kênh). Ý tưởng kết nối cục bộ lấy cảm hứng từ cấu trúc hệ thị giác trong sinh học: neuron ở vỏ não thị giác chỉ nhận thông tin cục bộ. Với ảnh hai chiều, các điểm ảnh lân cận tương quan mạnh. Kết nối cục bộ đảm bảo bộ lọc sau huấn luyện phản ứng mạnh nhất với đặc trưng cục bộ, giúp mạng trích được đặc trưng cục bộ của dữ liệu.
+Hình dưới là minh họa kinh điển: bên trái là kết nối đầy đủ, bên phải là kết nối cục bộ.
+
+<img src="../img/qa/ch05/5.27.1.png" alt="image"/>
+
+Với ảnh đầu vào $1000 \times 1000$, nếu tầng ẩn tiếp theo có $10^6$ neuron, kết nối đầy đủ sẽ có $1000 \times 1000 \times 10^6 = 10^{12}$ trọng số, số tham số khổng lồ gần như không thể huấn luyện; còn kết nối cục bộ, mỗi neuron ẩn chỉ nối với một vùng $10 \times 10$ của ảnh, thì số trọng số là $10 \times 10 \times 10^6 = 10^8$, giảm trực tiếp 4 bậc độ lớn.
+
+### 5.19.2 Chia sẻ trọng số
+
+Chia sẻ trọng số nghĩa là các neuron cùng một lát độ sâu (cùng kênh đầu ra) dùng chung tham số kernel. Chia sẻ trọng số có ý nghĩa ở chỗ đặc trưng cạnh mức thấp trích ra trong mạng không phụ thuộc vị trí của nó trong ảnh. Nhưng trong một số tình huống thì không hợp lý, ví dụ trong nhận dạng khuôn mặt (đã căn chỉnh), ta muốn học các đặc trưng khác nhau ở các vị trí khác nhau.
+Cần chú ý: trọng số chỉ được chia sẻ giữa các neuron cùng một lát độ sâu. Trong tầng tích chập thường dùng nhiều nhóm kernel để trích các đặc trưng khác nhau, ứng với các lát độ sâu khác nhau, và trọng số giữa các lát độ sâu khác nhau không chia sẻ. Hệ số điều chỉnh cũng được chia sẻ giữa mọi neuron trong cùng một lát độ sâu.
+Lợi ích của chia sẻ trọng số là giảm mạnh độ khó huấn luyện. Như hình dưới, giả sử trong kết nối cục bộ mỗi neuron ẩn nối với một vùng $10 \times 10$, tức có $10 \times 10$ trọng số; chia sẻ $10 \times 10$ trọng số này cho mọi neuron còn lại, tức $10^6$ neuron ẩn có cùng trọng số, thì dù tầng ẩn có bao nhiêu neuron, số tham số cần huấn luyện chỉ là $10 \times 10$ (đúng bằng kích thước kernel).
+
+<img src="../img/qa/ch05/5.27.2.png" alt="image"/>
+
+Đây là chỗ kỳ diệu của mạng neuron tích chập: dùng rất ít tham số mà vẫn đạt hiệu quả rất tốt. Trên đây chỉ là quá trình trích một loại đặc trưng của ảnh. Muốn trích thêm đặc trưng, có thể thêm nhiều kernel; mỗi kernel cho một loại đặc trưng khác nhau của ảnh, gọi là ánh xạ đặc trưng (feature map).
+
+### 5.19.3 Phép gộp
+
+Phép gộp cùng với cấu trúc nhiều tầng thực hiện việc giảm chiều dữ liệu, tổ hợp đặc trưng cục bộ mức thấp thành đặc trưng mức cao hơn, từ đó biểu diễn được cả bức ảnh. Như hình dưới:
+
+<img src="../img/qa/ch05/5.27.3.png" alt="image"/>
+
+## 5.20 Kết nối đầy đủ, kết nối cục bộ, tích chập toàn cục và tích chập cục bộ
+
+Phần lớn mạng neuron dùng tầng kết nối đầy đủ (Fully Connected Layer) ở các tầng cao, tổng hợp đặc trưng toàn cục qua kết nối nhiều–nhiều, trích hiệu quả thông tin toàn cục. Nhưng kết nối đầy đủ cần rất nhiều tham số, là một trong những phần tốn tài nguyên nhất của mạng; vì vậy cần kết nối cục bộ (Locally Connected Layer): neuron chỉ nối trong một vùng cục bộ, giảm hiệu quả số tham số. Theo phạm vi tác dụng của phép tích chập, có thể chia thành tích chập toàn cục (Global Convolution) và tích chập cục bộ (Local Convolution). Thực ra "tích chập toàn cục" ở đây chính là tích chập chuẩn, tức dùng cùng tham số kernel trên toàn bộ đầu vào; cách chia sẻ tham số toàn cục này giảm mạnh số tham số kết nối giữa các neuron. Tích chập cục bộ còn gọi là tích chập lát gạch (Tiled Convolution) hoặc tích chập không chia sẻ (Unshared Convolution), là dung hòa giữa kết nối cục bộ và tích chập toàn cục. So sánh bốn kiểu như Bảng 5.11.
+
+Bảng 5.11 So sánh các kiểu kết nối trong mạng tích chập
+
+| Kiểu kết nối | Minh họa | Giải thích |
+| :-: | :-: | :- |
+| Kết nối đầy đủ | <img src="../img/qa/ch05/full-connected.png" alt="full-connected"/> | Các neuron giữa hai tầng nối với nhau hoàn toàn; mỗi neuron đầu ra lấy được thông tin của mọi neuron đầu vào, có lợi cho tổng hợp thông tin, thường đặt ở cuối mạng; mỗi kết nối có tham số riêng, rất nhiều kết nối làm số tham số tăng mạnh. |
+| Kết nối cục bộ | <img src="../img/qa/ch05/local-connected.png" alt="local-connected"/> | Các neuron giữa hai tầng chỉ nối trong phạm vi cục bộ, trong phạm vi đó nối đầy đủ, ngoài phạm vi thì không nối; mỗi kết nối có tham số riêng; so với kết nối đầy đủ, bỏ các kết nối ngoài vùng tiếp nhận nên giảm hiệu quả số tham số |
+| Tích chập toàn cục | <img src="../img/qa/ch05/conv.png" alt="convolution"/> | Các neuron giữa hai tầng chỉ nối trong phạm vi cục bộ, trong phạm vi đó nối đầy đủ, và tham số được chia sẻ giữa các vùng tiếp nhận, có lợi cho trích đặc trưng của một mẫu cụ thể; so với kết nối cục bộ, chia sẻ tham số giữa các vùng tiếp nhận giảm số tham số thêm nữa. |
+| Tích chập cục bộ | <img src="../img/qa/ch05/local-conv.png" alt="local-conv"/> | Các neuron giữa hai tầng chỉ nối trong phạm vi cục bộ, trong vùng tiếp nhận nối đầy đủ, còn giữa các vùng tiếp nhận thì xen kẽ kiểu kết nối cục bộ và tích chập toàn cục; so với tích chập toàn cục thêm tham số gấp nhiều lần nhưng linh hoạt và biểu diễn mạnh hơn; so với kết nối cục bộ thì kiểm soát được số tham số |
+
+> **Biên tập:** "tích chập toàn cục" ở đây là cách gọi của bản gốc cho tích chập chuẩn, không nên nhầm với "mạng tích chập toàn phần" (Fully Convolutional Network, FCN) trong phân vùng ảnh.
+
+## 5.21 Ứng dụng của tích chập cục bộ
+
+Không phải tích chập nào cũng chia sẻ trọng số; trong một số nhiệm vụ cụ thể, người ta dùng tích chập không chia sẻ trọng số. Dưới đây giải thích qua bài toán nhận dạng khuôn mặt. Khi đọc các bài báo về khuôn mặt, sẽ thấy nhiều bài thêm một Local Connected Conv ở phía cuối, tức tầng tích chập không chia sẻ trọng số. Lý do: khuôn mặt đầu vào đã được căn chỉnh (bằng mô hình 3D) nên mỗi vị trí trong ảnh luôn ứng với cùng một bộ phận của mặt, và tầng không chia sẻ trọng số tận dụng điều đó để CNN phát huy tối đa hiệu quả.
+
+<img src="../img/qa/ch05/img66.png" alt="image"/>
+
+Hình trên trích từ bài báo DeepFace; sau căn chỉnh 3D, ảnh đều có kích thước $152×152$, đưa vào mạng trên. Tham số của cấu trúc:
+
+Conv: 32 kernel $11×11×3$,
+
+Max-pooling: $3×3$, stride=2,
+
+Conv: 16 kernel $9×9$,
+
+Local-Conv: 16 kernel $9×9$,
+
+Local-Conv: 16 kernel $7×7$,
+
+Local-Conv: 16 kernel $5×5$,
+
+Fully-connected: 4096 chiều,
+
+Softmax: 4030 chiều.
+
+Ba tầng đầu nhằm trích đặc trưng mức thấp, như cạnh và kết cấu đơn giản. Tầng max-pooling giúp đầu ra của tích chập bền vững hơn với các dịch chuyển nhỏ. Nhưng không thể dùng nhiều tầng max-pooling hơn, vì quá nhiều tầng max-pooling làm mạng mất thông tin ảnh. Tầng kết nối đầy đủ nối mỗi đơn vị của tầng trước với mọi đơn vị của tầng này, để nắm bắt tương quan giữa đặc trưng ở các vị trí khác nhau của ảnh khuôn mặt. Cuối cùng dùng tầng softmax để phân loại khuôn mặt.
+Ba tầng giữa đều dùng kernel không chia sẻ tham số, vì:
+
+(1) Trong ảnh khuôn mặt đã căn chỉnh, các vùng khác nhau có đặc trưng thống kê khác nhau, nên không có tính ổn định cục bộ của đặc trưng; dùng cùng một kernel sẽ làm mất thông tin.
+
+(2) Kernel không chia sẻ không làm tăng khối lượng tính đặc trưng khi suy luận, chỉ tăng số tham số cần huấn luyện.
+Vì số tham số cần huấn luyện tăng mạnh khi không chia sẻ kernel, thường phải dùng thêm các cách khác để tăng lượng dữ liệu.
+
+> **Biên tập:** bản gốc viết "tác dụng của tầng này là dùng mô hình 3D để căn chỉnh khuôn mặt"; căn chỉnh 3D là bước tiền xử lý *trước* mạng, còn tầng tích chập cục bộ tận dụng việc ảnh đã căn chỉnh.
+
+## 5.22 Gộp NetVLAD
+
+(*Người đóng góp: Hùng Sở Nguyên – Đại học Nhân dân Trung Quốc*)
+
+NetVLAD là phương pháp tổng hợp đặc trưng cục bộ do bài báo [15] đề xuất.
+
+Trong các mạng truyền thống, ví dụ VGG, đầu ra của tầng tích chập cuối có dạng Batchsize × 3 × 3 × 512, sau đó qua kết nối đầy đủ, hoặc gộp trung bình toàn cục (cách làm của NIN), hay cách nào đó, để thành một vector đặc trưng, rồi dùng softmax hoặc hàm mất mát khác.
+
+Nói đơn giản, cách này là đưa vào một ảnh (hay dữ liệu có cấu trúc), trích đặc trưng để được một vector có độ dài cố định, rồi dùng độ đo khoảng cách cho các việc sau như phân loại, truy vấn, so sánh độ tương tự…
+
+NetVLAD tập trung vào đặc trưng đầu ra của tầng tích chập cuối: ta không muốn giảm mẫu hay ánh xạ toàn cục trực tiếp để có đặc trưng, mà với đầu ra $W \times H \times D$ của tầng cuối, thiết kế một kiểu gộp mới để tổng hợp các "đặc trưng cục bộ"; đó là vai trò của NetVLAD.
+
+Một đầu vào của NetVLAD là đặc trưng ảnh $W \times H \times D$, ví dụ ma trận $3 \times 3 \times 512$ cuối cùng của VGG-Net; trong mạng còn có thêm chiều Batchsize. Có thể coi đây là $N = W\times H$ đặc trưng cục bộ $x_i$, mỗi cái $D$ chiều.
+
+NetVLAD còn nhận một số vô hướng $K$, là số tâm cụm của VLAD; nó dùng để dựng ma trận tâm cụm $C$ có kích thước $K \times D$ (ban đầu tính từ dữ liệu bằng phân cụm các đặc trưng cục bộ). Từ ba đầu vào này, VLAD tính $V$ theo công thức:
+
+$$
+V(j, k) = \sum_{i=1}^{N}{a_k(x_i)\left(x_i(j) - c_k(j)\right)}
+$$
+
+trong đó $j$ là chỉ số chiều, từ 1 tới $D$. Có thể thấy với mỗi cụm $k$, VLAD tính trên mọi $x_i$: nếu $x_i$ thuộc cụm $k$ thì $a_k=1$, ngược lại $a_k=0$; tính phần dư giữa mỗi $x_i$ và tâm cụm của nó, rồi cộng các phần dư lại thành kết quả của cụm $k$. Cuối cùng chuẩn hóa L2 từng cụm (intra-normalization), duỗi thành một vector dài rồi chuẩn hóa L2 lần nữa. Chuẩn hóa rất quan trọng, vì nó đưa giá trị của mọi cụm về cùng thang đo; còn việc cộng phần dư giúp giảm ảnh hưởng của việc số đặc trưng rơi vào các cụm không đều nhau. Hai yếu tố kết hợp mới cho đầu ra đúng.
+
+Kết quả trung gian là $K$ vector $D$ chiều, mỗi vector là tổng phần dư của $N$ đặc trưng cục bộ so với tâm cụm tương ứng; ghép $K$ vector lại được vector một chiều độ dài $K \times D$.
+
+VLAD gốc không khả vi, vì $a$ ở trên chỉ là 0 hoặc 1: hoặc $x$ thuộc cụm hiện tại, hoặc không, là giá trị rời rạc. Để huấn luyện được bằng lan truyền ngược trong mạng tích chập sâu, NetVLAD sửa lại $a$.
+
+Vậy làm sao dựng lại $a$ để nó đo được mức độ liên quan giữa $x$ và từng cụm? Dùng softmax:
+
+$$
+a_k(x_i) = \frac{e^{W_k^T x_i + b_k}}{\sum_{k'} e^{W_{k'}^T x_i + b_{k'}}}
+$$
+
+Thay $a$ ở trên bằng biểu thức này ta có công thức của NetVLAD, cập nhật được tham số bằng lan truyền ngược.
+
+Như vậy có ba bộ tham số huấn luyện: $W$ cỡ $K \times D$ và $b$ cỡ $K \times 1$ trong biểu thức của $a$, cùng các tâm cụm $c$ cỡ $K \times D$; còn VLAD gốc chỉ có một bộ tham số $c$.
+
+Đầu ra của phép gộp là một vector một chiều cố định độ dài $K \times D$ (đã chuẩn hóa L2); nếu có Batchsize thì đầu ra là ma trận hai chiều Batchsize × $(K \times D)$.
+
+NetVLAD được nhúng vào mạng CNN như một tầng gộp, đặt sau tầng tích chập cuối, thay cho gộp toàn cục.
+
+Bài báo gốc cải tiến phương pháp truy vấn ảnh truyền thống VLAD rồi dùng làm phần gộp của CNN, như một kiểu gộp đặc trưng cục bộ khác lạ, đạt kết quả rất tốt trong truy vấn cảnh (place recognition).
+
+Sau đó lần lượt có các cải tiến như ActionVLAD, GhostVLAD…
+
+> **Biên tập:** mẫu số của softmax trong bản gốc thiếu dấu tổng theo $k'$. Hai hình minh họa của bản gốc trỏ tới một trang web cá nhân không còn truy cập được, nên đã bỏ và mô tả bằng lời; câu "$K$ vector $D$ chiều là kết quả với $D$ đặc trưng $x$" đã sửa thành $N$ đặc trưng cục bộ.
+
+## Tài liệu tham khảo
+
+[1] Chu Phi Yến và cộng sự. Tổng quan nghiên cứu mạng neuron tích chập (卷积神经网络研究综述). *Tạp chí Máy tính Trung Quốc*, 2017, 40(6): 1229–1251.
+
+[2] Thường Lượng, Đặng Tiểu Minh, Chu Minh Toàn và cộng sự. Mạng neuron tích chập trong hiểu ảnh (图像理解中的卷积神经网络). *Acta Automatica Sinica*, 2016, 42(9): 1300–1312.
+
+[3] Chua L O. *CNN: A Paradigm for Complexity*. 1998.
+
+[4] He K, Gkioxari G, Dollar P, et al. Mask R-CNN. *IEEE Transactions on Pattern Analysis & Machine Intelligence*, 2017.
+
+[5] Hoo-Chang S, Roth H R, Gao M, et al. Deep Convolutional Neural Networks for Computer-Aided Detection: CNN Architectures, Dataset Characteristics and Transfer Learning. *IEEE Transactions on Medical Imaging*, 2016, 35(5): 1285–1298.
+
+[6] Hứa Khả. Nghiên cứu ứng dụng mạng neuron tích chập trong nhận dạng ảnh (luận văn). Đại học Chiết Giang, 2012.
+
+[7] Trần Tiên Xương. Nghiên cứu thuật toán học sâu và ứng dụng dựa trên mạng neuron tích chập (luận văn). Đại học Công Thương Chiết Giang, 2014.
+
+[8] [CS231n Convolutional Neural Networks for Visual Recognition, Stanford](http://cs231n.github.io/convolutional-networks/)
+
+[9] [Machine Learning is Fun! Part 3: Deep Learning and Convolutional Neural Networks](https://medium.com/@ageitgey/machine-learning-is-fun-part-3-deep-learning-and-convolutional-neural-networks-f40359318721)
+
+[10] Ảnh động tích chập của cs231n: <http://cs231n.github.io/assets/conv-demo/index.html>
+
+[11] Krizhevsky A, Sutskever I, Hinton G E. ImageNet classification with deep convolutional neural networks. *NIPS*, 2012: 1097–1105.
+
+[12] Sun Y, Wang X, Tang X. Deep learning face representation from predicting 10,000 classes. *CVPR*, 2014: 1891–1898.
+
+[13] Ngụy Tú Tham. *Giải tích học sâu: nguyên lý mạng neuron tích chập và thực hành thị giác* (解析深度学习——卷积神经网络原理与视觉实践). Nhà xuất bản Công nghiệp Điện tử, 2018.
+
+[14] Wu J, Gao B B, Wei X S, et al. Resource-constrained deep learning: challenges and practices. *Scientia Sinica Informationis*, 2018.
+
+[15] Arandjelovic R, Gronat P, Torii A, et al. NetVLAD: CNN Architecture for Weakly Supervised Place Recognition. *CVPR*, 2016: 5297–5307.

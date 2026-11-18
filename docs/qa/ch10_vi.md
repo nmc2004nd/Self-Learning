@@ -1,0 +1,272 @@
+# Chương 10 Học tăng cường
+
+> Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch10_强化学习), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
+
+> **Biên tập:** phần lớn mục 10.4–10.8 và 10.10 của bản gốc chép gần nguyên văn từ bài tổng quan *Tổng quan về học tăng cường sâu: kiêm bàn về sự phát triển của cờ vây máy tính* (Zhao Dongbin và cộng sự, tạp chí *Control Theory & Applications*, tập 34, 2017). Vì thế bản gốc còn sót các số trích dẫn như [45], [49] mà không có danh mục tài liệu, và cả một dòng đầu trang của tạp chí ("1536 控制理论与应用 第34卷") lọt vào giữa câu. Bản dịch bỏ các số trích dẫn và dòng thừa đó, ghi tên bài báo gốc của từng thuật toán thay vào. Bản gốc cũng có dẫn [hướng dẫn học tăng cường của Morvan Zhou](https://morvanzhou.github.io/tutorials/machine-learning/reinforcement-learning/) (tiếng Trung) làm tài liệu đọc thêm.
+
+## 10.1 Học tăng cường có những đặc điểm chính nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 1.1 Tổng quan về học tăng cường](chapter1/chapter1_vi?id=_11-tổng-quan-về-học-tăng-cường) · [Tăng cường · 1.2 Ra quyết định tuần tự](chapter1/chapter1_vi?id=_12-ra-quyết-định-tuần-tự)
+
+</div>
+
+Ở nhiều thuật toán học máy khác, bộ học được dạy phải làm thế nào; còn học tăng cường (reinforcement learning, RL) học qua quá trình thử, để biết trong từng tình huống cụ thể thì chọn hành động nào sẽ nhận được nhiều phần thưởng nhất. Trong nhiều bài toán, hành động hiện tại không chỉ ảnh hưởng tới phần thưởng (reward) trước mắt mà còn ảnh hưởng tới trạng thái tiếp theo và cả chuỗi phần thưởng về sau. Ba đặc điểm quan trọng nhất của RL:
+
+1. về cơ bản hoạt động theo vòng kín (closed loop): hành động của tác tử làm thay đổi dữ liệu mà nó nhận được ở bước sau;
+2. không ai chỉ thẳng cho tác tử nên chọn hành động (action) nào;
+3. chuỗi hành động và tín hiệu phần thưởng (reward signal) đều ảnh hưởng tới một khoảng thời gian dài về sau.
+
+### 10.1.1 Định nghĩa
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 1.4 Các thành phần và các loại tác tử học tăng cường](chapter1/chapter1_vi?id=_14-các-thành-phần-và-các-loại-tác-tử-học-tăng-cường)
+
+</div>
+
+Học tăng cường là một nhánh quan trọng của học máy, là sản phẩm giao thoa của nhiều ngành. Bản chất của nó là giải bài toán ra quyết định (decision making): tự động ra quyết định, và ra được quyết định nối tiếp nhau.
+
+Nó gồm bốn thành phần chính: tác tử (agent), trạng thái môi trường, hành động và phần thưởng. Mục tiêu của học tăng cường là nhận được tổng phần thưởng tích lũy lớn nhất.
+
+Lấy một ví dụ dễ hình dung: một em bé muốn đi. Trước đó em phải đứng dậy được; đứng dậy rồi phải giữ thăng bằng; tiếp theo phải bước một chân ra, chân trái hay chân phải, bước được một bước rồi lại phải bước bước tiếp theo.
+
+Em bé chính là tác tử. Em cố thao túng môi trường (mặt đất em đi trên đó) bằng cách hành động (bước đi), và chuyển từ trạng thái này sang trạng thái khác (mỗi bước em đi). Khi em hoàn thành một nhiệm vụ con (đi được vài bước), em được thưởng (cho ăn sô-cô-la); khi em không đi được thì không có sô-cô-la.
+
+<img src="../img/qa/ch10/10-1.png" alt="Vòng tương tác giữa tác tử và môi trường"/>
+
+Hình 10.1 Vòng tương tác giữa tác tử và môi trường
+
+Trong hình, tác tử (agent) đại diện cho chính chủ thể. Với xe tự lái, tác tử là chiếc xe; khi chơi game, tác tử là nhân vật bạn đang điều khiển, chẳng hạn Mario. Khi Mario đi tới, môi trường liên tục thay đổi: có quái vật nhỏ hay chướng ngại vật xuất hiện, Mario phải nhảy để tránh, tức là phải thực hiện hành động (như đi tới và nhảy lên). Hành động của xe tự lái là rẽ trái, rẽ phải, phanh… Tác tử liên tục tương tác với môi trường: hành động tác động vào môi trường, làm môi trường thay đổi. Nếu xe tự lái có mục tiêu đi 100 mét và nó đã chạy được 10 mét thì môi trường đã thay đổi; như vậy mỗi hành động đều làm môi trường thay đổi, và sự thay đổi đó lại phản hồi về tác tử, tạo thành một vòng lặp. Phản hồi có hai kiểu: làm tốt (phần thưởng, reward) là phản hồi dương; làm chưa tốt (hình phạt, punishment) là phản hồi âm. Tác tử có thể làm tốt hoặc chưa tốt, nhưng môi trường luôn phản hồi cho nó; tác tử cố gắng ra quyết định có lợi cho mình, và qua vòng lặp này lặp đi lặp lại, nó làm ngày càng tốt hơn, giống như một đứa trẻ lớn lên dần biết phân biệt đúng sai. Đó chính là học tăng cường.
+
+## 10.2 Ví dụ ứng dụng của học tăng cường
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 1.1.4 Ứng dụng của học tăng cường](chapter1/chapter1_vi?id=_114-Ứng-dụng-của-học-tăng-cường)
+
+</div>
+
+**(1) Sản xuất (Manufacturing)**
+
+Ví dụ công ty Nhật Bản Fanuc: khi robot trong nhà máy nhặt một vật, nó quay video quá trình đó, ghi nhớ hành động mỗi lần thao tác, thao tác thành công hay thất bại, tích lũy kinh nghiệm để lần sau hành động nhanh và chính xác hơn.
+
+<img src="../img/qa/ch10/10-2.png" alt="Robot nhặt vật trong nhà máy Fanuc"/>
+
+Hình 10.2 Robot công nghiệp học cách nhặt vật
+
+**(2) Quản lý kho (Inventory Management)**
+
+Quản lý kho là bài toán khó vì lượng hàng tồn lớn, nhu cầu biến động mạnh, bổ sung hàng chậm… Có thể xây dựng thuật toán học tăng cường để rút ngắn thời gian quay vòng hàng tồn và tăng hiệu suất sử dụng mặt bằng.
+
+**(3) Định giá động (Dynamic pricing)**
+
+Q-learning trong học tăng cường có thể dùng để giải bài toán định giá động.
+
+**(4) Giao hàng cho khách (Customer Delivery)**
+
+Khi vận chuyển hàng tới nhiều khách hàng, nhà sản xuất muốn đáp ứng mọi nhu cầu của khách mà vẫn giảm tổng chi phí đội xe. Dùng hệ đa tác tử (multi-agent) kết hợp Q-learning có thể rút ngắn thời gian và giảm số xe.
+
+**(5) Cá nhân hóa trong thương mại điện tử (E-commerce Personalization)**
+
+Trong thương mại điện tử, cũng có thể dùng thuật toán học tăng cường để học và phân tích hành vi khách hàng, tùy biến sản phẩm và dịch vụ theo nhu cầu riêng của từng người.
+
+**(6) Phân phối quảng cáo (Ad Serving)**
+
+Ví dụ thuật toán LinUCB (một thuật toán bandit, dạng đơn giản của học tăng cường) sẽ thử hiển thị cả những quảng cáo chưa được xem nhiều trong quá khứ, nhờ đó ước lượng tỉ lệ nhấp thật tốt hơn.
+
+Một ví dụ khác là bài toán gợi ý trong ngày hội mua sắm 11/11: Alibaba dùng học tăng cường sâu kết hợp học trực tuyến thích nghi, liên tục học và tối ưu mô hình để xây dựng bộ máy ra quyết định, phân tích theo thời gian thực hành vi của lượng người dùng khổng lồ và đặc trưng của hàng chục tỉ sản phẩm, giúp mỗi người dùng nhanh chóng tìm được món hàng mình cần, tăng hiệu quả ghép cặp người dùng–sản phẩm. Ngoài ra, nhờ học tăng cường, tỉ lệ nhấp của người dùng điện thoại di động đã tăng 10–20%.
+
+> **Biên tập:** con số 10–20% là số Alibaba tự công bố năm 2017, bản gốc không dẫn nguồn và không nói rõ so với hệ thống nào.
+
+**(7) Quyết định đầu tư tài chính (Financial Investment Decisions)**
+
+Ví dụ công ty Pit.ai dùng học tăng cường để đánh giá chiến lược giao dịch, giúp người dùng xây dựng chiến lược giao dịch và đạt được mục tiêu đầu tư.
+
+**(8) Y tế (Medical Industry)**
+
+Chế độ điều trị động (Dynamic Treatment Regime, DTR) là một chủ đề nghiên cứu y học, nhằm tìm phác đồ điều trị hiệu quả cho bệnh nhân. Với những bệnh cần dùng thuốc dài hạn như ung thư, thuật toán học tăng cường có thể lấy các chỉ số lâm sàng của bệnh nhân làm đầu vào để đề ra chiến lược điều trị.
+
+## 10.3 Học tăng cường khác học có giám sát và học không giám sát thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 1.1.1 Học tăng cường và học có giám sát](chapter1/chapter1_vi?id=_111-học-tăng-cường-và-học-có-giám-sát)
+
+</div>
+
+Trong học máy, ta quen thuộc nhất với học có giám sát và học không giám sát; ngoài ra còn một nhóm lớn nữa là học tăng cường. Các thuật toán học máy hiện nay có thể chia thành 3 loại: học có giám sát (Supervised Learning), học không giám sát (Unsupervised Learning) và học tăng cường (Reinforcement Learning), như hình dưới:
+
+<img src="../img/qa/ch10/10-3.png" alt="Ba nhánh của học máy"/>
+
+Hình 10.3 Ba nhánh của học máy
+
+### 10.3.1 Học tăng cường khác học có giám sát thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 1.1.1 Học tăng cường và học có giám sát](chapter1/chapter1_vi?id=_111-học-tăng-cường-và-học-có-giám-sát) · [Tăng cường · 1.6 Khám phá và khai thác](chapter1/chapter1_vi?id=_16-khám-phá-và-khai-thác)
+
+</div>
+
+Học có giám sát giống như khi học có một người thầy đứng bên chỉ bảo, biết thế nào là đúng, thế nào là sai. Nhưng trong nhiều bài toán thực tế, như cờ vua (chess) hay cờ vây (go), số cách kết hợp lên tới hàng nghìn hàng vạn, không thể có người thầy nào biết hết mọi kết quả có thể.
+
+Khi đó, học tăng cường không cần nhãn: nó thử làm vài hành động trước để nhận một kết quả, dựa vào phản hồi kết quả đó đúng hay sai để điều chỉnh hành động trước đó; cứ điều chỉnh mãi như thế, thuật toán học được trong tình huống nào nên chọn hành động nào để có kết quả tốt nhất.
+
+Giống như bạn có một chú chó con chưa được huấn luyện: mỗi lần nó bày bừa nhà cửa thì bớt phần đồ ăn ngon (phạt), mỗi lần nó ngoan thì tăng gấp đôi phần đồ ăn ngon (thưởng). Cuối cùng chú chó học được một điều: bày bừa phòng khách là hành vi không tốt.
+
+Cả hai cách học đều học một ánh xạ từ đầu vào ra đầu ra. Học có giám sát học quan hệ giữa chúng, cho thuật toán biết đầu vào nào ứng với đầu ra nào. Học tăng cường học một **chính sách** (policy): ánh xạ từ trạng thái sang hành động sao cho tổng phần thưởng về lâu dài lớn nhất; tín hiệu để học là phần thưởng mà môi trường trả về, cho biết hành động tốt hay xấu.
+
+> **Biên tập:** bản gốc viết học tăng cường "học ra phản hồi cho máy, tức hàm phần thưởng (reward function), dùng để đánh giá hành động tốt hay xấu". Sai: trong học tăng cường, hàm phần thưởng là thứ môi trường *cho sẵn*, cái cần học là chính sách (hoặc hàm giá trị dùng để suy ra chính sách). Học ra hàm phần thưởng là bài toán của học tăng cường ngược (inverse RL), một nhánh riêng.
+
+Ngoài ra, phản hồi kết quả trong học tăng cường có độ trễ: đôi khi phải đi rất nhiều bước mới biết một lựa chọn ở bước nào đó trước kia là tốt hay xấu; còn trong học có giám sát, một lựa chọn tồi được phản hồi lại cho thuật toán ngay lập tức.
+
+Hơn nữa, đầu vào mà học tăng cường gặp luôn thay đổi: mỗi khi thuật toán thực hiện một hành động, hành động đó ảnh hưởng tới đầu vào của lần ra quyết định tiếp theo; còn học có giám sát giả định đầu vào độc lập cùng phân phối (i.i.d.).
+
+Với học tăng cường, tác tử có thể cân bằng giữa khám phá và khai thác (exploration and exploitation) và chọn cách cho phần thưởng lớn nhất.
+
+- Khám phá (exploration): thử nhiều việc khác nhau, xem có tốt hơn những gì đã thử trước đó không.
+- Khai thác (exploitation): làm hành động hiệu quả nhất theo kinh nghiệm đã có.
+
+Học có giám sát thông thường không có sự cân bằng này: dữ liệu huấn luyện đã cố định từ trước, mô hình không tự chọn được dữ liệu mình sẽ thấy, nên không có khái niệm khám phá.
+
+> **Biên tập:** bản gốc nói học có giám sát "chỉ khai thác" (exploitative). Diễn đạt chính xác hơn là học có giám sát không đặt ra bài toán khám phá–khai thác, vì mô hình không quyết định dữ liệu nào được thu thập; đã sửa câu trên cho rõ.
+
+### 10.3.2 Học tăng cường khác học không giám sát thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 1.1.1 Học tăng cường và học có giám sát](chapter1/chapter1_vi?id=_111-học-tăng-cường-và-học-có-giám-sát) · [Học máy · Khoá Học máy](ml/README_vi)
+
+</div>
+
+Học không giám sát không học ánh xạ từ đầu vào ra đầu ra mà học các mẫu (pattern) trong dữ liệu. Ví dụ trong bài toán gợi ý bài báo cho người dùng: học không giám sát tìm những bài tương tự bài người dùng đã đọc rồi gợi ý một trong số đó; còn học tăng cường sẽ gợi ý trước một ít bài, liên tục nhận phản hồi từ người dùng, rồi dần xây dựng "bản đồ tri thức" về những bài người dùng có thể thích.
+
+Học không giám sát học từ những ví dụ huấn luyện không có nhãn khái niệm, để tìm ra tri thức cấu trúc ẩn trong dữ liệu. Ở đây nhãn của các ví dụ hoàn toàn không biết, nên độ mơ hồ (ambiguity) của mẫu huấn luyện là cao nhất. Học tăng cường học từ những ví dụ không có nhãn khái niệm nhưng gắn với một phần thưởng hay độ lợi trễ (có thể coi là một nhãn khái niệm đến muộn), để có được một ánh xạ từ trạng thái sang hành động. Ở đây vốn không có nhãn, nhưng phần thưởng trễ có thể coi là nhãn trễ, nên độ mơ hồ của mẫu huấn luyện nằm giữa học có giám sát và học không giám sát.
+
+Cần lưu ý, học có giám sát và học không giám sát ngay từ đầu đã là hai khái niệm đối lập nhau; còn học tăng cường khi ra đời không được định nghĩa theo góc độ độ mơ hồ của mẫu huấn luyện, nên một số nghiên cứu ban đầu coi học tăng cường là một dạng học không giám sát đặc biệt. Thật ra, vị trí của học tăng cường đến nay vẫn còn tranh cãi; có học giả còn coi nó là khái niệm ngang hàng với "học từ ví dụ".
+
+Hệ phân loại theo độ mơ hồ của mẫu huấn luyện có thể được mở rộng trong vài năm tới: những khung học mới như học đa thể hiện (multi-instance learning), vốn rất đặc biệt xét về độ mơ hồ của mẫu, có thể được đưa vào hệ này. Nhưng cho tới nay chưa có khung mới nào được công nhận rộng rãi. Học bán giám sát (semi-supervised learning) cũng có triển vọng; trở ngại là độ mơ hồ trong học bán giám sát không phải bẩm sinh mà do con người tạo ra, tức người dùng muốn dùng mẫu chưa gán nhãn để hỗ trợ việc học trên mẫu đã gán nhãn. Điều này hoàn toàn khác với độ mơ hồ bẩm sinh của học có giám sát, không giám sát và học tăng cường. Độ mơ hồ nhân tạo của học bán giám sát cần thiết và hữu ích khi giải bài toán kỹ thuật (gán nhãn lượng lớn mẫu có thể cực kỳ tốn kém), nhưng có lẽ không làm thay đổi lớn về phương pháp luận hay cách nhìn bài toán học.
+
+**Khác biệt cốt lõi giữa học tăng cường và hai loại kia:** học tăng cường không có khái niệm "dữ liệu" rõ ràng như hai loại kia; nó không biết kết quả đúng, chỉ có mục tiêu. "Khái niệm dữ liệu" ở đây là một lượng lớn dữ liệu có sẵn: học có giám sát và không giám sát cần nhiều dữ liệu để huấn luyện, tối ưu mô hình đã xây. Như bài toán nhận diện chó mèo, dùng rất nhiều ảnh chó mèo để huấn luyện; huấn luyện xong, đưa cho mô hình một ảnh chó mèo hoàn toàn mới, nó sẽ biết đó là chó hay mèo. Còn dữ liệu của học tăng cường do chính tác tử thu thập trong khi tương tác với môi trường.
+
+## 10.4 Học tăng cường có những thuật toán chính nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 3.3 Dự đoán không mô hình](chapter3/chapter3_vi?id=_33-dự-đoán-không-mô-hình) · [Tăng cường · Chương 4 Gradient chính sách](chapter4/chapter4_vi) · [Tăng cường · Chương 6 Mạng Q sâu](chapter6/chapter6_vi) · [Tăng cường · 9.4 Thuật toán diễn viên-nhà phê bình lợi thế bất đồng bộ](chapter9/chapter9_vi?id=_94-thuật-toán-diễn-viên-nhà-phê-bình-lợi-thế-bất-đồng-bộ) · [Tăng cường · Chương 5 Thuật toán PPO](chapter5/chapter5_vi)
+
+</div>
+
+Học tăng cường không cần tín hiệu giám sát dạng nhãn (chỉ cần tín hiệu phần thưởng), và có thể cân bằng khám phá–khai thác trong môi trường chưa biết mô hình. Các thuật toán chính gồm học tăng cường Monte Carlo, học sai phân thời gian (temporal difference, TD), gradient chính sách… Đặc điểm và hiệu năng của một số thuật toán học tăng cường sâu tiêu biểu ở bảng dưới.
+
+Bảng 10.1 Đặc điểm và hiệu năng của các thuật toán học tăng cường sâu tiêu biểu
+
+| Thuật toán | Đặc điểm | Hiệu năng trên game Atari |
+|---|---|---|
+| DQN | Phát lại kinh nghiệm, cập nhật mạng mục tiêu trễ (định kỳ) | 100% (lấy DQN làm mốc) |
+| Dueling DQN | Kiến trúc mạng đối đầu, tăng hiệu quả cập nhật mạng | 151.72% |
+| A3C | Nhiều luồng chạy bất đồng bộ, dùng hàm lợi thế để cập nhật mạng | 163.07% |
+| TRPO | Có bảo đảm lý thuyết về cải thiện đơn điệu, nhưng huấn luyện lâu | Ít game được thử, hiệu năng kém hơn |
+| ACKTR | Dùng phân rã nhân tử Kronecker (K-FAC), giảm độ phức tạp tính gradient, tăng hiệu suất dùng mẫu | 353.87% |
+| PPO | Ổn định và tin cậy như TRPO, nhưng thuật toán đơn giản hơn | 46.26% |
+
+> **Biên tập:** bản gốc đưa bảng này dưới dạng ảnh chụp từ bài tổng quan nói ở đầu chương; bản dịch chép lại thành bảng chữ. Hai sửa đổi: (1) cột đặc điểm của DQN ghi "cập nhật mạng mục tiêu bất đồng bộ"; thật ra mạng mục tiêu được *sao chép định kỳ* từ mạng chính (cập nhật trễ), không có gì bất đồng bộ — "bất đồng bộ" là đặc điểm của A3C. (2) Cột phần trăm **không so sánh được với nhau**: các con số lấy từ những bài báo khác nhau, đo theo cách khác nhau (điểm trung vị chuẩn hóa theo người chơi, so với DQN trên bộ game riêng của từng bài…). Ví dụ PPO được ghi 46.26%, nhưng trong bài báo PPO (Schulman và cộng sự, 2017) nó thắng A2C và ACER trên phần lớn 49 game; không thể kết luận PPO "kém hơn DQN một nửa". Chỉ nên đọc cột này như ghi chú lịch sử.
+
+Ngoài các thuật toán học tăng cường sâu trên, còn có học tăng cường sâu chuyển giao, học tăng cường sâu phân cấp, học tăng cường sâu có bộ nhớ và học tăng cường sâu đa tác tử…
+
+## 10.5 Thuật toán học tăng cường sâu chuyển giao
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 11.1 Nhân bản hành vi](chapter11/chapter11_vi?id=_111-nhân-bản-hành-vi) · [d2l (tiếng Anh) · 14.2 Tinh chỉnh (học chuyển giao)](https://d2l.ai/chapter_computer-vision/fine-tuning.html) ↗
+
+</div>
+
+Thuật toán học tăng cường sâu truyền thống mỗi lần chỉ giải được một loại game, không thể học nhiều nhiệm vụ trong một lần huấn luyện. Kết hợp học chuyển giao (transfer learning) với học tăng cường là một hướng chính của học tăng cường sâu.
+
+- **Actor-Mimic** (Parisotto và cộng sự, 2016): thuật toán học tăng cường sâu chuyển giao dựa trên bắt chước hành vi. Nhờ tín hiệu giám sát hướng dẫn, một mạng chính sách duy nhất học được chính sách của từng nhiệm vụ, rồi chuyển tri thức sang nhiệm vụ mới.
+- **Chưng cất chính sách** (policy distillation, Rusu và cộng sự, 2016): gồm mạng học (học trò) và mạng hướng dẫn (thầy); hàm mục tiêu xây dựng từ độ lệch giữa giá trị Q của hai mạng, kéo mạng học tiến gần không gian hàm giá trị của mạng hướng dẫn.
+- **Mạng neuron tiến dần** (progressive neural networks, PNN, Rusu và cộng sự, 2016): nối mạng neuron với mạng neuron. Trên một chuỗi nhiệm vụ tuần tự, PNN lưu tri thức và trích đặc trưng theo cách tiến dần (mỗi nhiệm vụ mới thêm một "cột" mạng có kết nối ngang sang các cột cũ đã đóng băng), qua đó chuyển giao tri thức. PNN huấn luyện được nhiều nhiệm vụ độc lập, tăng tốc học nhờ chuyển giao và tránh quên thảm họa (catastrophic forgetting).
+- **PathNet** (Fernando và cộng sự, 2017): có thể coi là bản nâng cấp của PNN. PathNet coi mỗi tầng trong mạng là một tập mô-đun, xây mạng giống như xếp khối gỗ, tức tái sử dụng các khối. Nó rất giống PNN, chỉ là ở đây không còn "cột" mà là các "đường đi" khác nhau. PathNet nhúng các tác tử vào mạng neuron; nhiệm vụ của tác tử là tìm những phần có thể tái sử dụng trong mạng cho nhiệm vụ mới. Tác tử là đường đi trong mạng, quyết định phạm vi tham số được dùng và cập nhật khi lan truyền ngược. Trên một loạt nhiệm vụ học tăng cường Atari, PathNet đều đạt chuyển giao dương (positive transfer), cho thấy nó có khả năng áp dụng chung khi huấn luyện mạng neuron. PathNet cũng làm việc chọn siêu tham số của thuật toán A3C bền vững hơn đáng kể.
+- **Bộ xấp xỉ hàm giá trị phổ quát** (universal value function approximators, UVFA, Schaul và cộng sự, 2015): khái quát hóa trên cả không gian trạng thái lẫn không gian mục tiêu. UVFA chuyển được tri thức đã học sang nhiệm vụ mới có cùng động lực học môi trường nhưng khác mục tiêu.
+
+> **Biên tập:** bản gốc ghi tên tác giả chưng cất chính sách và PNN là "Rusa"; đúng là Andrei A. **Rusu** (DeepMind). Tên các thuật toán (Actor-Mimic) và năm công bố do người biên tập bổ sung, bản gốc chỉ viết "Parisotto và cộng sự đề xuất…".
+
+## 10.6 Thuật toán học tăng cường sâu phân cấp
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 10.4 Học tăng cường phân cấp](chapter10/chapter10_vi?id=_104-học-tăng-cường-phân-cấp)
+
+</div>
+
+Học tăng cường phân cấp (hierarchical RL) chia mục tiêu cuối cùng thành nhiều nhiệm vụ con để học chính sách theo tầng, rồi ghép chính sách của các nhiệm vụ con thành một chính sách tổng thể hiệu quả.
+
+- **h-DQN** (hierarchical deep Q-network, Kulkarni và cộng sự, 2016): phân tầng dựa trên trừu tượng hóa không gian–thời gian và động lực nội tại (intrinsic motivation); đặt mục tiêu con ở các thang thời gian–không gian khác nhau để xử lý hàm giá trị theo tầng. Hàm giá trị tầng trên dùng để ra quyết định vĩ mô (chọn mục tiêu con), hàm giá trị tầng dưới dùng để chọn hành động cụ thể.
+- Krishnamurthy và cộng sự, dựa trên h-DQN, đề xuất thuật toán học tăng cường sâu phân cấp dựa trên lựa chọn nội tại (options). Mô hình kết hợp trừu tượng không gian–thời gian với mạng neuron sâu, tự động học các mục tiêu con, tránh phải thiết kế động lực nội tại cụ thể hay đặt mục tiêu trung gian bằng tay, nhờ đó tăng tốc quá trình học của tác tử và tăng khả năng khái quát của mô hình.
+- **DSRL** (deep successor reinforcement learning, Kulkarni và cộng sự, 2016): dựa trên biểu diễn trạng thái kế tiếp (successor representation). DSRL phân rã mục tiêu con theo từng giai đoạn và học chính sách cho từng mục tiêu con, tăng cường khám phá không gian trạng thái chưa biết, giúp tác tử thích nghi tốt hơn với những nhiệm vụ có phản hồi trễ.
+- **FeUdal Networks (FuN)** (Vezhnevets và cộng sự, 2017): lấy cảm hứng từ học tăng cường phong kiến (feudal RL), đề xuất kiến trúc học tăng cường sâu phân cấp gồm một mô-đun quản lý (manager) và một mô-đun công nhân (worker). Mô-đun quản lý làm việc ở độ phân giải thời gian thấp hơn, đặt mục tiêu trừu tượng rồi giao cho mô-đun công nhân thực hiện. Khung FuN tạo ra một cấu trúc phân tầng tự nhiên và ổn định, cho phép hai mô-đun học theo cách bổ trợ nhau. Thực nghiệm cho thấy FuN giúp xử lý bài toán gán công trạng dài hạn (long-term credit assignment) và nhiệm vụ cần ghi nhớ, đạt kết quả tốt trên cả game Atari lẫn game mê cung.
+
+## 10.7 Thuật toán học tăng cường sâu có bộ nhớ
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 6.5 Phát lại kinh nghiệm](chapter6/chapter6_vi?id=_65-phát-lại-kinh-nghiệm) · [Ôn tập · Chương 6 Mạng neuron hồi tiếp (RNN)](qa/ch06_vi)
+
+</div>
+
+Mô hình học tăng cường sâu truyền thống không có các năng lực bậc cao như ghi nhớ, nhận thức, suy luận, nhất là khi trạng thái chỉ quan sát được một phần và phần thưởng đến trễ.
+
+- **FRMQN** (feedback recurrent memory Q-network, Junhyuk Oh và cộng sự, 2016): thêm vào mô hình học tăng cường sâu truyền thống một mạng bộ nhớ ngoài và cơ chế điều khiển phản hồi. FRMQN có một mức năng lực ghi nhớ và suy luận: nhờ cơ chế phản hồi, nó kết hợp những ký ức giá trị đã lưu với trạng thái ngữ cảnh hiện tại để đánh giá hàm giá trị hành động và ra quyết định. FRMQN bước đầu mô phỏng năng lực nhận thức và suy luận chủ động của con người, hoàn thành được một số nhiệm vụ nhận thức bậc cao, và cho thấy khả năng khái quát mạnh trên những nhiệm vụ chưa từng huấn luyện.
+- **MFEC** (model-free episodic control, điều khiển theo ký ức sự kiện không dùng mô hình, Blundell và cộng sự, 2016): lưu nhanh và phát lại các chuỗi chuyển trạng thái, đưa các chuỗi đó vào hệ tri thức có cấu trúc, giúp tác tử nhanh chóng đạt trình độ người chơi trên một số nhiệm vụ ra quyết định phức tạp. MFEC ghi nhớ, cho mỗi cặp (trạng thái, hành động), tổng phần thưởng cao nhất từng đạt được, nhờ đó tác tử có được một dạng ký ức sự kiện (episodic memory) sơ khai. Thực nghiệm cho thấy học tăng cường sâu dựa trên MFEC không chỉ học được chính sách hiệu quả trên game Atari mà còn xử lý được một số nhiệm vụ phức tạp trong cảnh 3D.
+- **NEC** (neural episodic control, Pritzel và cộng sự, 2017): phát triển từ MFEC, tăng đáng kể năng lực ghi nhớ và hiệu quả học của tác tử. NEC hấp thu kinh nghiệm mới rất nhanh và hành động dựa trên kinh nghiệm mới đó. Hàm giá trị gồm hai phần: biểu diễn trạng thái thay đổi chậm (học bằng gradient) và ước lượng giá trị cập nhật nhanh (lưu trong bảng tra cứu). Nghiên cứu trên nhiều loại môi trường cho thấy NEC học nhanh hơn hẳn các tác tử học tăng cường sâu tổng quát tốt nhất thời đó.
+
+> **Biên tập:** bản gốc gọi tác giả FRMQN là "Junhyuk và cộng sự" (đó là tên riêng, họ là Oh), gọi MFEC là "episode control" (đúng là *episodic* control), và mô tả MFEC dùng "phát lại kinh nghiệm ngược" — MFEC không có bước phát lại để huấn luyện mạng mà ghi trực tiếp tổng phần thưởng tốt nhất vào bảng; đã sửa câu đó.
+
+## 10.8 Thuật toán học tăng cường sâu đa tác tử
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 13.4.4 Học đa tác tử / tự học](chapter13/chapter13_vi?id=_1344-học-đa-tác-tử-tự-học) · [Tăng cường · 12.2 Gradient chính sách tất định sâu](chapter12/chapter12_vi?id=_122-gradient-chính-sách-tất-định-sâu) · [Tăng cường · Chương 9 Thuật toán diễn viên-nhà phê bình](chapter9/chapter9_vi)
+
+</div>
+
+Trong một số tình huống phức tạp có bài toán nhận thức–ra quyết định của nhiều tác tử; khi đó cần mở rộng mô hình đơn lẻ thành hệ học tăng cường sâu đa tác tử, trong đó các tác tử hợp tác, giao tiếp và cạnh tranh với nhau.
+
+- **DDRQN** (deep distributed recurrent Q-networks, Foerster và cộng sự, 2016): giải bài toán khó về giao tiếp và hợp tác đa tác tử khi trạng thái chỉ quan sát được một phần. Thực nghiệm cho thấy sau huấn luyện, các tác tử DDRQN đạt được một giao thức giao tiếp thống nhất, giải thành công các câu đố kinh điển như câu đố mũ đỏ–mũ xanh.
+
+Dạy tác tử biết hợp tác và cạnh tranh từ lâu là đề tài nghiên cứu quan trọng của trí tuệ nhân tạo, cũng là điều kiện cần để đạt trí tuệ nhân tạo tổng quát.
+
+- **MADDPG** (multi-agent deep deterministic policy gradient, Lowe và cộng sự, 2017): thuật toán actor-critic đa tác tử cho môi trường vừa hợp tác vừa cạnh tranh. MADDPG mở rộng thuật toán học tăng cường DDPG, cho phép học tập trung, thực thi phân tán (centralized training, decentralized execution): khi huấn luyện, critic của mỗi tác tử thấy được quan sát và hành động của mọi tác tử; khi chạy, mỗi actor chỉ dùng quan sát của chính mình. Trên nhiều nhiệm vụ thử nghiệm, MADDPG đều tốt hơn DDPG.
+
+## 10.9 Các framework mã nguồn mở cho học tăng cường
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 1.7.1 Gym](chapter1/chapter1_vi?id=_171-gym)
+
+</div>
+
+**TensorFlow Agents** của Google: bản mở rộng của TensorFlow, cung cấp nhiều công cụ để xây dựng và huấn luyện đủ loại ứng dụng thông minh bằng học tăng cường. Framework này mở rộng giao diện OpenAI Gym ra nhiều môi trường chạy song song, cho phép các tác tử chạy trong TensorFlow để tính toán theo lô. Giao diện lô cho môi trường OpenAI Gym tích hợp hoàn toàn với TensorFlow, nhờ đó chạy các thuật toán hiệu quả. Framework còn kèm BatchPPO, một bản cài đặt đã tối ưu của thuật toán tối ưu chính sách cận kề (PPO). Các thành phần lõi gồm: một lớp bọc môi trường (environment wrapper) để dựng môi trường OpenAI Gym trong tiến trình bên ngoài; một bộ thao tác theo lô để thực hiện bước và đặt lại môi trường như các phép toán trong đồ thị TensorFlow; và một thành phần gộp quy trình xử lý lô của đồ thị TensorFlow với thuật toán học tăng cường vào một bước huấn luyện duy nhất.
+
+**Roboschool:** cung cấp phần mềm mã nguồn mở để xây dựng và huấn luyện mô phỏng robot bằng học tăng cường. Nó hỗ trợ huấn luyện học tăng cường nhiều tác tử trong cùng một môi trường. Với cơ chế huấn luyện nhiều bên, bạn có thể huấn luyện cùng một tác tử đóng vai cả hai người chơi (để tự đấu với chính mình), huấn luyện hai tác tử bằng cùng thuật toán, hoặc cho hai thuật toán đấu với nhau. Roboschool do OpenAI phát triển (tổ chức phi lợi nhuận, thời đó được tài trợ bởi Elon Musk, Sam Altman, Reid Hoffman và Peter Thiel). Nó tích hợp với OpenAI Gym, một bộ công cụ mã nguồn mở để phát triển và đánh giá thuật toán học tăng cường. OpenAI Gym tương thích với TensorFlow, Theano và nhiều thư viện học sâu khác, gồm mã cho tính toán số, game và engine vật lý. Roboschool dựa trên engine vật lý Bullet, một thư viện vật lý mã nguồn mở được nhiều phần mềm mô phỏng khác dùng rộng rãi, như Gazebo và Virtual Robot Experimentation Platform (V-REP). Bộ công cụ đi kèm nhiều thuật toán học tăng cường, cụ thể là: phương pháp học tăng cường sâu bất đồng bộ, Actor-Critic with Experience Replay (ACER), Actor-Critic using Kronecker-Factored Trust Region (ACKTR), gradient chính sách tất định sâu (DDPG), tối ưu chính sách cận kề (PPO) và tối ưu chính sách vùng tin cậy (TRPO)…
+
+**Coach:** framework học tăng cường mã nguồn mở của Intel, dùng để mô hình hóa, huấn luyện và đánh giá tác tử thông minh cho game, robot và các ứng dụng dựa trên tác tử. Coach cung cấp một sandbox dạng mô-đun, các thành phần tái sử dụng được, và một API Python để ghép thuật toán học tăng cường mới và huấn luyện ứng dụng mới trong nhiều lĩnh vực. Framework dùng OpenAI Gym làm công cụ chính để giao tiếp với các môi trường học tăng cường khác nhau, và hỗ trợ các phần mở rộng ngoài như Roboschool, gym-extensions, PyBullet và ViZDoom. Lớp bọc môi trường của Coach cho phép người dùng thêm môi trường học tăng cường tùy chỉnh để giải bài toán khác. Framework huấn luyện tác tử học tăng cường hiệu quả trên máy tính để bàn, tận dụng CPU nhiều lõi. Nó có bản cài đặt đơn luồng và đa luồng cho một số thuật toán, gồm Actor-Critic lợi thế bất đồng bộ (A3C), DDPG, PPO, dự đoán tương lai trực tiếp (Direct Future Prediction) và hàm lợi thế chuẩn hóa (Normalized Advantage Functions). Mọi thuật toán đều cài bằng TensorFlow đã tối ưu cho hệ thống Intel, một số còn chạy được trên framework học sâu Neon của Intel. Coach gồm nhiều bản cài đặt tác tử, có cả chuyển đổi từ đơn luồng sang đa luồng; nó cho phép phát triển tác tử mới hỗ trợ một hoặc nhiều worker (đồng bộ hoặc bất đồng bộ). Ngoài ra nó hỗ trợ cả không gian hành động liên tục lẫn rời rạc, và không gian quan sát dạng hình ảnh hoặc chỉ gồm các phép đo thô.
+
+> **Biên tập:** đoạn này dịch từ một bài báo công nghệ năm 2017, bản gốc tiếng Trung có vài chỗ máy dịch hỏng (ví dụ "具体以怨报德", "纳入训练特内单一却步"), bản dịch đã diễn đạt lại theo ý đúng. Quan trọng hơn, cả ba framework nay **đã ngừng phát triển**: TensorFlow Agents bản này (BatchPPO) được thay bằng thư viện TF-Agents khác hẳn; Roboschool bị OpenAI khai tử năm 2019 và khuyên chuyển sang PyBullet; Intel Coach đã lưu trữ (archived). OpenAI Gym cũng đã chuyển giao cho Farama Foundation thành **Gymnasium**. Hệ sinh thái hiện nay thường dùng: Gymnasium (môi trường), Stable-Baselines3 (thuật toán cài sẵn, PyTorch), CleanRL (mỗi thuật toán gói trong một file, dễ đọc), RLlib của Ray (huấn luyện phân tán) và TorchRL. Các thư viện Theano, Neon nhắc ở trên cũng đã ngừng phát triển.
+
+## 10.10 Tóm tắt các thuật toán học tăng cường sâu
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · Chương 6 Mạng Q sâu](chapter6/chapter6_vi) · [Tăng cường · 12.1 Khác biệt giữa hành động rời rạc và hành động liên tục](chapter12/chapter12_vi?id=_121-khác-biệt-giữa-hành-động-rời-rạc-và-hành-động-liên-tục) · [Tăng cường · 9.4 Thuật toán diễn viên-nhà phê bình lợi thế bất đồng bộ](chapter9/chapter9_vi?id=_94-thuật-toán-diễn-viên-nhà-phê-bình-lợi-thế-bất-đồng-bộ) · [Tăng cường · 5.2 Tối ưu chính sách cận kề](chapter5/chapter5_vi?id=_52-tối-ưu-chính-sách-cận-kề)
+
+</div>
+
+DQN dựa trên hàm giá trị và các thuật toán mở rộng của nó đã cho hiệu năng xuất sắc trên các nhiệm vụ điều khiển có hành động rời rạc, nhưng vì đầu ra hàm giá trị là rời rạc (mỗi hành động một giá trị Q, chọn hành động bằng $\arg\max$), chúng lúng túng với nhiệm vụ điều khiển liên tục. Các thuật toán học tăng cường sâu dựa trên gradient chính sách, tiêu biểu là DDPG, TRPO, phù hợp hơn với nhiệm vụ điều khiển có không gian trạng thái liên tục và hành động liên tục; về độ ổn định và độ tin cậy, các thuật toán này có một mức bảo đảm lý thuyết, tính hoàn chỉnh về lý thuyết cao. Thuật toán A3C với kiến trúc actor-critic và các bản mở rộng của nó, so với DQN truyền thống, dùng dữ liệu hiệu quả hơn, học nhanh hơn, tổng quát và dễ mở rộng hơn, đạt hiệu năng tốt hơn, nhưng không bảo đảm được độ ổn định. Còn các thuật toán khác như học tăng cường sâu chuyển giao, phân cấp, có bộ nhớ và đa tác tử đều là hướng nghiên cứu nóng, giúp xử lý những bài toán, hệ thống và nhiệm vụ điều khiển phức tạp hơn; đây là biên giới hiện nay của nghiên cứu học tăng cường sâu.
+
+> **Biên tập:** bản gốc viết DQN mạnh ở nhiệm vụ "trạng thái rời rạc, hành động rời rạc". Sai một nửa: DQN sinh ra chính là để xử lý trạng thái liên tục, nhiều chiều (ảnh điểm ảnh của game Atari); giới hạn của nó nằm ở **hành động** rời rạc, vì phải lấy $\max_a Q(s,a)$ trên mọi hành động. Đã sửa câu trên.
+
+Nhìn về tương lai, người phát triển trí tuệ nhân tạo cần nắm càng vững càng tốt các framework trên và các thuật toán học tăng cường dùng trong đó. Ngoài ra cần hiểu sâu hơn kiến trúc học tăng cường đa tác tử, vì nhiều framework dựa nhiều vào kết quả nghiên cứu mới về lý thuyết trò chơi. Cuối cùng, cần quen thuộc với kiến thức học tăng cường sâu.

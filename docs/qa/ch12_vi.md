@@ -1,0 +1,895 @@
+# Chương 12 Xây dựng và huấn luyện mạng
+
+> Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch12_网络搭建及训练), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
+
+> **Biên tập:** chương này viết năm 2018–2019, lúc TensorFlow 1.x, PyTorch 0.4 và Caffe còn là ba framework phổ biến. Từ đó nhiều thứ đã đổi:
+> - TensorFlow 2.0 (2019) mặc định chạy **eager** (tính ngay như Python thường); `tf.Session`, `tf.placeholder`, `tf.get_variable`, `tf.variable_scope` chỉ còn trong `tf.compat.v1`. Đồ thị tĩnh vẫn có, nhưng sinh tự động bằng `@tf.function`. Keras là API chính.
+> - PyTorch đã thành framework phổ biến nhất trong nghiên cứu; từ bản 2.0 có thêm `torch.compile` để biên dịch đồ thị.
+> - Caffe gần như không còn được phát triển; Caffe2 đã nhập vào PyTorch (2018).
+>
+> Bản dịch giữ nội dung gốc vì nó giải thích các khái niệm vẫn còn giá trị (đồ thị tính toán, tĩnh và động, kiến trúc một framework), và ghi chú chỗ nào đã lỗi thời. Mục 12.4–12.6 bản gốc đánh số nhầm thành 10.4–10.6 (chép từ chỗ khác), bản dịch đánh lại số.
+
+## 12.1 TensorFlow
+
+### 12.1.1 TensorFlow là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 2.1 Thao tác với Dữ liệu](dl/ch02_s1_vi) · [Học sâu · 6.7 GPU](dl/ch06_s7_vi)
+
+</div>
+
+TensorFlow hỗ trợ nhiều nền tảng phần cứng khác nhau: nhiều CPU/GPU, máy chủ, thiết bị di động, nên chạy được trên nhiều nền tảng. Kiến trúc TensorFlow linh hoạt, hỗ trợ đủ loại mô hình mạng, nên dùng được cho nhiều mục đích; ngoài ra kiến trúc dễ mở rộng, thêm phép toán (OP) mới và viết kernel chuyên biệt cho từng phần cứng đều thuận tiện.
+
+TensorFlow ban đầu do các nhà nghiên cứu và kỹ sư của Google Brain phát triển cho nghiên cứu học máy và mạng neuron, được công bố mã nguồn mở tháng 10/2015, nổi bật giữa các framework học sâu và có nhiều sao (star) nhất trên GitHub.
+
+> **Biên tập:** TensorFlow công bố mã nguồn mở ngày 9/11/2015 (bản gốc ghi tháng 10). Thứ hạng số sao GitHub là số liệu thời điểm viết; về mức độ dùng trong nghiên cứu, PyTorch đã vượt TensorFlow từ khoảng 2019–2020.
+
+### 12.1.2 Triết lý thiết kế của TensorFlow là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 2.5.4 Gradient và Luồng Điều khiển của Python](dl/ch02_s5_vi?id=_254-gradient-và-luồng-Điều-khiển-của-python) · [Học sâu · 2.5.1 Một Hàm Đơn giản](dl/ch02_s5_vi?id=_251-một-hàm-Đơn-giản)
+
+</div>
+
+Triết lý thiết kế của TensorFlow thể hiện ở hai điểm.
+
+**(1) Tách hoàn toàn việc định nghĩa đồ thị và việc chạy đồ thị.**
+
+TensorFlow được coi là thư viện theo "chủ nghĩa ký hiệu". Ta biết lối lập trình thường chia thành lập trình mệnh lệnh (imperative style programming) và lập trình ký hiệu (symbolic style programming). Lập trình mệnh lệnh là viết chương trình theo nghĩa thông thường mà ta vẫn hiểu: dễ hiểu, dễ gỡ lỗi, chạy đúng theo logic đã viết. Lập trình ký hiệu có nhiều bước nhúng và tối ưu, khó hiểu và khó gỡ lỗi hơn, nhưng chạy nhanh hơn phần nào. Trong các framework học sâu lúc đó, Torch là kiểu mệnh lệnh điển hình; Caffe, MXNet kết hợp cả hai kiểu; còn TensorFlow hoàn toàn dùng lập trình ký hiệu.
+
+Tính toán ký hiệu thường định nghĩa các biến trước, rồi dựng một đồ thị luồng dữ liệu (dataflow graph) quy định quan hệ tính toán giữa các biến, cuối cùng biên dịch đồ thị. Lúc đó đồ thị vẫn chỉ là cái vỏ rỗng, không chứa dữ liệu thật; chỉ khi đưa đầu vào cần tính vào thì dữ liệu mới chảy qua mô hình và cho ra giá trị đầu ra.
+
+Ví dụ:
+
+```python
+t = 8 + 9
+print(t)
+```
+
+Trong chương trình thông thường, phép tính `t` được định nghĩa và thực hiện ngay khi chạy, in ra 17. Còn trong TensorFlow, mỗi nút của đồ thị luồng dữ liệu ứng với một phép toán (operation) trong API TensorFlow, và chưa thực sự chạy:
+
+```python
+import tensorflow as tf
+t = tf.add(8, 9)
+print(t)
+
+# Kết quả  Tensor("Add_1:0", shape=(), dtype=int32)
+```
+
+**(2) Mọi phép tính đều phải đặt trong đồ thị, và đồ thị chỉ chạy trong một phiên (session).** Mở phiên rồi mới đưa dữ liệu vào các nút để tính; đóng phiên thì không tính được nữa. Vì thế phiên cung cấp môi trường để chạy các phép toán và tính giá trị tensor.
+
+Ví dụ:
+
+```python
+import tensorflow as tf
+# Dựng đồ thị
+a = tf.constant([4.0, 5.0])
+b = tf.constant([6.0, 7.0])
+c = a * b
+# Tạo phiên
+sess = tf.Session()
+# Tính c
+print(sess.run(c))   # nhân từng phần tử, in ra [24. 35.]
+sess.close()
+```
+
+> **Biên tập:** (a) chú thích trong bản gốc ghi `a * b` là "nhân ma trận"; thực ra `*` là **nhân từng phần tử** (kết quả $[4\cdot6,\ 5\cdot7] = [24, 35]$), nhân ma trận là `tf.matmul`. (b) Cả hai ví dụ chỉ đúng với TensorFlow 1.x. Ở TensorFlow 2.x, `print(tf.add(8, 9))` in ngay `tf.Tensor(17, shape=(), dtype=int32)` vì chạy eager, còn `tf.Session` không còn (chỉ còn `tf.compat.v1.Session`). Muốn có đồ thị tĩnh để tối ưu, TF2 bọc hàm bằng `@tf.function`.
+
+### 12.1.3 TensorFlow có những đặc điểm gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 6.7 GPU](dl/ch06_s7_vi)
+
+</div>
+
+#### 1. Rất linh hoạt
+
+TensorFlow không chỉ là thư viện học sâu: chỉ cần biểu diễn được quá trình tính toán thành đồ thị luồng dữ liệu là dùng TensorFlow để tính được. TensorFlow cho phép dựng mạng tính toán dưới dạng đồ thị tính toán, đồng thời thao tác trên mạng rất tiện. Người dùng có thể viết cấu trúc và thư viện tầng trên bằng Python dựa trên TensorFlow; nếu TensorFlow chưa có API cần dùng, ta có thể viết code C++ tầng dưới và thêm vào TensorFlow qua cơ chế phép toán tùy chỉnh.
+
+#### 2. Khả chuyển thực sự
+
+TensorFlow chạy được trên CPU và GPU, trên máy bàn, máy chủ, thiết bị di động. Muốn thử huấn luyện học sâu trên laptop, hoặc không muốn sửa code mà vẫn chạy mô hình trên nhiều CPU, hay muốn đưa mô hình đã huấn luyện lên thiết bị di động, TensorFlow đều làm được.
+
+#### 3. Hỗ trợ nhiều ngôn ngữ
+
+TensorFlow có giao diện Python dễ dùng, và cả giao diện C++ cho người dùng tự viết chương trình trên nền C++.
+
+#### 4. Thư viện thuật toán phong phú
+
+Trong các framework học sâu mã nguồn mở, TensorFlow có thư viện thuật toán đầy đủ nhất và liên tục bổ sung thêm. Các thư viện này về cơ bản đã đáp ứng phần lớn nhu cầu; với ứng dụng thông thường, gần như không phải tự cài đặt lại các thuật toán cơ bản.
+
+#### 5. Tài liệu đầy đủ
+
+Trang chủ TensorFlow có tài liệu rất chi tiết, gồm cách dùng từng API, ví dụ các ứng dụng cơ bản, và một phần lý thuyết học sâu cơ bản.
+
+Từ khi mở mã nguồn, rất nhiều người đã đóng góp cho TensorFlow, gồm nhân viên Google, nhà nghiên cứu bên ngoài và lập trình viên độc lập; nhờ kỹ sư khắp thế giới hoàn thiện, cộng đồng TensorFlow đã thành cộng đồng framework học sâu sôi động nhất trên GitHub.
+
+> **Biên tập:** bản gốc mục "Hỗ trợ nhiều ngôn ngữ" chỉ có tiêu đề, bản dịch bổ sung một câu. Các so sánh "đầy đủ nhất", "sôi động nhất" là nhận định năm 2018.
+
+### 12.1.4 Kiến trúc hệ thống của TensorFlow thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 6.7.1 Thiết bị Tính toán](dl/ch06_s7_vi?id=_671-thiết-bị-tính-toán)
+
+</div>
+
+Toàn hệ thống chia thành bảy tầng, từ dưới lên trên:
+
+Bảng 12.1 Các tầng của hệ thống TensorFlow
+
+| Tầng | Chức năng | Thành phần |
+|---|---|---|
+| Tầng hiển thị | Trực quan hóa đồ thị tính toán | TensorBoard |
+| Tầng luồng công việc | Chuẩn bị, lưu trữ, nạp tập dữ liệu | Keras / TF Slim |
+| Tầng đồ thị tính toán | Dựng và tối ưu đồ thị tính toán; tính xuôi / tính ngược | TensorFlow Core |
+| Tầng tính toán nhiều chiều | Xử lý mảng nhiều chiều | Eigen |
+| Tầng tính toán số | Tính toán ma trận / tích chập | BLAS / cuBLAS / cuRAND / cuDNN |
+| Tầng mạng | Truyền thông | gRPC / RDMA |
+| Tầng thiết bị | Phần cứng | CPU / GPU |
+
+- Tầng thiết bị: tài nguyên tính toán phần cứng, hỗ trợ CPU, GPU.
+- Tầng mạng: hỗ trợ hai giao thức truyền thông (gRPC và RDMA) để chạy phân tán.
+- Tầng tính toán số: các phép tính cơ bản nhất như đại số tuyến tính, tích chập.
+- Tầng tính toán nhiều chiều: dữ liệu tham gia tính toán dưới dạng mảng.
+- Tầng đồ thị tính toán: dùng để thiết kế cấu trúc mạng neuron.
+- Tầng luồng công việc: cung cấp các framework gọn nhẹ để dùng.
+- Tầng hiển thị: mạng học sâu dựng xong có thể trực quan hóa bằng TensorBoard.
+
+> **Biên tập:** bản gốc vẽ bảng này thành ảnh (chữ Trung) và gọi tầng trên cùng là "tầng xây dựng" trong lời văn nhưng "tầng hiển thị" trong ảnh; bản dịch chép lại thành bảng chữ theo ảnh. TF Slim đã bị bỏ ở TF2.
+
+### 12.1.5 Mô hình lập trình của TensorFlow thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 2.5 Tính Vi phân Tự động](dl/ch02_s5_vi) · [Học sâu · 3.2.4 Huấn luyện](dl/ch03_s2_vi?id=_324-huấn-luyện)
+
+</div>
+
+
+Mô hình lập trình của TensorFlow là cho dữ liệu dạng tensor chảy trong đồ thị tính toán. Khi lập trình có ít nhất ba bước: 1. dựng đồ thị, 2. khởi chạy đồ thị, 3. đưa dữ liệu vào đồ thị và lấy kết quả.
+
+#### 1. Dựng đồ thị
+
+Đồ thị trong TensorFlow có kiểu `tf.Graph`, gồm tập các nút tính toán và tensor.
+
+Ở đây có hai khái niệm mới: tensor và nút tính toán. Trước hết là tensor. Như đã nói, ta phải đưa dữ liệu vào đồ thị đã khởi chạy thì mới có kết quả. Vậy khi dựng đồ thị, dùng gì để biểu diễn kết quả tính trung gian? Đó là lúc cần khái niệm tensor. Kiểu của nó là `tf.Tensor`, *đại diện* cho đầu ra của một nút tính toán (chú ý chữ "đại diện"). Nó có hai tác dụng chính:
+
+1. Dựng luồng dữ liệu giữa các nút tính toán khác nhau.
+2. Khi chạy đồ thị, có thể đặt giá trị cho một số tensor rồi lấy giá trị của tensor chỉ định. Như vậy là có đầu vào và đầu ra của phép tính.
+
+Code như sau:
+
+```python
+inImage = tf.placeholder(tf.float32, [32, 32, 3], "inputImage")
+processedImage = tf.image.per_image_standardization(inImage, "processedImage")
+```
+
+Ở đây `inImage` và `processedImage` đều là tensor. Chúng đại diện cho dữ liệu đầu ra của nút tính toán; giá trị cụ thể chỉ biết khi chạy đồ thị. Hai lời gọi trên đều truyền một chuỗi, đó là tên của nút tính toán. Tốt nhất nên đặt tên cho nút, để có thể gọi `get_tensor_by_name(name)` trên đồ thị lấy ra tensor tương ứng, rất tiện. (Tên tensor có dạng `"<tên nút>:<chỉ số tensor>"`.)
+
+Khi tạo tensor cần chỉ định kiểu (type) và hình dạng (shape). Tính toán giữa các tensor đòi hỏi cùng kiểu, có thể đổi kiểu bằng `tf.cast`. Hình dạng cũng phải thỏa điều kiện của phép tính; có thể đổi hình dạng bằng `tf.reshape`.
+
+Giờ đến khái niệm nút tính toán: chức năng của nó là tính toán trên tensor, tạo tensor hoặc làm thao tác khác; kiểu là `tf.Operation`. Lấy đối tượng nút bằng `get_operation_by_name(name)`.
+
+Dựng đồ thị như code dưới:
+
+```python
+g = tf.Graph()
+
+with g.as_default():
+    input_data = tf.placeholder(tf.float32, [None, 2], "input_data")
+    input_label = tf.placeholder(tf.float32, [None, 2], "input_label")
+
+    W1 = tf.Variable(tf.truncated_normal([2, 2]), name="W1")
+    B1 = tf.Variable(tf.zeros([2]), name="B1")
+
+    output = tf.add(tf.matmul(input_data, W1), B1, name="output")
+    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=output, labels=input_label)
+
+    train_step = tf.train.AdamOptimizer().minimize(cross_entropy, name="train_step")
+
+    initer = tf.global_variables_initializer()
+```
+
+Code trên tạo một đồ thị và thêm nhiều nút vào đó. Có thể gọi `get_default_graph()` để lấy đồ thị mặc định.
+
+`input_data`, `input_label`, `W1`, `B1`, `output`, `cross_entropy` đều là tensor; `train_step`, `initer` là nút.
+
+> **Biên tập:** về sau code gọi `graph.get_operation_by_name("initer")`, nhưng nút khởi tạo ở đây không được đặt tên "initer" (`initer` chỉ là tên biến Python; nút có tên mặc định là `init`). Muốn tra theo tên phải viết `tf.global_variables_initializer(name="initer")` hoặc dùng thẳng biến `initer`.
+
+Có vài loại tensor hay nút khá quan trọng, giới thiệu dưới đây.
+
+**(a) placeholder**
+
+TensorFlow, đúng như tên gọi, tensor là dữ liệu tensor, flow là dòng chảy; ý tưởng thiết kế ban đầu là dựng một đồ thị luồng dữ liệu tĩnh. Đồ thị gồm các nút tính toán nối với nhau, và giữa các nút là dữ liệu tensor trung gian chảy qua. Muốn dữ liệu tensor chảy được trong đồ thị tĩnh đã dựng, phải có luồng dữ liệu đầu vào ban đầu. Placeholder (chỗ giữ chỗ) đúng như tên gọi là cổng nhận dữ liệu đầu vào: mọi dữ liệu đầu vào, như mẫu huấn luyện, siêu tham số… đều có thể đưa vào đồ thị qua cổng placeholder. Ví dụ:
+
+```python
+import tensorflow as tf
+x = tf.placeholder(dtype=tf.float32, shape=[], name='x')
+y = tf.placeholder(dtype=tf.float32, shape=[], name='y')
+z = x * y
+with tf.Session() as sess:
+    prod = sess.run(z, feed_dict={x: 1., y: 5.2})
+    print(prod)
+# [out]: 5.2
+```
+
+**(b) variable**
+
+Dù là thuật toán học máy truyền thống như máy vector hỗ trợ tuyến tính (Support Vector Machine, SVM) với mô hình toán $y = \langle w, x\rangle + b$, hay thuật toán học sâu hiện đại như mạng neuron tích chập (Convolutional Neural Network, CNN) với đầu ra của một neuron $y = w * x + b$, ta đều thấy $w$ và $b$ chính là mô hình cần tìm. Mô hình được giải bằng thuật toán tối ưu (với SVM dùng thuật toán SMO $^{[1]}$, với CNN thường dựa trên hạ gradient), cập nhật $w$ và $b$ từng bước cho đến khi thỏa điều kiện dừng. Vì vậy trong phần lớn mô hình học máy, $w$ và $b$ xuất hiện trong code dưới dạng biến, tức ta phải định nghĩa biến của mô hình trong code.
+
+```python
+import tensorflow as tf
+a = tf.Variable(2.)
+b = tf.Variable(3.)
+with tf.Session() as sess:
+    sess.run(tf.global_variables_initializer())  # khởi tạo biến
+    print(sess.run(a * b))
+# [out]: 6.0
+```
+
+[1] Platt, John. "Sequential minimal optimization: A fast algorithm for training support vector machines." (1998).
+
+**(c) initializer**
+
+Vì TensorFlow dựng đồ thị luồng tính toán tĩnh, trước khi mở phiên thì không phép toán nào được thực hiện. Do đó để chạy các nút gán giá trị khởi tạo đã dựng trong đồ thị, phải chạy bước khởi tạo trong môi trường phiên sau khi mở phiên. Nếu đồ thị có biến mà trong phiên không chạy lệnh khởi tạo thì chương trình báo lỗi:
+
+```python
+import tensorflow as tf
+a = tf.Variable(2.)
+b = tf.Variable(3.)
+with tf.Session() as sess:
+    # sess.run(tf.global_variables_initializer())  # bỏ lệnh khởi tạo
+    print(sess.run(a * b))
+# [Error]: Attempting to use uninitialized value Variable
+```
+
+> **Biên tập:** code gốc có lỗi chính tả làm chương trình không chạy (`dtpe=`, `nmae=` trong ví dụ placeholder) và thụt lề lẫn tab với dấu cách (Python 3 báo `TabError`); bản dịch đã sửa. Trong TF2, biến được khởi tạo ngay khi tạo, không còn bước `global_variables_initializer`.
+
+#### 2. Khởi chạy đồ thị
+
+Trước hết cần hiểu khái niệm phiên (session), rồi mới hiểu rõ việc khởi chạy đồ thị.
+
+Mỗi lần chạy đồ thị đều phải nằm trong một phiên; phiên cung cấp môi trường để đồ thị chạy. Phiên có kiểu `tf.Session`; khi tạo đối tượng phiên cần truyền một đối tượng đồ thị, nếu không truyền thì dùng đồ thị mặc định. Phiên có thuộc tính `graph`, qua đó lấy được đồ thị tương ứng.
+
+Code như sau:
+
+```python
+numOfBatch = 5
+datas = np.zeros([numOfBatch, 2], np.float32)
+labels = np.zeros([numOfBatch, 2], np.float32)
+
+sess = tf.Session(graph=g)
+graph = sess.graph
+sess.run([graph.get_operation_by_name("init")])
+
+dataHolder = graph.get_tensor_by_name("input_data:0")
+labelHolder = graph.get_tensor_by_name("input_label:0")
+train = graph.get_operation_by_name("train_step")
+out = graph.get_tensor_by_name("output:0")
+
+with g.as_default():
+    saver = tf.train.Saver()
+for i in range(200):
+    result = sess.run([out, train], feed_dict={dataHolder: datas, labelHolder: labels})
+    if i % 100 == 0:
+        saver.save(sess, "./models")
+
+sess.close()
+```
+
+Code khá đơn giản nên không giải thích thêm. Chỉ cần chú ý 2 điểm: 1. đừng quên chạy nút khởi tạo; 2. đừng quên đóng (close) phiên để giải phóng tài nguyên.
+
+> **Biên tập:** code gốc có ba lỗi khiến không chạy được: `for i inrange(200)` (thiếu dấu cách), `saver` dùng mà chưa tạo, và tra nút tên `"initer"` không tồn tại (xem ghi chú ở trên). Bản dịch sửa cả ba và đổi `./moules` thành `./models`.
+
+#### 3. Đưa dữ liệu vào đồ thị và lấy kết quả
+
+Code:
+
+```python
+for i in range(200):
+    result = sess.run([out, train], feed_dict={dataHolder: datas, labelHolder: labels})
+```
+
+Ở đây chủ yếu dùng phương thức `run` của đối tượng phiên, dùng để chạy một nút hay tensor nào đó và lấy giá trị tương ứng. Thường mỗi lần ta chỉ đưa vào một phần nhỏ dữ liệu, để tối ưu mô hình bằng hạ gradient theo minibatch.
+
+Ta đặt các nút hay tensor cần chạy vào một danh sách, rồi truyền danh sách đó làm tham số thứ nhất (không tính `self`) cho `run`; `run` trả về danh sách kết quả, tương ứng từng phần tử với tham số đã truyền.
+
+Nếu nút cần chạy phụ thuộc vào một placeholder thì phải gán giá trị cho placeholder đó. Cách gán thể hiện rõ trong code: truyền một từ điển cho tham số từ khóa `feed_dict`, khóa của từ điển là đối tượng placeholder, giá trị là giá trị ta chỉ định. Kiểu dữ liệu của giá trị phải khớp với placeholder, kể cả hình dạng. Bản thân giá trị là mảng NumPy.
+
+Giải thích thêm một chi tiết. Khi định nghĩa placeholder, code như sau:
+
+```python
+input_data = tf.placeholder(tf.float32, [None, 2], "input_data")
+input_label = tf.placeholder(tf.float32, [None, 2], "input_label")
+```
+
+Hình dạng là `[None, 2]`, nghĩa là chiều thứ nhất của dữ liệu chưa xác định, TensorFlow sẽ tự suy ra chiều thứ nhất từ dữ liệu ta truyền vào; nhờ vậy có thể đổi kích thước batch lúc chạy. Ví dụ mỗi điểm dữ liệu có 2 chiều, mỗi lần truyền 10 điểm thì tensor tương ứng có hình dạng `[10, 2]`. Có thể đặt nhiều chiều là `None` không? Được: ví dụ `tf.placeholder(tf.float32, [None, None, None, 3])` nhận ảnh RGB với batch, chiều cao và chiều rộng tùy ý. Cái giá là một số phép toán cần biết trước hình dạng (như `tf.reshape` với kích thước cố định, hay tầng kết nối đầy đủ ngay sau tầng tích chập) sẽ không suy ra được hình dạng lúc dựng đồ thị.
+
+> **Biên tập:** bản gốc trả lời "về lý thuyết là không được". Sai: TensorFlow cho phép bất kỳ chiều nào là `None` (thậm chí `shape=None` là không biết cả số chiều); các mạng tích chập hoàn toàn (FCN) dùng điều này để nhận ảnh kích thước tùy ý.
+
+### 12.1.6 Dựng VGG16 bằng TensorFlow thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 4.5 VGGNet](qa/ch04_vi?id=_45-vggnet) · [d2l (tiếng Anh) · 8.2 Mạng dùng khối (VGG)](https://d2l.ai/chapter_convolutional-modern/vgg.html) ↗
+
+</div>
+
+Giới thiệu xong kiến thức cơ bản về TensorFlow, đến lúc thực hành dựng mạng. Trên mạng có nhiều hướng dẫn, nhưng ở đây tác giả muốn xuất phát từ code và cú pháp TensorFlow chuẩn nhất (không gọi API cấp cao, để giữ được "hương vị" gốc), trình bày cách dựng kiến trúc VGG16 chuẩn. Không dài dòng, vào code:
+
+```python
+import numpy as np
+import tensorflow as tf
+
+def get_weight_variable(shape):
+    return tf.get_variable('weight', shape=shape, initializer=tf.truncated_normal_initializer(stddev=0.1))
+
+def get_bias_variable(shape):
+    return tf.get_variable('bias', shape=shape, initializer=tf.constant_initializer(0))
+
+def conv2d(x, w, padding='SAME', s=1):
+    x = tf.nn.conv2d(x, w, strides=[1, s, s, 1], padding=padding)
+    return x
+
+def maxPoolLayer(x):
+    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
+                          strides=[1, 2, 2, 1], padding='SAME')
+
+def conv2d_layer(x, in_chs, out_chs, ksize, layer_name):
+    with tf.variable_scope(layer_name):
+        w = get_weight_variable([ksize, ksize, in_chs, out_chs])
+        b = get_bias_variable([out_chs])
+        y = tf.nn.relu(tf.nn.bias_add(conv2d(x, w, padding='SAME', s=1), b))
+    return y
+
+def fc_layer(x, in_kernels, out_kernels, layer_name, relu=True):
+    with tf.variable_scope(layer_name):
+        w = get_weight_variable([in_kernels, out_kernels])
+        b = get_bias_variable([out_kernels])
+        y = tf.nn.bias_add(tf.matmul(x, w), b)
+    return tf.nn.relu(y) if relu else y
+
+def VGG16(x):
+    conv1_1 = conv2d_layer(x, x.get_shape().as_list()[-1], 64, 3, 'conv1_1')
+    conv1_2 = conv2d_layer(conv1_1, 64, 64, 3, 'conv1_2')
+    pool1 = maxPoolLayer(conv1_2)
+
+    conv2_1 = conv2d_layer(pool1, 64, 128, 3, 'conv2_1')
+    conv2_2 = conv2d_layer(conv2_1, 128, 128, 3, 'conv2_2')
+    pool2 = maxPoolLayer(conv2_2)
+
+    conv3_1 = conv2d_layer(pool2, 128, 256, 3, 'conv3_1')
+    conv3_2 = conv2d_layer(conv3_1, 256, 256, 3, 'conv3_2')
+    conv3_3 = conv2d_layer(conv3_2, 256, 256, 3, 'conv3_3')
+    pool3 = maxPoolLayer(conv3_3)
+
+    conv4_1 = conv2d_layer(pool3, 256, 512, 3, 'conv4_1')
+    conv4_2 = conv2d_layer(conv4_1, 512, 512, 3, 'conv4_2')
+    conv4_3 = conv2d_layer(conv4_2, 512, 512, 3, 'conv4_3')
+    pool4 = maxPoolLayer(conv4_3)
+
+    conv5_1 = conv2d_layer(pool4, 512, 512, 3, 'conv5_1')
+    conv5_2 = conv2d_layer(conv5_1, 512, 512, 3, 'conv5_2')
+    conv5_3 = conv2d_layer(conv5_2, 512, 512, 3, 'conv5_3')
+    pool5 = maxPoolLayer(conv5_3)
+
+    pool5_flatten_dims = int(np.prod(pool5.get_shape().as_list()[1:]))
+    pool5_flatten = tf.reshape(pool5, [-1, pool5_flatten_dims])
+
+    fc_6 = fc_layer(pool5_flatten, pool5_flatten_dims, 4096, 'fc6')
+    fc_7 = fc_layer(fc_6, 4096, 4096, 'fc7')
+    fc_8 = fc_layer(fc_7, 4096, 10, 'fc8', relu=False)  # logits: không qua ReLU
+
+    return fc_8
+```
+
+> **Biên tập:** code gốc có năm lỗi, bản dịch đã sửa:
+> 1. `pool_1` được tạo nhưng dòng sau dùng `pool1` (NameError);
+> 2. `tf.bias_add` không tồn tại, đúng là `tf.nn.bias_add`;
+> 3. `tf.get_shape(x)` không tồn tại, đúng là `x.get_shape()`;
+> 4. `conv5_3` nhận đầu vào `conv5_1` thay vì `conv5_2`, làm `conv5_2` bị bỏ qua (mạng chỉ còn 15 tầng có trọng số);
+> 5. tầng cuối `fc8` cũng qua ReLU. Đầu ra cuối phải là logits (âm dương tùy ý) để đưa vào softmax / cross-entropy; ReLU cắt mọi logit âm về 0, làm hỏng việc phân loại.
+>
+> Ngoài ra code thụt lề lẫn tab và dấu cách, và thiếu dropout giữa các tầng kết nối đầy đủ như trong bài báo VGG. Code vẫn là TF1 (`tf.get_variable`, `tf.variable_scope`), không chạy trên TF2 nếu không dùng `tf.compat.v1`.
+
+**Bổ sung: VGG16 bằng PyTorch.** Bản viết theo cách thường gặp hiện nay, đã chạy thử: đầu vào $224\times224$, 1000 lớp, tổng cộng **138,357,544** tham số, khớp với `torchvision.models.vgg16`.
+
+```python
+import torch
+from torch import nn
+
+def vgg_block(num_convs, in_ch, out_ch):
+    layers = []
+    for _ in range(num_convs):
+        layers += [nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1), nn.ReLU()]
+        in_ch = out_ch
+    layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
+    return nn.Sequential(*layers)
+
+def vgg16(num_classes=1000):
+    cfg = [(2, 64), (2, 128), (3, 256), (3, 512), (3, 512)]   # (số tầng tích chập, số kênh) của 5 khối
+    blocks, in_ch = [], 3
+    for n, out_ch in cfg:
+        blocks.append(vgg_block(n, in_ch, out_ch))
+        in_ch = out_ch
+    return nn.Sequential(
+        *blocks, nn.Flatten(),
+        nn.Linear(512 * 7 * 7, 4096), nn.ReLU(), nn.Dropout(0.5),
+        nn.Linear(4096, 4096), nn.ReLU(), nn.Dropout(0.5),
+        nn.Linear(4096, num_classes))   # tầng cuối ra logits, không ReLU
+
+net = vgg16()
+print(net(torch.randn(1, 3, 224, 224)).shape)       # torch.Size([1, 1000])
+print(sum(p.numel() for p in net.parameters()))    # 138357544
+```
+
+## 12.2 PyTorch
+
+### 12.2.1 PyTorch là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 2.1 Thao tác với Dữ liệu](dl/ch02_s1_vi) · [Học sâu · 2.5 Tính Vi phân Tự động](dl/ch02_s5_vi)
+
+</div>
+
+PyTorch là phiên bản Python của Torch, framework mạng neuron mã nguồn mở của Facebook, chuyên cho lập trình mạng neuron sâu (DNN) tăng tốc bằng GPU. Torch là một thư viện tensor kinh điển thao tác trên dữ liệu ma trận nhiều chiều, được dùng rộng rãi trong học máy và các ứng dụng nặng về toán. Khác đồ thị tính toán tĩnh của TensorFlow, đồ thị tính toán của PyTorch là động, có thể thay đổi theo nhu cầu ngay trong lúc tính. Nhưng vì Torch dùng ngôn ngữ Lua, nó luôn ít người dùng ở Trung Quốc và dần bị TensorFlow (hỗ trợ Python) giành mất người dùng. Là bản chuyển của thư viện học máy kinh điển Torch, PyTorch cho người dùng Python một lựa chọn viết code dễ chịu.
+
+> **Biên tập:** "phiên bản Python của Torch" là cách nói đơn giản hóa: PyTorch dùng chung thư viện lõi C (TH, THC) của Torch lúc đầu, nhưng phần tự động tính đạo hàm và API được viết lại từ đầu. Từ 2022 PyTorch thuộc PyTorch Foundation (dưới Linux Foundation), không còn do riêng Meta quản lý.
+
+### 12.2.2 Vì sao chọn PyTorch?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 6.1 Tầng và Mô-đun](dl/ch06_s1_vi)
+
+</div>
+
+#### 1. Gọn gàng
+
+PyTorch được thiết kế để bọc ít lớp nhất có thể, tránh tái phát minh bánh xe. Không như TensorFlow đầy rẫy khái niệm mới như session, graph, operation, name_scope, variable, tensor, layer, PyTorch theo ba tầng trừu tượng từ thấp lên cao: tensor → variable (autograd) → nn.Module, lần lượt là mảng nhiều chiều (tensor), tự động tính đạo hàm (biến) và mạng neuron (tầng / mô-đun); ba tầng này gắn bó chặt với nhau, có thể sửa và thao tác cùng lúc.
+
+Thiết kế gọn còn có lợi là code dễ hiểu. Mã nguồn PyTorch chỉ cỡ một phần mười TensorFlow; ít trừu tượng hơn, thiết kế trực quan hơn nên mã nguồn PyTorch rất dễ đọc.
+
+> **Biên tập:** từ PyTorch 0.4 (2018), `Variable` đã gộp vào `Tensor`: mọi tensor có `requires_grad=True` đều tự ghi lại phép tính để lan truyền ngược, không còn lớp `Variable` riêng. So sánh kích thước mã nguồn là số liệu năm 2017–2018.
+
+#### 2. Tốc độ
+
+Sự linh hoạt của PyTorch không phải trả giá bằng tốc độ; trong nhiều phép đo, PyTorch nhanh hơn TensorFlow, Keras… Tốc độ chạy phụ thuộc rất nhiều vào trình độ lập trình viên, nhưng cùng một thuật toán, bản cài bằng PyTorch nhiều khả năng nhanh hơn bản cài bằng framework khác.
+
+#### 3. Dễ dùng
+
+PyTorch là framework thiết kế hướng đối tượng thanh lịch nhất trong các framework. Thiết kế giao diện hướng đối tượng của PyTorch bắt nguồn từ Torch, mà giao diện của Torch nổi tiếng linh hoạt, dễ dùng; tác giả Keras ban đầu cũng được Torch truyền cảm hứng khi viết Keras. PyTorch kế thừa Torch, nhất là thiết kế API và giao diện mô-đun rất giống Torch. Thiết kế của PyTorch hợp với cách nghĩ của con người nhất, giúp người dùng tập trung tối đa vào việc hiện thực ý tưởng của mình, nghĩ sao viết vậy, không phải bận tâm nhiều tới ràng buộc của framework.
+
+#### 4. Cộng đồng sôi động
+
+PyTorch có tài liệu đầy đủ, hướng dẫn từng bước, diễn đàn do chính tác giả duy trì để người dùng trao đổi và hỏi đáp. Viện Nghiên cứu Trí tuệ Nhân tạo của Facebook (FAIR) hỗ trợ mạnh cho PyTorch; là một trong ba viện nghiên cứu học sâu hàng đầu hiện nay, sự hỗ trợ của FAIR đủ bảo đảm PyTorch được phát triển, cập nhật liên tục, không như nhiều framework do cá nhân phát triển chỉ sớm nở tối tàn.
+
+> **Biên tập:** "nhanh hơn", "thanh lịch nhất", "hợp cách nghĩ nhất" là nhận định chủ quan của bản gốc. Về tốc độ, với cùng phép toán trên GPU, các framework lớn gọi cùng thư viện cuDNN/cuBLAS nên chênh lệch thường nhỏ; khác biệt chủ yếu đến từ khâu nạp dữ liệu, biên dịch đồ thị và cách viết code.
+
+### 12.2.3 Kiến trúc của PyTorch thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 6.7 GPU](dl/ch06_s7_vi) · [Học sâu · 6.6 Đọc/Ghi Tệp](dl/ch06_s6_vi)
+
+</div>
+
+PyTorch (gộp với Caffe2) cho phép thử nghiệm nhanh, linh hoạt và đưa vào sản xuất hiệu quả nhờ giao diện lai, huấn luyện phân tán và hệ sinh thái công cụ, thư viện. PyTorch và TensorFlow cài đặt đồ thị tính toán theo cách khác nhau: TensorFlow dùng cơ chế đồ thị tĩnh (định nghĩa trước rồi mới dùng), PyTorch dùng đồ thị động (định nghĩa trong lúc chạy). PyTorch có các đặc điểm cấp cao sau:
+
+- **Giao diện lai (hybrid front-end):** chế độ eager dễ dùng và linh hoạt, đồng thời chuyển liền mạch sang chế độ đồ thị để có tốc độ, tối ưu và chức năng trong môi trường chạy C++.
+- **Huấn luyện phân tán:** tối ưu hiệu năng nhờ thực thi bất đồng bộ các phép toán tập thể (collective operations) và truyền thông ngang hàng, gọi được từ Python lẫn C++.
+- **Ưu tiên Python:** PyTorch được xây dựng để tích hợp sâu vào Python, nên dùng được cùng các thư viện, gói phổ biến như Cython và Numba.
+- **Công cụ và thư viện phong phú:** cộng đồng nhà nghiên cứu và lập trình viên sôi động đã xây dựng hệ sinh thái công cụ, thư viện phong phú để mở rộng PyTorch, hỗ trợ phát triển trong các lĩnh vực từ thị giác máy tính tới học tăng cường.
+- **Hỗ trợ ONNX sẵn có:** xuất mô hình theo định dạng chuẩn ONNX (Open Neural Network Exchange) để dùng trực tiếp với các nền tảng, môi trường chạy, công cụ trực quan hóa tương thích ONNX.
+- **Giao diện C++:** giao diện C++ thuần của PyTorch (LibTorch), theo thiết kế và kiến trúc của giao diện Python đã có, nhắm tới hiệu năng cao, độ trễ thấp và các ứng dụng C++ chạy trực tiếp trên phần cứng (bare metal).
+
+Nền tảng của tất cả là một thư viện tensor cho học sâu, tối ưu cho cả GPU và CPU.
+
+> **Biên tập:** "giao diện lai" ở đây là TorchScript (`torch.jit`) của PyTorch 1.0. Từ PyTorch 2.0, cách chính để biên dịch là `torch.compile`; TorchScript chỉ còn được duy trì.
+
+### 12.2.4 PyTorch và TensorFlow khác nhau ở đâu?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 2.5.4 Gradient và Luồng Điều khiển của Python](dl/ch02_s5_vi?id=_254-gradient-và-luồng-Điều-khiển-của-python)
+
+</div>
+
+Như đã nói, ưu điểm lớn nhất của PyTorch là mạng neuron dựng ra là động; so với TensorFlow tĩnh, nó xử lý một số bài toán hiệu quả hơn, ví dụ đầu ra có độ dài thay đổi theo thời gian của RNN. Mỗi bên có ưu nhược riêng. Cả hai đều do công ty lớn phát hành: TensorFlow (Google) tuyên bố đã đầu tư nhiều vào huấn luyện phân tán, nên có thể coi TensorFlow mạnh hơn PyTorch (Facebook) về huấn luyện phân tán, lại có công cụ trực quan hóa TensorBoard; nhưng đồ thị tĩnh của TensorFlow khiến nó hơi bị động với RNN (dù nó đã giải quyết bằng cách khác), còn khi dùng PyTorch ta hiểu RNN động kiểu này rõ hơn. Ngoài ra TensorFlow được công nghiệp hóa cao, code tầng dưới rất khó đọc; PyTorch đỡ hơn một chút, nếu đào sâu vào API của PyTorch, ít ra ta hiểu thêm được tầng dưới của PyTorch đang làm gì so với đọc TensorFlow.
+
+> **Biên tập:** phần lớn khác biệt này đã mờ đi: TF2 mặc định eager (động) như PyTorch, còn PyTorch có `torch.compile` để tối ưu như đồ thị tĩnh; TensorBoard dùng được trực tiếp từ PyTorch (`torch.utils.tensorboard`); huấn luyện phân tán của PyTorch (DDP, FSDP) hiện là lựa chọn phổ biến cho các mô hình lớn.
+
+### 12.2.5 PyTorch có những gói công cụ thường dùng nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 2.5 Tính Vi phân Tự động](dl/ch02_s5_vi) · [Học sâu · 6.1 Tầng và Mô-đun](dl/ch06_s1_vi) · [Học sâu · 12.10 Adam](dl/ch12_s10_vi)
+
+</div>
+
+- `torch`: thư viện tensor giống NumPy, hỗ trợ GPU mạnh;
+- `torch.autograd`: thư viện tự động tính đạo hàm (automatic differentiation) dựa trên băng ghi (tape), hỗ trợ mọi phép toán khả vi trên tensor trong torch;
+- `torch.nn`: thư viện mạng neuron gắn chặt với autograd, thiết kế để linh hoạt tối đa;
+- `torch.optim`: gói tối ưu dùng cùng `torch.nn`, gồm các phương pháp chuẩn như SGD, RMSProp, LBFGS, Adam;
+- `torch.multiprocessing`: chạy đa tiến trình Python, chia sẻ bộ nhớ tensor giữa các tiến trình;
+- `torch.utils`: bộ nạp dữ liệu (DataLoader) và các hàm tiện ích khác;
+- `torch.legacy(.nn/.optim)`: code cũ chuyển từ Torch sang, giữ lại để tương thích ngược.
+
+> **Biên tập:** bản gốc là bản máy dịch từ README của PyTorch nên có câu tối nghĩa ("tự động khác biệt" cho *automatic differentiation*, "để linh hoạt tối đa mà chưa liên quan" cho *designed for maximum flexibility*, `torch.utils` "có trình huấn luyện"); bản dịch theo nghĩa của README gốc. `torch.legacy` đã bị xóa từ PyTorch 1.0.
+
+## 12.3 Caffe
+
+### 12.3.1 Caffe là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 6.1 Tầng và Mô-đun](dl/ch06_s1_vi)
+
+</div>
+
+Tên đầy đủ của Caffe là Convolutional Architecture for Fast Feature Embedding (kiến trúc tích chập để nhúng đặc trưng nhanh). Đó là một framework học sâu rõ ràng, hiệu quả, mã nguồn mở, ngôn ngữ lõi là C++, hỗ trợ giao diện dòng lệnh, Python và Matlab, chạy được cả trên CPU lẫn GPU. Giấy phép của nó là BSD 2-Clause.
+
+> **Biên tập:** Caffe do Yangqing Jia viết ở Berkeley (2013); bản cuối là 1.0 (2017), sau đó gần như không còn phát triển. Mục này giữ lại chủ yếu vì lịch sử và vì các khái niệm (tầng, blob, solver) vẫn thấy trong framework hiện nay.
+
+### 12.3.2 Caffe có những đặc điểm gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 6.1 Tầng và Mô-đun](dl/ch06_s1_vi) · [Học sâu · 6.7 GPU](dl/ch06_s7_vi)
+
+</div>
+
+1. **Mô-đun hóa:** Caffe ngay từ đầu được thiết kế mô-đun hóa nhiều nhất có thể, cho phép mở rộng sang định dạng dữ liệu, tầng mạng và hàm mất mát mới.
+2. **Tách biệt biểu diễn và cài đặt:** định nghĩa mô hình (model) của Caffe viết bằng ngôn ngữ Protocol Buffer vào tệp cấu hình. Caffe hỗ trợ kiến trúc mạng dạng đồ thị có hướng không chu trình bất kỳ. Caffe cấp phát bộ nhớ đúng theo nhu cầu của mạng. Chỉ một lời gọi hàm là chuyển qua lại giữa CPU và GPU.
+3. **Có kiểm thử đầy đủ:** trong Caffe, mỗi mô-đun đều có một bài kiểm thử tương ứng.
+4. **Giao diện Python và Matlab:** có cả giao diện Python lẫn Matlab.
+5. **Mô hình tham chiếu đã huấn luyện sẵn:** cho các dự án thị giác, Caffe cung cấp một số mô hình tham chiếu; các mô hình này chỉ dùng cho học thuật và phi thương mại, giấy phép của chúng không phải BSD.
+
+### 12.3.3 Tư tưởng thiết kế của Caffe thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 6.1.1 Một Mô-đun Tùy chỉnh](dl/ch06_s1_vi?id=_611-một-mô-đun-tùy-chỉnh) · [Học máy · 16.4 Lan truyền ngược](ml/ch16_vi?id=_164-lan-truyền-ngược) · [d2l (tiếng Anh) · 14.2 Tinh chỉnh](https://d2l.ai/chapter_computer-vision/fine-tuning.html) ↗
+
+</div>
+
+Về cơ bản, Caffe theo một giả định đơn giản về mạng neuron: mọi phép tính đều biểu diễn dưới dạng tầng (layer). Việc của một tầng là nhận một ít dữ liệu rồi xuất ra kết quả sau khi tính. Ví dụ tích chập: nhận một ảnh, tích chập với tham số của tầng (bộ lọc, filter), rồi xuất kết quả tích chập. Mỗi tầng cần làm hai phép tính: forward là tính đầu ra từ đầu vào; backward là từ gradient đến từ tầng trên, tính gradient theo đầu vào. Chỉ cần cài hai hàm này, ta có thể nối nhiều tầng thành một mạng. Việc của mạng là nhận dữ liệu (ảnh, giọng nói hay gì cũng được) rồi tính đầu ra cần thiết (như nhãn nhận diện). Khi huấn luyện, ta dùng nhãn đã có để tính mất mát (loss) và gradient, rồi dùng gradient để cập nhật tham số của mạng. Đó là quy trình cơ bản của Caffe.
+
+Về cơ bản, cách đơn giản nhất để bắt đầu với Caffe là: ghi dữ liệu thành định dạng của Caffe, thiết kế một mạng, rồi dùng solver của Caffe để tối ưu xem kết quả thế nào. Nếu dữ liệu là ảnh, có thể bắt đầu từ mạng có sẵn như AlexNet hay GoogLeNet rồi tinh chỉnh (fine-tuning); nếu dữ liệu hơi khác, ví dụ trực tiếp là vector số thực, có thể phải cấu hình tùy chỉnh một chút, khi đó ví dụ hồi quy logistic của Caffe có thể có ích.
+
+Phương pháp tinh chỉnh: ý tưởng là một mạng rất mạnh đã được huấn luyện trên tập dữ liệu lớn như ImageNet thì trên nhiệm vụ khác chắc cũng không tệ. Nên ta có thể lấy mạng đã huấn luyện trước (pretrain) về, chỉ huấn luyện lại vài tầng cuối. Huấn luyện lại nghĩa là, ví dụ trước kia phải phân loại 1000 lớp của ImageNet, giờ chỉ muốn nhận diện chó hay mèo, hay có phải biển số xe không, thì thay tầng softmax cuối từ bộ phân loại $4096\times1000$ thành bộ phân loại $4096\times2$. Chiến lược này rất hiệu quả trong ứng dụng, nên ta thường huấn luyện trước một mạng trên ImageNet, vì ta biết đại khái quá trình huấn luyện trên ImageNet sẽ diễn ra thế nào.
+
+### 12.3.4 Kiến trúc của Caffe thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 6.1 Tầng và Mô-đun](dl/ch06_s1_vi) · [Học sâu · 6.2.2 Tham số Ràng buộc](dl/ch06_s2_vi?id=_622-tham-số-ràng-buộc) · [Học sâu · 6.6 Đọc/Ghi Tệp](dl/ch06_s6_vi)
+
+</div>
+
+Kiến trúc của Caffe hơi khác các framework học sâu khác: nó không viết code theo trình tự cài đặt thuật toán, mà lấy trừu tượng cấp hệ thống làm kiến trúc tổng thể, bọc dần chi tiết cài đặt theo từng tầng, nhờ đó kiến trúc phía trên rất rõ ràng. Kiến trúc tổng thể của Caffe như sau.
+
+#### 1. SyncedMem
+
+Lớp này chủ yếu bọc các thao tác trao đổi dữ liệu giữa CPU và GPU. Thông thường dữ liệu đi theo đường: ổ đĩa → bộ nhớ CPU → bộ nhớ GPU → bộ nhớ CPU → (ổ đĩa). Vì thế khi viết code thường phải viết đoạn truyền dữ liệu giữa CPU và GPU, đồng thời giữ hai con trỏ bộ nhớ ở hai phía. Việc này không khó nhưng rườm rà. SyncedMem ra đời để bọc thao tác truyền dữ liệu CPU/GPU, chỉ cần gọi giao diện đơn giản là có dữ liệu đã đồng bộ ở cả hai phía.
+
+#### 2. Blob
+
+Blob là đối tượng lưu dữ liệu. Trong Caffe, mọi loại dữ liệu (ảnh đầu vào, tham số mô hình) đều truyền trong mạng dưới dạng Blob. Blob cung cấp giao diện lưu trữ thống nhất, dùng để lưu dữ liệu huấn luyện, tham số mô hình…, đồng thời Blob đồng bộ được giữa CPU và GPU để hỗ trợ tính toán lẫn CPU/GPU.
+
+Lớp này bọc hai thứ. Một là bọc thao tác dữ liệu: dùng Blob có thể thao tác dữ liệu nhiều chiều, truy cập nhanh, đổi số chiều… Hai là bọc dữ liệu gốc và lượng cập nhật: mỗi Blob có hai con trỏ dữ liệu `data` và `diff`; `data` lưu dữ liệu gốc, `diff` lưu gradient của lan truyền ngược (backpropagation). Blob dùng SyncedMem nên dễ truy cập ở cả hai phía xử lý. Blob về cơ bản bọc toàn bộ phần cấu trúc dữ liệu của Caffe; trong lớp Net có thể thấy mọi dữ liệu xuôi, ngược và tham số đều biểu diễn bằng Blob là đủ. Trừu tượng dữ liệu đến đây là xong, tiếp theo là trừu tượng tầng. Tính xuôi và ngược của mạng neuron có thể làm hoàn toàn độc lập giữa các tầng; chỉ cần mỗi tầng cài đặt theo một quy ước giao diện nhất định là bảo đảm toàn mạng đúng.
+
+#### 3. Layer
+
+Layer là đơn vị cơ bản của mạng Net, cũng là đơn vị cấu trúc mạng nhỏ nhất có thể điều chỉnh từ bên ngoài trong Caffe; mỗi Layer có Blob đầu vào và Blob đầu ra. Layer là mô-đun đồ sộ, phức tạp nhất trong Caffe, là đơn vị tính toán cơ bản của mạng neuron. Vì Caffe nhấn mạnh thiết kế mô-đun, mỗi tầng chỉ được làm một loại phép tính nhất định, như tích chập, gộp, biến đổi phi tuyến, tích trong, cũng như nạp dữ liệu, chuẩn hóa và tính mất mát. Caffe có rất nhiều loại tầng; loại cụ thể và chức năng xem tài liệu chính thức. Khi tạo một mô hình Caffe cũng lấy Layer làm nền. Layer là lớp cha, bên dưới có nhiều lớp con cài các chức năng cụ thể như `data_layer`, `conv_layer`, `loss_layer`… Layer được tạo qua `LayerFactory`.
+
+#### 4. Net
+
+Net là một mạng sâu hoàn chỉnh, gồm tầng đầu vào, các tầng ẩn, tầng đầu ra; trong Caffe thường là một mạng neuron tích chập (Convolution Neural Network, CNN). Định nghĩa các loại Layer khác nhau rồi nối chúng bằng Blob là có một Net. Net gộp dữ liệu Blob và tầng Layer để bọc thêm một lớp nữa, cung cấp ra ngoài giao diện khởi tạo và lan truyền xuôi, ngược; nhìn tổng thể giống chức năng một tầng, nhưng tổ hợp bên trong có thể muôn hình vạn trạng. Đáng nói là dữ liệu đầu vào, đầu ra của mỗi tầng đều lưu thống nhất trong Net, con trỏ tham số của mỗi tầng cũng lưu trong Net; các tầng có thể dùng chung tham số qua WeightShare, nên có thể cấu hình để nhiều tầng mạng neuron chia sẻ tham số. Một Net gồm nhiều Layer. Một mạng điển hình đi từ tầng dữ liệu (data layer, nạp dữ liệu từ đĩa) tới tầng mất mát (loss layer).
+
+#### 5. Solver
+
+Có Net rồi là tính được lan truyền xuôi, ngược của mạng neuron, nhưng còn thiếu chức năng huấn luyện và dự đoán; lớp Solver bọc thêm các chức năng liên quan tới huấn luyện và dự đoán. Nó cung cấp hai giao diện: một là giao diện cập nhật tham số, kế thừa Solver để cài các cách cập nhật khác nhau như Momentum, Nesterov, Adagrad…, nên dùng được nhiều thuật toán tối ưu khác nhau; hai là các hàm gọi lại (callback) chèn được ở những trạng thái nhất định trong mỗi vòng huấn luyện, trong code người dùng trực tiếp của điểm gọi lại này là thuật toán huấn luyện nhiều GPU. Solver định nghĩa cách giải cho mô hình mạng Net, ghi lại quá trình huấn luyện, lưu tham số mô hình, ngắt và tiếp tục quá trình huấn luyện. Tự viết Solver có thể cài các cách giải mạng neuron khác nhau. Đọc code Solver giúp hiểu quá trình tối ưu khi giải mạng. Solver là lớp cha, bên dưới có các lớp con cài các phương pháp tối ưu khác nhau như `sgd_solver`, `adagrad_solver`…; Solver được tạo qua `SolverFactory`.
+
+#### 6. Proto
+
+`caffe.proto` nằm trong thư mục `…/src/caffe/proto`, trong thư mục này còn một tệp `.pb.cc` và một tệp `.pb.h`, đều biên dịch từ `caffe.proto`. `caffe.proto` định nghĩa nhiều dữ liệu có cấu trúc, gồm: BlobProto, Datum, FillerParameter, NetParameter, SolverParameter, SolverState, LayerParameter, ConcatParameter, ConvolutionParameter, DataParameter, DropoutParameter, HDF5DataParameter, HDF5OutputParameter, ImageDataParameter, InfogainLossParameter, InnerProductParameter, LRNParameter, MemoryDataParameter, PoolingParameter, PowerParameter, WindowDataParameter, V0LayerParameter.
+
+#### 7. IO
+
+Ngoài những thứ trên còn cần dữ liệu đầu vào và tham số. DataReader và DataTransformer giúp chuẩn bị dữ liệu đầu vào, Filler khởi tạo tham số, một số phương thức Snapshot lưu mô hình bền vững.
+
+> **Biên tập:** bản gốc viết tên nhà máy tạo tầng là "LayFactory"; tên đúng trong mã nguồn Caffe là `LayerRegistry` (macro `REGISTER_LAYER_CLASS`), thường được gọi là "layer factory". Tương tự Solver dùng `SolverRegistry`.
+
+### 12.3.5 Caffe có những giao diện nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 6.6 Đọc/Ghi Tệp](dl/ch06_s6_vi)
+
+</div>
+
+Framework học sâu Caffe hỗ trợ nhiều giao diện lập trình, gồm dòng lệnh, Python và Matlab. Dưới đây giới thiệu cách dùng các giao diện này.
+
+#### 1. Giao diện Python của Caffe
+
+Caffe có giao diện Python là Pycaffe, cài đặt trong thư mục `caffe/python`. Trong code Python, `import caffe` là có thể nạp mô hình (load models), lan truyền xuôi và ngược (forward and backward), xử lý vào ra (handle IO), vẽ mạng (visualize networks) và tự điều khiển việc tối ưu (instrument model solving). Mọi dữ liệu mô hình, tham số tính toán đều để lộ ra ngoài, đọc ghi được.
+
+1. `caffe.Net` là giao diện chính, phụ trách nạp dữ liệu, kiểm tra dữ liệu, tính toán mô hình.
+2. `caffe.Classifier` dùng cho phân loại ảnh.
+3. `caffe.Detector` dùng cho phát hiện đối tượng trong ảnh.
+4. `caffe.SGDSolver` là giao diện solver để lộ ra ngoài.
+5. `caffe.io` xử lý vào ra, tiền xử lý dữ liệu.
+6. `caffe.draw` trực quan hóa cấu trúc mạng.
+7. Các blob của Caffe biểu diễn dưới dạng `ndarray` của NumPy, tiện và hiệu quả.
+
+#### 2. Giao diện MATLAB của Caffe
+
+Giao diện MATLAB (Matcaffe) là gói `caffe` trong thư mục `caffe/matlab`. Dựa trên matcaffe có thể tích hợp Caffe vào code MATLAB. Giao diện MATLAB gồm:
+
+1. Tạo nhiều cấu trúc mạng trong MATLAB.
+2. Tính lan truyền xuôi (Forward) và lan truyền ngược (Backward) của mạng.
+3. Truy cập một tầng bất kỳ của mạng và tham số của nó.
+4. Lưu tham số mạng ra tệp hoặc nạp từ tệp.
+5. Điều chỉnh hình dạng của blob và mạng.
+6. Sửa và điều chỉnh tham số mạng.
+7. Tạo nhiều solver để huấn luyện.
+8. Khôi phục và tiếp tục huấn luyện từ ảnh chụp (snapshot) của solver.
+9. Truy cập mạng huấn luyện (train net) và mạng kiểm tra (test net).
+10. Sau một số vòng lặp, trao quyền điều khiển mạng cho MATLAB.
+11. Kết hợp thuật toán gradient viết bằng code MATLAB.
+
+#### 3. Giao diện dòng lệnh của Caffe
+
+Giao diện dòng lệnh Cmdcaffe là công cụ của Caffe để huấn luyện mô hình, tính điểm và đo thời gian. Cmdcaffe nằm trong thư mục `caffe/build/tools`.
+
+**(a) caffe train**
+
+Lệnh `caffe train` dùng để huấn luyện mô hình, cụ thể:
+
+1. `caffe train` với tham số `solver.prototxt` để cấu hình.
+2. `caffe train` với tham số `snapshot mode_iter_1000.solverstate` để nạp ảnh chụp của solver.
+3. `caffe train` với tham số `weights model.caffemodel` để khởi tạo mô hình khi tinh chỉnh (fine-tuning).
+
+**(b) caffe test**
+
+Lệnh `caffe test` dùng để chạy kiểm tra và tính điểm mô hình, kết quả cuối cùng của mạng biểu diễn theo phần trăm, ví dụ dùng độ chính xác (accuracy) hoặc mất mát (loss) làm kết quả. Trong lúc kiểm tra, hiện điểm của từng batch, cuối cùng in ra điểm trung bình của mọi batch.
+
+**(c) caffe time**
+
+Lệnh `caffe time` dùng để kiểm tra hiệu năng hệ thống và đo thời gian chạy tương đối của mô hình; lệnh này đo thời gian và đồng bộ từng tầng khi chạy mô hình.
+
+Tài liệu tham khảo:
+1. Nhạc Nghị (乐毅), Vương Bân (王斌), *Học sâu: giảng giải và thực hành các mô hình kinh điển với Caffe* (深度学习：Caffe之经典模型讲解与实战).
+
+## 12.4 Xây dựng mạng có những nguyên tắc nào?
+
+### 12.4.1 Nguyên tắc cho người mới
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · Khoá Học sâu](dl/README_vi) · [Ôn tập · Chương 4 Các mạng kinh điển](qa/ch04_vi)
+
+</div>
+
+Người mới bắt đầu không nên lao ngay vào dựng mô hình mạng. Thứ tự học nên là:
+
+1. Hiểu nguyên lý hoạt động của mạng neuron, quen các khái niệm và thuật ngữ cơ bản.
+2. Đọc bài báo về các mô hình mạng kinh điển cùng mã nguồn cài đặt (framework học sâu tùy hoàn cảnh của mình).
+3. Tìm một tập dữ liệu và tự chạy một mạng, có thể thử sửa cấu trúc của mô hình có sẵn.
+4. Thiết kế mạng theo nhu cầu dự án của mình.
+
+### 12.4.2 Nguyên tắc ưu tiên độ sâu
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 4.5.3 Đặc điểm của mô hình](qa/ch04_vi?id=_453-Đặc-điểm-của-mô-hình) · [Ôn tập · Bổ sung: ResNet và DenseNet](qa/ch04_vi?id=bổ-sung-resnet-và-densenet)
+
+</div>
+
+Thường tăng độ sâu mạng giúp tăng độ chính xác, nhưng phải hy sinh một phần tốc độ và bộ nhớ. Tuy vậy độ sâu không phải cứ chồng bừa lên; phải tăng độ sâu trên nền một mạng nông đã có hiệu quả nhất định. Tăng độ sâu là để tăng độ chính xác; nếu mạng nông còn không học được gì thì sâu hơn cũng vô ích.
+
+> **Biên tập:** với mạng "trơn" (không có kết nối tắt), chồng thêm tầng tới mức nào đó làm *giảm* độ chính xác cả trên tập huấn luyện (hiện tượng suy thoái, xem ResNet ở chương 4); tăng độ sâu chỉ hiệu quả khi đi kèm kết nối tắt và chuẩn hóa theo batch.
+
+### 12.4.3 Kích thước kernel tích chập thường là số lẻ
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.3.1 Đệm](dl/ch07_s3_vi?id=_731-Đệm)
+
+</div>
+
+Kernel kích thước lẻ có các lợi ích sau:
+
+1. Bảo đảm điểm neo (anchor) nằm đúng giữa, tiện trượt tích chập lấy điểm ảnh trung tâm (central pixel) làm chuẩn, tránh lệch thông tin vị trí.
+2. Khi đệm (padding) thêm các hàng, cột 0 quanh ảnh, hai bên ảnh vẫn đối xứng: kernel $k\times k$ với $k$ lẻ cần đệm $(k-1)/2$ ở mỗi bên để giữ nguyên kích thước.
+
+### 12.4.4 Kernel tích chập không phải càng lớn càng tốt
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 5.10 Kernel tích chập càng lớn có càng tốt không?](qa/ch05_vi?id=_510-kernel-tích-chập-càng-lớn-có-càng-tốt-không) · [Ôn tập · 4.5.3 Đặc điểm của mô hình](qa/ch04_vi?id=_453-Đặc-điểm-của-mô-hình)
+
+</div>
+
+AlexNet dùng một số kernel rất lớn như $11\times11$, $5\times5$. Trước đây người ta cho rằng kernel càng lớn thì vùng tiếp nhận càng lớn, thấy được nhiều thông tin ảnh hơn, nên đặc trưng thu được càng tốt. Nhưng kernel lớn làm khối lượng tính toán tăng vọt, cản trở việc tăng độ sâu, hiệu năng tính toán cũng giảm. Vì vậy trong VGG và Inception, tổ hợp 2 kernel $3\times3$ cho hiệu quả tốt hơn 1 kernel $5\times5$, đồng thời số tham số giảm (mỗi cặp kênh vào–ra, tính cả độ lệch: $2\times(3\times3+1)=20 < 26 = 5\times5+1$), nên về sau kernel $3\times3$ được dùng rộng rãi trong các mô hình.
+
+> **Biên tập:** bản gốc tính $3\times3\times2+1=19$, tức chỉ tính một độ lệch cho cả hai tầng; mỗi tầng tích chập có độ lệch riêng nên là $2\times(9+1)=20$. Không tính độ lệch thì là $18 < 25$. Kết luận không đổi.
+
+## 12.5 Có những mô hình mạng kinh điển nào đáng học?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · Chương 4 Các mạng kinh điển](qa/ch04_vi) · [d2l (tiếng Anh) · 8 Mạng tích chập hiện đại](https://d2l.ai/chapter_convolutional-modern/index.html) ↗
+
+</div>
+
+Nhắc tới mô hình mạng kinh điển thì không thể không nhắc cuộc thi kinh điển của thị giác máy tính: ILSVRC, tên đầy đủ là ImageNet Large Scale Visual Recognition Challenge. Chính vì AlexNet bất ngờ xuất hiện tại ILSVRC 2012 mà làn sóng học sâu lan khắp thế giới; năm đó được gọi là "năm đầu tiên của học sâu". Các mạng neuron lập kỷ lục mới ở mỗi kỳ ILSVRC cũng thành kinh điển trong lòng mọi người, thành đối tượng mà giới học thuật và công nghiệp đua nhau học và tái hiện, rồi mở ra nghiên cứu mới trên nền đó.
+
+Bảng 12.2 Các mạng nổi bật ở ILSVRC
+
+| STT | Năm | Tên mạng | Thành tích |
+|---|---|---|---|
+| 1 | 2012 | AlexNet | Vô địch phân loại ảnh ILSVRC |
+| 2 | 2014 | VGGNet | Á quân phân loại ảnh ILSVRC |
+| 3 | 2014 | GoogLeNet | Vô địch phân loại ảnh ILSVRC |
+| 4 | 2015 | ResNet | Vô địch phân loại ảnh ILSVRC |
+| 5 | 2017 | SENet | Vô địch phân loại ảnh ILSVRC |
+
+**1. AlexNet**
+
+- Bài báo: [ImageNet Classification with Deep Convolutional Neural Networks](https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf)
+- Cài đặt: [tensorflow](https://github.com/tensorflow/tensorflow/blob/361a82d73a50a800510674b3aaa20e4845e56434/tensorflow/contrib/slim/python/slim/nets/alexnet.py)
+- Đặc điểm chính:
+  1. Dùng hàm kích hoạt phi tuyến ReLU thay sigmoid/tanh trong một CNN lớn.
+  2. Thêm biện pháp chống quá khớp: tầng Dropout, tăng độ bền vững của mô hình.
+  3. Dùng tăng cường dữ liệu (cắt ngẫu nhiên, lật ngang, nhiễu màu) ở quy mô lớn.
+  4. Dùng GPU (hai card GTX 580) để tăng tốc huấn luyện.
+
+> **Biên tập:** bản gốc viết AlexNet "lần đầu" dùng ReLU, tăng cường dữ liệu và GPU. Không chính xác: ReLU đã được Nair và Hinton (2010) dùng cho mạng neuron; tăng cường dữ liệu đã có từ LeNet (biến dạng ảnh chữ số); CNN chạy trên GPU đã có trước, ví dụ mạng của Cireșan và cộng sự (2011) thắng nhiều cuộc thi. Đóng góp của AlexNet là kết hợp tất cả ở quy mô ImageNet và chứng minh nó vượt xa các phương pháp đặc trưng thủ công.
+
+**2. VGGNet**
+
+- Bài báo: [Very Deep Convolutional Networks for Large-Scale Image Recognition](https://arxiv.org/abs/1409.1556)
+- Cài đặt: [tensorflow](https://github.com/tensorflow/tensorflow/blob/361a82d73a50a800510674b3aaa20e4845e56434/tensorflow/contrib/slim/python/slim/nets/vgg.py)
+- Đặc điểm chính:
+  1. Cấu trúc mạng sâu hơn.
+  2. Dùng phổ biến kernel nhỏ.
+
+**3. GoogLeNet**
+
+- Bài báo: [Going Deeper with Convolutions](https://arxiv.org/abs/1409.4842)
+- Cài đặt: [tensorflow](https://github.com/tensorflow/tensorflow/blob/361a82d73a50a800510674b3aaa20e4845e56434/tensorflow/contrib/slim/python/slim/nets/inception_v1.py)
+- Đặc điểm chính:
+  1. Tăng cường chức năng của mô-đun tích chập. Đổi mới chính là Inception, một cấu trúc "mạng trong mạng" (Network In Network): mỗi nút vốn là một tầng giờ cũng là một mạng. Inception liên tục được phát triển, đã có V2, V3, V4. Trong đó tích chập $1\times1$ chủ yếu dùng để giảm chiều; dùng Inception thì cả chiều rộng lẫn chiều sâu của mạng đều mở rộng được, cho hiệu năng tăng 2–3 lần.
+  2. Dùng nhiều kernel nhỏ liên tiếp thay kernel lớn, giữ nguyên vùng tiếp nhận mà giảm số tham số.
+
+> **Biên tập:** "hiệu năng tăng 2–3 lần" là cách nói của bài báo GoogLeNet về **tốc độ tính** so với mạng không dùng Inception có độ chính xác tương đương, không phải độ chính xác tăng 2–3 lần. Điểm 2 (thay $5\times5$ bằng hai $3\times3$) là của Inception v2/v3, không có ở GoogLeNet (Inception v1).
+
+**4. ResNet**
+
+- Bài báo: [Deep Residual Learning for Image Recognition](https://arxiv.org/abs/1512.03385)
+- Cài đặt: [tensorflow](https://github.com/tensorflow/tensorflow/blob/361a82d73a50a800510674b3aaa20e4845e56434/tensorflow/contrib/slim/python/slim/nets/resnet_v1.py)
+- Đặc điểm chính: giải quyết vấn đề "suy thoái" (degradation), tức khi mạng sâu thêm thì tỉ lệ lỗi lại tăng (cả trên tập huấn luyện).
+
+> **Biên tập:** link cài đặt ResNet của bản gốc trỏ nhầm sang `inception_v1.py`; đã sửa thành `resnet_v1.py`. Lưu ý thư mục `tf.contrib` này đã bị xóa từ TF2; các link trên trỏ tới một commit cũ nên vẫn đọc được.
+
+**5. SENet**
+
+- Bài báo: [Squeeze-and-Excitation Networks](https://arxiv.org/abs/1709.01507)
+- Cài đặt: [tensorflow](https://github.com/ry/tensorflow-resnet)
+- Đặc điểm chính: đề xuất hiệu chỉnh lại đặc trưng (feature recalibration): dùng một cơ chế chú ý (attention) để đánh lại trọng số cho từng kênh, nén các đặc trưng vô ích và tăng trọng số của đặc trưng hữu ích; dễ ghép vào các mạng có sẵn để tăng hiệu năng mà khối lượng tính toán không tăng nhiều.
+
+> **Biên tập:** link "cài đặt" của SENet trong bản gốc là một bản cài **ResNet** (repo `ry/tensorflow-resnet`), không có khối SE. Bản cài đặt chính thức của tác giả (Caffe) ở [hujie-frank/SENet](https://github.com/hujie-frank/SENet).
+
+**Quá trình phát triển cấu trúc mạng trong thị giác máy tính:**
+
+<img src="../img/qa/ch12/网络结构演进.png" alt="Quá trình phát triển cấu trúc mạng CNN"/>
+
+Hình 12.1 Quá trình phát triển cấu trúc mạng CNN. Chú thích chữ Trung trong hình: 历史突破 = bước đột phá lịch sử (AlexNet, nhờ Dropout, ReLU, GPU + dữ liệu lớn); 网络加深 = mạng sâu hơn (VGG16 → VGG19 → MSRANet); 增强卷积模块功能 = tăng cường mô-đun tích chập (NIN → GoogLeNet → Inception V3/V4); 二者结合，网络加深+收敛加速 = kết hợp cả hai: sâu hơn và hội tụ nhanh hơn (ResNet → Inception-ResNet); 从分类任务到检测任务 = từ phân loại sang phát hiện đối tượng (SPP-Net, R-CNN → Fast R-CNN → Faster R-CNN); 增加新的功能单元 = thêm đơn vị chức năng mới (Inception V2, FCN, STNet, CNN+RNN/LSTM).
+
+**Nhà vô địch ILSVRC qua các năm:**
+
+<img src="../img/qa/ch12/历年冠军.png" alt="Tỉ lệ lỗi phân loại của nhà vô địch ILSVRC qua các năm"/>
+
+Hình 12.2 Tỉ lệ lỗi top-5 phân loại ảnh của đội thắng ILSVRC qua các năm; vùng xám là mức của con người (khoảng 5–10%).
+
+Từ đó, thứ hạng ở ILSVRC luôn là thước đo quan trọng cho trình độ kỹ thuật của một viện nghiên cứu hay doanh nghiệp. ILSVRC 2017 là kỳ cuối cùng. Từ 2018, cuộc thi WebVision (Challenge on Visual Understanding by Learning from Web Data) tiếp nối. Dù ILSVRC đã dừng, ảnh hưởng sâu xa và đóng góp to lớn của nó với học sâu sẽ mãi được ghi vào lịch sử.
+
+> **Biên tập:** trên thực tế WebVision không thay được vị trí của ILSVRC; tập ImageNet-1k vẫn là chuẩn đo chính cho phân loại ảnh, còn ILSVRC 2017 khép lại sau khi lỗi top-5 xuống dưới mức người (SENet 2.25%). Cũng nên biết rằng 2012 thường được gọi là năm bùng nổ của học sâu trong thị giác máy tính, còn trong nhận dạng giọng nói học sâu đã thắng từ 2009–2011.
+
+## 12.6 Huấn luyện mạng có những mẹo gì?
+
+### 12.6.1 Tập dữ liệu phù hợp
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · D.4 Giá trị ngoại lai](ml/prep_vi?id=d4-giá-trị-ngoại-lai) · [Học máy · D.3 Dữ liệu thiếu](ml/prep_vi?id=d3-dữ-liệu-thiếu) · [Học máy · E.3 Accuracy và bẫy dữ liệu mất cân bằng](ml/eval_vi?id=e3-accuracy-và-bẫy-dữ-liệu-mất-cân-bằng)
+
+</div>
+
+1. Không có dữ liệu bẩn rõ rệt (tránh được phần lớn trường hợp mất mát ra NaN).
+2. Phân bố mẫu đồng đều giữa các lớp; nếu lệch nhiều thì phải xử lý (lấy mẫu lại, đặt trọng số cho lớp) và chọn thước đo đánh giá phù hợp.
+
+### 12.6.2 Phương pháp tiền xử lý phù hợp
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · D.6 Co giãn đặc trưng](ml/prep_vi?id=d6-co-giãn-đặc-trưng) · [Ôn tập · 3.6.2 Vì sao phải chuẩn hóa?](qa/ch03_vi?id=_362-vì-sao-phải-chuẩn-hóa) · [Ôn tập · 3.6.8 Batch Normalization là gì?](qa/ch03_vi?id=_368-batch-normalization-là-gì)
+
+</div>
+
+Cách tiền xử lý chính là trừ trung bình rồi chia cho độ lệch chuẩn (chuẩn hóa từng kênh hay từng đặc trưng về trung bình 0, phương sai 1). Ngoài ra là sàng lọc dữ liệu, tăng cường dữ liệu…
+
+> **Biên tập:** bản gốc viết "trừ trung bình rồi chia phương sai", và cho rằng "từ khi có Batch Normalization thì không cần trừ trung bình chia phương sai nữa". Hai chỗ sai: (1) chuẩn hóa chia cho **độ lệch chuẩn**, không phải phương sai; (2) BN chuẩn hóa *bên trong* mạng chứ không thay việc chuẩn hóa *đầu vào*: tầng đầu tiên vẫn nhận dữ liệu gốc, và gần như mọi pipeline hiện nay (ví dụ `transforms.Normalize(mean, std)` với ảnh ImageNet) vẫn chuẩn hóa đầu vào. Mô hình huấn luyện sẵn còn *bắt buộc* dùng đúng mean/std lúc nó được huấn luyện.
+
+### 12.6.3 Khởi tạo mạng
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 5.4.2 Khởi tạo Tham số](dl/ch05_s4_vi?id=_542-khởi-tạo-tham-số) · [Học sâu · 6.3 Khởi tạo Tham số](dl/ch06_s3_vi) · [Học sâu · 5.4.1 Tiêu biến và Bùng nổ Gradient](dl/ch05_s4_vi?id=_541-tiêu-biến-và-bùng-nổ-gradient)
+
+</div>
+
+Cách khởi tạo thô bạo nhất là gán toàn bộ tham số bằng 0, điều này tuyệt đối không nên. Vì nếu mọi tham số đều là 0 thì đầu ra của mọi neuron trong một tầng như nhau, khi lan truyền ngược thì mọi neuron cùng tầng cũng nhận gradient như nhau và được cập nhật như nhau; các neuron không bao giờ khác nhau được (tính đối xứng không bị phá), mạng nhiều neuron chẳng hơn mạng một neuron.
+
+Cách đúng là khởi tạo ngẫu nhiên với phương sai co theo số đầu vào của tầng: khởi tạo Xavier (Glorot) $\mathrm{Var}(w) = \dfrac{2}{n_{in}+n_{out}}$ cho tanh/sigmoid, khởi tạo He (Kaiming) $\mathrm{Var}(w) = \dfrac{2}{n_{in}}$ cho ReLU. Độ lệch thường khởi tạo bằng 0.
+
+> **Biên tập:** bản gốc viết "phương pháp trong video của Andrew Ng là khởi tạo trọng số theo phân phối chuẩn trung bình 0, phương sai 1". Sai: phương sai 1 làm đầu ra mỗi tầng có phương sai cỡ $n_{in}$ lần đầu vào, qua vài tầng là bùng nổ (hoặc bão hòa với sigmoid/tanh). Trong khóa Deep Learning của mình Andrew Ng dạy nhân thêm $\sqrt{1/n^{[l-1]}}$ hoặc $\sqrt{2/n^{[l-1]}}$, tức đúng là Xavier/He như trên. Đã sửa đoạn này.
+
+### 12.6.4 Chạy thử với dữ liệu nhỏ
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 3.6.2 Dưới khớp hay Quá khớp?](dl/ch03_s6_vi?id=_362-dưới-khớp-hay-quá-khớp) · [Học sâu · 12.11 Lập lịch Tốc độ học](dl/ch12_s11_vi)
+
+</div>
+
+Trước khi huấn luyện chính thức, có thể chạy thử với một lượng dữ liệu nhỏ, vì:
+
+1. Kiểm tra được quy trình huấn luyện có đúng không. Mẹo hay dùng: cho mạng học thuộc một batch nhỏ (vài chục mẫu); mạng đúng phải đưa được mất mát trên batch đó về gần 0, nếu không là có lỗi trong code.
+2. Quan sát được tốc độ hội tụ, giúp chỉnh tốc độ học.
+3. Xem lượng bộ nhớ GPU dùng, để chọn `batch_size` lớn nhất có thể (với điều kiện đã dùng chuẩn hóa theo batch: miễn là card không tràn bộ nhớ thì chọn càng lớn càng tốt).
+
+> **Biên tập:** "batch càng lớn càng tốt" không đúng hẳn: batch lớn chạy nhanh hơn mỗi epoch nhưng cần tăng tốc độ học tương ứng (quy tắc tỉ lệ tuyến tính, kèm khởi động – warmup), và quá lớn có thể làm mô hình tổng quát hóa kém hơn. Xem câu 3.5.5 ở chương 3 về ảnh hưởng của batch size.
+
+### 12.6.5 Đặt tốc độ học hợp lý
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 12.3.1 Hạ Gradient Một chiều](dl/ch12_s3_vi?id=_1231-hạ-gradient-một-chiều) · [Học sâu · 12.11 Lập lịch Tốc độ học](dl/ch12_s11_vi) · [Học sâu · 12.4.2 Tốc độ học Động](dl/ch12_s4_vi?id=_1242-tốc-độ-học-Động)
+
+</div>
+
+1. Quá lớn: mất mát bùng nổ, ra NaN…
+2. Quá nhỏ: hội tụ quá chậm, thời gian huấn luyện kéo dài rất nhiều.
+3. Tốc độ học thay đổi được: ví dụ khi độ chính xác đạt một ngưỡng nào đó thì giảm một nửa tốc độ học rồi huấn luyện tiếp (lập lịch tốc độ học; chi tiết ở chương 14).
+
+### 12.6.6 Hàm mất mát
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · E.9 Hồi quy: MAE, MSE, RMSE và $R^2$](ml/eval_vi?id=e9-hồi-quy-mae-mse-rmse-và-r2r2r2) · [Học máy · 15.3 Hàm mất mát và phương pháp tối ưu](ml/ch15_vi?id=_153-hàm-mất-mát-và-phương-pháp-tối-ưu) · [Học máy · 27.4.2 Mất mát bản lề](ml/ch27_vi?id=_2742-mất-mát-bản-lề)
+
+</div>
+
+Hàm mất mát chủ yếu chia hai nhóm: mất mát cho phân loại và mất mát cho hồi quy.
+
+**1. Mất mát hồi quy:**
+
+- **Sai số bình phương trung bình** (MSE, mất mát bậc hai, mất mát L2): trung bình bình phương hiệu giữa giá trị đích và giá trị dự đoán, $\frac{1}{n}\sum_i (y_i - \hat y_i)^2$.
+- **Sai số tuyệt đối trung bình** (MAE, mất mát L1): trung bình trị tuyệt đối hiệu giữa giá trị đích và giá trị dự đoán, $\frac{1}{n}\sum_i |y_i - \hat y_i|$.
+
+So sánh MSE và MAE: MSE dễ tối ưu hơn (khả vi mọi nơi, gradient nhỏ dần khi gần nghiệm), nhưng MAE bền vững hơn với giá trị ngoại lai (vì ngoại lai không bị bình phương). Về hiệu năng của MAE và MSE, xem thêm [L1 vs. L2 Loss Function](https://rishy.github.io/ml/2015/07/28/l1-vs-l2-loss/). Mất mát Huber (Smooth L1) kết hợp cả hai: bậc hai khi sai số nhỏ, tuyến tính khi sai số lớn.
+
+**2. Mất mát phân loại:**
+
+- **Mất mát entropy chéo** (cross-entropy): hàm mục tiêu phân loại hay dùng nhất trong mạng neuron hiện nay.
+- **Mất mát bản lề** (hinge loss), $\max(0,\ 1 - y\,f(x))$ với $y\in\{-1,+1\}$: dùng rộng rãi trong máy vector hỗ trợ, đôi khi cũng dùng cho mạng neuron. Nó chỉ phạt những mẫu bị phân loại sai hoặc nằm trong lề, mức phạt tăng tuyến tính theo độ sai; mẫu đã đúng và xa lề không đóng góp gì.
+
+> **Biên tập:** bản gốc viết nhược điểm của mất mát bản lề là "phạt nặng hơn mẫu sai nhiều, nên nhạy với nhiễu". Mức phạt của mất mát bản lề chỉ tăng **tuyến tính** theo độ sai, nên nó *ít* nhạy với ngoại lai hơn các hàm mất mát tăng bậc hai (như mất mát bình phương hay mất mát bản lề bình phương); so với entropy chéo (cũng tăng gần tuyến tính khi sai nhiều) thì hai bên tương đương. Nhược điểm thật của nó là không cho ra xác suất và không khả vi tại điểm gãy.

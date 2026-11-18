@@ -51,7 +51,10 @@
       links: [['Dive into Deep Learning', 'https://d2l.ai'], ['Đắm mình vào Học Sâu (d2l-vn)', 'https://github.com/aivivn/d2l-vn'], ['PyTorch Documentation', 'https://pytorch.org/docs/stable/']] },
     { id: 'rl', name: 'Học tăng cường', tab: 'Tăng cường', short: 'RL', home: '/rl_vi', icon: 'target', start: '/chapter1/chapter1_vi', blurb: 'Từ MDP đến PPO, DDPG',
       desc: 'Tác tử học từ phần thưởng: MDP, DQN, PPO, DDPG',
-      links: [['EasyRL (Datawhale)', 'https://github.com/datawhalechina/easy-rl'], ['Sách của Shiyu Zhao', 'https://github.com/MathFoundationRL/Book-Mathematical-Foundation-of-Reinforcement-Learning'], ['Gymnasium', 'https://gymnasium.farama.org'], ['OpenAI Spinning Up', 'https://spinningup.openai.com']] }
+      links: [['EasyRL (Datawhale)', 'https://github.com/datawhalechina/easy-rl'], ['Sách của Shiyu Zhao', 'https://github.com/MathFoundationRL/Book-Mathematical-Foundation-of-Reinforcement-Learning'], ['Gymnasium', 'https://gymnasium.farama.org'], ['OpenAI Spinning Up', 'https://spinningup.openai.com']] },
+    { id: 'qa', name: 'Ôn tập phỏng vấn', tab: 'Phỏng vấn', short: 'QA', home: '/qa/README_vi', icon: 'circle-help', prefix: /^\/qa\//, blurb: 'Hỏi đáp học sâu, kèm lý thuyết',
+      desc: 'Câu hỏi phỏng vấn học sâu, mỗi phần dẫn về bài lý thuyết',
+      links: [['DeepLearning-500-questions', 'https://github.com/scutan90/DeepLearning-500-questions'], ['Dive into Deep Learning', 'https://d2l.ai'], ['Machine Learning cơ bản', 'https://machinelearningcoban.com']] }
   ];
   var COURSE_KEY = 'hff-course';
   function courseById(id) {
@@ -91,7 +94,8 @@
     'Dựa trên giá trị': ['value', 'chart-column'],
     'Nâng cao': ['adv', 'rocket'],
     'Chuyên đề': ['topic', 'sparkles'],
-    'Nền tảng toán học': ['math', 'sigma']
+    'Nền tảng toán học': ['math', 'sigma'],
+    'Hỏi đáp học sâu': ['adv', 'circle-help']
   };
   // Nhãn nguồn chèn trước một nhóm, theo khoá học: '<khoá>:<nhóm>'.
   var NAV_PARTS = {
@@ -100,10 +104,11 @@
     'ml:base': ['Machine Learning cơ bản', 'Vũ Hữu Tiệp · CC BY-SA 4.0'],
     'math:base': ['Machine Learning cơ bản', 'Vũ Hữu Tiệp · CC BY-SA 4.0'],
     'ml:math': ['Chủ đề bổ sung', 'Người biên soạn viết thêm'],
-    'dl:base': ['Dive into Deep Learning', 'Zhang, Lipton, Li, Smola · CC BY-SA 4.0']
+    'dl:base': ['Dive into Deep Learning', 'Zhang, Lipton, Li, Smola · CC BY-SA 4.0'],
+    'qa:adv': ['Deep Learning 500 câu hỏi', 'Tan Jiyong và cộng sự · GPL-3.0']
   };
   var PAGE_ICON = {
-    '/': 'house', '/ml/README_vi': 'chart-spline', '/dl/README_vi': 'brain-circuit', '/dl/ch07_vi': 'eye', '/dl/notation_vi': 'whole-word', '/dl/ch01_vi': 'sprout', '/dl/ch02_vi': 'terminal', '/dl/ch06_vi': 'blocks', '/dl/ch03_vi': 'trending-up', '/dl/ch04_vi': 'layers', '/dl/ch05_vi': 'brain', '/dl/ch12_vi': 'mountain', '/math/README_vi': 'sigma', '/ml/ch07_vi': 'trending-up', '/ml/ch08_vi': 'chart-spline', '/ml/ch09_vi': 'network',
+    '/': 'house', '/ml/README_vi': 'chart-spline', '/dl/README_vi': 'brain-circuit', '/qa/README_vi': 'circle-help', '/qa/ch01_vi': 'sigma', '/qa/ch02_vi': 'chart-spline', '/qa/ch03_vi': 'brain', '/qa/ch04_vi': 'layout-grid', '/qa/ch05_vi': 'eye', '/qa/ch06_vi': 'repeat', '/qa/ch07_vi': 'sparkles', '/qa/ch08_vi': 'target', '/qa/ch09_vi': 'layout-grid', '/qa/ch10_vi': 'gamepad-2', '/qa/ch11_vi': 'compass', '/qa/ch12_vi': 'blocks', '/qa/ch13_vi': 'mountain', '/qa/ch14_vi': 'sliders-horizontal', '/qa/ch15_vi': 'gauge', '/qa/ch16_vi': 'globe', '/qa/ch17_vi': 'rocket', '/qa/ch18_vi': 'network', '/dl/ch07_vi': 'eye', '/dl/notation_vi': 'whole-word', '/dl/ch01_vi': 'sprout', '/dl/ch02_vi': 'terminal', '/dl/ch06_vi': 'blocks', '/dl/ch03_vi': 'trending-up', '/dl/ch04_vi': 'layers', '/dl/ch05_vi': 'brain', '/dl/ch12_vi': 'mountain', '/math/README_vi': 'sigma', '/ml/ch07_vi': 'trending-up', '/ml/ch08_vi': 'chart-spline', '/ml/ch09_vi': 'network',
     '/ml/ch10_vi': 'chart-scatter', '/ml/ch12_vi': 'mountain', '/ml/ch13_vi': 'sliders-horizontal', '/ml/ch14_vi': 'gauge',
     '/ml/ch15_vi': 'layers', '/ml/ch16_vi': 'brain',
     '/ml/ch00_vi': 'book-open', '/ml/ch05_vi': 'blocks', '/ml/ch06_vi': 'sliders-horizontal', '/ml/ch11_vi': 'dices', '/ml/appendix_b_vi': 'eye',
@@ -477,7 +482,7 @@
       return '<a data-path="' + path + '" href="#' + path + '">' + icon + '<span>' + label + '</span>' + (extra || '') + '</a>';
     }
     var courses = [
-      { id: 'math' }, { id: 'ml' }, { id: 'dl' }, { id: 'rl' }, { soon: 'LLM và ứng dụng' }
+      { id: 'math' }, { id: 'ml' }, { id: 'dl' }, { id: 'rl' }, { id: 'qa' }, { soon: 'LLM và ứng dụng' }
     ].map(function (c) {
       if (c.soon) return '<span class="is-soon">' + ICON.lock + '<span>' + c.soon + '</span><small>Sắp có</small></span>';
       var co = courseById(c.id);
@@ -1264,6 +1269,56 @@
     });
   }
 
+  // Trang ôn tập phỏng vấn: tô ô "Biên tập", và chế độ tự kiểm tra (ẩn đáp án, bấm câu hỏi để mở).
+  var QA_KEY = 'hff-qa-hide';
+  function qaPage(section) {
+    Array.prototype.forEach.call(section.querySelectorAll('blockquote'), function (q) {
+      var b = q.querySelector('p:first-child > strong:first-child');
+      if (b && b.textContent.trim() === 'Biên tập:') q.classList.add('qa-edit');
+    });
+    // Câu hỏi là mọi h3, cộng các h2 không có h3 con (vài chương đặt câu hỏi ngay ở cấp ##).
+    var qs = Array.prototype.filter.call(section.querySelectorAll('h2, h3'), function (h) {
+      if (h.tagName === 'H3') return true;
+      if (/^Tài liệu tham khảo/.test(h.textContent.trim())) return false;
+      for (var n = h.nextElementSibling; n && !/^H[12]$/.test(n.tagName); n = n.nextElementSibling) {
+        if (n.tagName === 'H3') return false;
+      }
+      return true;
+    });
+    if (!qs.length || section.querySelector('.qa-tools')) return;
+    qs.forEach(function (h) {
+      h.classList.add('qa-q');
+      var ans = [], n = h.nextElementSibling;
+      while (n && !/^H[123]$/.test(n.tagName)) {
+        if (!n.classList.contains('qa-theory')) { n.classList.add('qa-ans'); ans.push(n); }
+        n = n.nextElementSibling;
+      }
+      h.addEventListener('click', function (e) {
+        if (!document.body.classList.contains('qa-hide') || e.target.closest('a')) return;
+        var open = h.classList.toggle('qa-open');
+        ans.forEach(function (x) { x.classList.toggle('qa-show', open); });
+      });
+    });
+    var tools = document.createElement('div');
+    tools.className = 'qa-tools';
+    tools.innerHTML = '<button type="button" class="btn btn-sm"></button><span>' + qs.length + ' câu hỏi</span>';
+    var btn = tools.firstChild;
+    function sync(on) {
+      document.body.classList.toggle('qa-hide', on);
+      btn.textContent = on ? 'Hiện mọi đáp án' : 'Tự kiểm tra: ẩn đáp án';
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    btn.addEventListener('click', function () {
+      var on = !document.body.classList.contains('qa-hide');
+      Array.prototype.forEach.call(section.querySelectorAll('.qa-open, .qa-show'), function (x) { x.classList.remove('qa-open', 'qa-show'); });
+      store(QA_KEY, on ? '1' : '0');
+      sync(on);
+    });
+    sync(load(QA_KEY) === '1');
+    var anchor = section.querySelector('h1 + blockquote') || section.querySelector('h1');
+    if (anchor) anchor.after(tools); else section.insertBefore(tools, section.firstChild);
+  }
+
   function renderPage() {
     var section = document.querySelector('.markdown-section');
     if (!section) return;
@@ -1275,7 +1330,8 @@
     enhanceSidebar();
     var course = courseOf(currentPath);
     if (course) setCourseView(course, true);
-    if (course === 'ml' || course === 'math' || course === 'dl') renderStrayMath(section);
+    if (course === 'ml' || course === 'math' || course === 'dl' || course === 'qa') renderStrayMath(section);
+    if (course === 'qa') qaPage(section);
     var landing = !!section.querySelector('.home-hero, .hub-hero, .rm-page');
     document.body.classList.toggle('is-home', landing);
     document.body.classList.toggle('is-hub', !!section.querySelector('.hub-hero'));

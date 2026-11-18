@@ -1,0 +1,871 @@
+# Chương 7 Mạng đối sinh (GAN)
+
+> Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch07_生成对抗网络(GAN)), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
+
+> **Biên tập:** bản gốc đánh số trùng: có hai mục 7.3 (mô hình sinh khác; ứng dụng dịch ảnh) và hai mục 7.4 (cải tiến GAN; sinh văn bản). Bản dịch giữ số gốc, nhóm trùng thứ hai thêm hậu tố "b" (7.3b, 7.4b). Một số số trích dẫn trong bài trỏ nhầm sang mục khác của danh mục tài liệu; bản dịch ghi thẳng tên bài báo. Lưu ý thêm về bối cảnh: chương này viết năm 2019. Từ khoảng 2021, sinh ảnh chất lượng cao chủ yếu dùng **mô hình khuếch tán** (diffusion: DDPM, Stable Diffusion…), còn sinh văn bản dùng mô hình ngôn ngữ tự hồi quy; GAN vẫn được dùng khi cần sinh nhanh trong một bước (siêu phân giải, chuyển đổi ảnh thời gian thực) và làm thành phần mất mát đối kháng trong các mô hình khác.
+
+## 7.1 Khái niệm cơ bản về GAN
+
+### 7.1.1 Hiểu GAN một cách dễ hiểu thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+Mạng đối sinh (GAN, Generative Adversarial Network) từ khi Ian Goodfellow đề xuất năm 2014 đã tạo ra một làn sóng nghiên cứu. GAN gồm bộ sinh (generator) và bộ phân biệt (discriminator): bộ sinh tạo ra mẫu, bộ phân biệt phán đoán mẫu là thật hay do bộ sinh tạo ra. Bộ sinh cố hết sức đánh lừa bộ phân biệt, còn bộ phân biệt cố hết sức phân biệt mẫu do bộ sinh tạo với mẫu thật.
+
+Trong bài báo gốc của GAN (Goodfellow và cộng sự, 2014), tác giả ví bộ sinh như kẻ in tiền giả, bộ phân biệt như cảnh sát. Kẻ in tiền giả cố làm tiền trông như thật, cảnh sát thì liên tục nâng khả năng nhận ra tiền giả. Hai bên đấu trí với nhau, theo thời gian đều ngày càng giỏi. Với bài toán sinh ảnh cũng vậy: bộ sinh liên tục tạo ảnh giả càng giống thật càng tốt, bộ phân biệt phán đoán ảnh là thật hay được sinh ra, hai bên không ngừng đấu và tối ưu. Cuối cùng ảnh do bộ sinh tạo ra khiến bộ phân biệt hoàn toàn không phân biệt được thật giả.
+
+### 7.1.2 Biểu diễn hình thức của GAN
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+Ví dụ trên chỉ giới thiệu ngắn gọn ý tưởng của GAN; dưới đây là định nghĩa hình thức, cụ thể hơn. Thường cả bộ sinh lẫn bộ phân biệt đều cài đặt bằng mạng neuron. Ta có thể biểu diễn định nghĩa dễ hiểu ở trên bằng mô hình sau:
+
+<img src="../img/qa/ch07/7.1.png" alt="Cấu trúc mạng GAN"/>
+
+Hình 7.1 Cấu trúc GAN: bộ sinh G (trái) biến vector nhiễu thành ảnh; ảnh sinh ra cùng tập mẫu thật được đưa vào bộ phân biệt D (phải), D cho ra 1 (thật) hoặc 0 (giả). Chữ trong hình: 生成器 = bộ sinh, 判别器 = bộ phân biệt, 真实样本集 = tập mẫu thật, 制造的样本集 = tập mẫu được tạo ra.
+
+Bên trái mô hình là bộ sinh G, đầu vào là $z$; với GAN gốc, $z$ là nhiễu lấy mẫu ngẫu nhiên từ phân phối Gauss. Nhiễu $z$ đi qua bộ sinh để thành mẫu giả.
+
+Mẫu giả được trộn với mẫu thật, lấy ngẫu nhiên rồi đưa vào bộ phân biệt D, để D phân biệt mẫu đầu vào là giả hay thật. Cả quá trình đơn giản rõ ràng; chữ "đối sinh" (sinh và đối kháng) trong tên gọi thể hiện chủ yếu ở sự đối kháng giữa bộ sinh và bộ phân biệt.
+
+### 7.1.3 Hàm mục tiêu của GAN là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗ · [Học máy · 15.3.1 Entropy chéo](ml/ch15_vi?id=_1531-entropy-chéo)
+
+</div>
+
+Với mô hình mạng neuron ở trên, muốn học tham số thì trước hết cần một hàm mục tiêu. Hàm mục tiêu của GAN định nghĩa như sau:
+
+$$
+\min_G \max_D V(D,G) = \mathbb E_{x\sim p_{data}(x)}[\log D(x)] + \mathbb E_{z\sim p_z(z)}[\log (1 - D(G(z)))]
+$$
+
+Có thể hiểu hàm mục tiêu này theo hai phần.
+
+**Phần thứ nhất:** bộ phân biệt được tối ưu qua $\max_D V(D,G)$; $V(D,G)$ là hàm mục tiêu của bộ phân biệt. Số hạng thứ nhất $\mathbb E_{x\sim p_{data}(x)}[\log D(x)]$ là kỳ vọng của log xác suất mà bộ phân biệt cho rằng mẫu lấy từ phân phối dữ liệu thật là thật. Với mẫu lấy từ phân phối thật, xác suất dự đoán là mẫu dương tất nhiên càng gần 1 càng tốt, nên ta muốn cực đại số hạng này. Số hạng thứ hai $\mathbb E_{z\sim p_z(z)}[\log (1 - D(G(z)))]$: lấy nhiễu từ phân phối $p_z(z)$, cho qua bộ sinh thành ảnh, đưa ảnh vào bộ phân biệt; bộ phân biệt muốn $D(G(z))$ càng gần 0 càng tốt (nhận ra đó là ảnh giả), tức $\log(1-D(G(z)))$ càng lớn (càng gần 0) càng tốt. Vì vậy cũng cực đại số hạng này.
+
+**Phần thứ hai:** bộ sinh được tối ưu qua $\min_G \big(\max_D V(D,G)\big)$. Chú ý, mục tiêu của bộ sinh không phải $\min_G V(D,G)$ với một $D$ tùy ý, tức bộ sinh không cực tiểu hàm mục tiêu của bộ phân biệt hiện tại, mà cực tiểu **giá trị lớn nhất** của hàm mục tiêu bộ phân biệt. Với $G$ cố định, bộ phân biệt tối ưu là
+
+$$
+D^*(x) = \frac{p_{data}(x)}{p_{data}(x) + p_g(x)},
+$$
+
+thay vào ta được
+
+$$
+\max_D V(D, G) = V(D^*, G) = 2\,\mathrm{JS}(p_{data}\,\Vert\, p_g) - \log 4,
+$$
+
+trong đó $p_g$ là phân phối của mẫu do bộ sinh tạo ra và JS là độ phân kỳ Jensen–Shannon. JS đo độ giống nhau giữa hai phân phối: hai phân phối càng gần, JS càng nhỏ, bằng 0 khi và chỉ khi $p_g = p_{data}$. Vậy cực tiểu theo $G$ chính là kéo phân phối sinh về phân phối thật.
+
+> **Biên tập:** (1) bản gốc giải thích số hạng thứ hai là "kỳ vọng của âm log xác suất dự đoán, càng lớn càng tốt, càng lớn thì càng gần 0" — câu bị hỏng chữ và lẫn dấu; đã viết lại. (2) Bản gốc nói giá trị lớn nhất của hàm mục tiêu bộ phân biệt "chính là" độ phân kỳ JS và bảo "xem phần suy dẫn ở phụ lục", nhưng không có phụ lục nào; đúng là $2\,\mathrm{JS} - \log 4$, bản dịch bổ sung $D^*$ và kết quả. Đã kiểm tra bằng số trên hai phân phối rời rạc ngẫu nhiên: $V(D^*, G)$ khớp $2\,\mathrm{JS}-\log 4$, và không $D$ nào trong 20 000 $D$ ngẫu nhiên cho giá trị lớn hơn.
+
+### 7.1.4 Hàm mục tiêu của GAN khác entropy chéo thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · 15.3.1 Entropy chéo](ml/ch15_vi?id=_1531-entropy-chéo) · [Ôn tập · 3.4.11 Hàm mất mát entropy chéo: định nghĩa và đạo hàm](qa/ch03_vi?id=_3411-hàm-mất-mát-entropy-chéo-định-nghĩa-và-đạo-hàm)
+
+</div>
+
+Viết hàm mục tiêu của bộ phân biệt dưới dạng rời rạc trên một batch $m$ mẫu thật $x^i$ và $m$ mẫu sinh $\tilde x^i$, rồi đổi dấu để thành hàm mất mát cần cực tiểu:
+
+$$
+L_D = -V(D,G) =-\frac{1}{m}\sum_{i=1}^{m}\log D(x^i)-\frac{1}{m}\sum_{i=1}^{m}\log\big(1-D(\tilde{x}^i)\big)
+$$
+
+Có thể thấy đây chính là mất mát entropy chéo nhị phân với nhãn 1 cho mẫu thật, nhãn 0 cho mẫu giả. Tức là: **bộ phân biệt cực tiểu mất mát entropy chéo; còn bộ sinh (khi bộ phân biệt đạt tối ưu) cực tiểu độ phân kỳ JS giữa phân phối sinh và phân phối thật**.
+
+> **Biên tập:** bản gốc viết công thức có dấu trừ nhưng vẫn gọi là $V(D,G)$; công thức đó là $-V$, tức mất mát cần cực tiểu.
+
+### 7.1.5 Vì sao mất mát của GAN không giảm xuống được?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗ · [Tăng cường · 9.6 Liên hệ với mạng đối sinh](chapter9/chapter9_vi?id=_96-liên-hệ-với-mạng-đối-sinh)
+
+</div>
+
+Nhiều người mới làm GAN có thể thắc mắc vì sao mất mát của GAN mãi không giảm. Rốt cuộc khi nào GAN mới hội tụ? Thực ra, một GAN huấn luyện tốt thì mất mát của nó vốn không giảm. Với GAN gốc, muốn biết đã huấn luyện tốt chưa gần như chỉ có cách nhìn bằng mắt chất lượng ảnh sinh ra. Với việc thiếu một chỉ số tốt để đánh giá hội tụ, nhiều nhà nghiên cứu đã làm nghiên cứu; WGAN nhắc tới ở phần sau đề xuất một cách thiết kế mất mát mới, giải quyết khá tốt việc khó đánh giá hội tụ. Dưới đây phân tích vì sao mất mát của GAN không giảm.
+
+Hàm mất mát của GAN như sau:
+
+$$
+\min_G \max_D V(D,G) = \mathbb E_{x\sim p_{data}(x)}[\log D(x)] + \mathbb E_{z\sim p_z(z)}[\log (1 - D(G(z)))]
+$$
+
+Từ $\min_G \max_D V(D,G)$ có thể thấy mục đích của bộ sinh và bộ phân biệt ngược nhau, tức hai mạng đối kháng nhau, bên này tăng thì bên kia giảm. Mất mát không thể cứ giảm mãi tới một trạng thái hội tụ.
+
+- Với bộ sinh: mất mát giảm nhanh rất có thể là do bộ phân biệt quá yếu, khiến bộ sinh dễ dàng "lừa" được bộ phân biệt.
+- Với bộ phân biệt: mất mát giảm nhanh nghĩa là bộ phân biệt rất mạnh; bộ phân biệt mạnh nghĩa là ảnh bộ sinh tạo ra chưa đủ thật, nên bộ phân biệt dễ dàng phân biệt, làm mất mát giảm nhanh.
+
+Tức là dù là bộ phân biệt hay bộ sinh, mất mát cao hay thấp đều không đại diện cho chất lượng bộ sinh. Một mạng GAN tốt, mất mát GAN của nó thường dao động liên tục (ở điểm cân bằng lý thuyết, $D = \tfrac12$ khắp nơi và $L_D = 2\log 2 \approx 1.386$).
+
+Đọc tới đây có thể thấy hơi tuyệt vọng, có vẻ đánh giá mô hình hội tụ hay chưa chỉ còn cách nhìn chất lượng ảnh sinh ra. Thực ra WGAN bàn ở phần sau đề xuất một cách đo mất mát mới, giúp ta dùng một số cách để đánh giá mô hình đã hội tụ chưa. Ngoài ra còn có các chỉ số khách quan ở mục 7.2 (FID…).
+
+### 7.1.6 Mô hình sinh và mô hình phân biệt khác nhau thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · 11.1 Bộ phân loại naive Bayes](ml/ch11_vi?id=_111-bộ-phân-loại-naive-bayes) · [Toán · 3.1.5 Quy tắc Bayes](math/ch03_vi?id=_315-quy-tắc-bayes)
+
+</div>
+
+Với các mô hình học máy, theo cách mô hình hóa dữ liệu có thể chia thành hai nhóm lớn: mô hình sinh (generative) và mô hình phân biệt (discriminative). Giả sử ta muốn huấn luyện mô hình phân loại chó mèo: mô hình phân biệt chỉ cần học sự khác nhau giữa hai loài, ví dụ mèo nhỏ hơn chó một chút. Mô hình sinh thì khác: phải học mèo trông thế nào, chó trông thế nào, có hình dáng của cả hai rồi mới dựa vào hình dáng để phân biệt. Cụ thể:
+
+- **Mô hình sinh:** từ dữ liệu học phân phối đồng thời $P(X,Y)$, rồi tính phân phối $P(Y|X)=P(X,Y)/P(X)$ làm mô hình dự đoán. Cách này biểu diễn quan hệ sinh ra đầu ra $Y$ từ đầu vào $X$ cho trước.
+- **Mô hình phân biệt:** từ dữ liệu học trực tiếp hàm quyết định $Y=f(X)$ hoặc phân phối có điều kiện $P(Y|X)$ làm mô hình dự đoán. Cách phân biệt quan tâm: với đầu vào $X$ cho trước, nên dự đoán đầu ra $Y$ nào.
+
+Hiểu theo chữ thì có vẻ chưa trực quan. Lấy ví dụ bài toán phân loại giới tính, làm bằng hai loại mô hình:
+
+1. **Dùng mô hình sinh:** huấn luyện một mô hình học quan hệ giữa đặc trưng $X$ của người và giới tính $Y$. Ví dụ có bảng phân phối đồng thời sau:
+
+| | $Y=0$ | $Y=1$ |
+|---|---|---|
+| $X=0$ | 1/8 | 3/8 |
+| $X=1$ | 3/8 | 1/8 |
+
+Bảng này có thể thống kê được, tức đếm tỉ lệ người có đặc trưng $X=0, 1, \dots$ thuộc lớp $Y=0, 1$. Có phân phối đồng thời $P(X, Y)$ rồi, có thể học một mô hình (ví dụ một mô hình phân phối có tham số) để khớp dữ liệu, thế là học được phân phối đồng thời của $X, Y$. Khi dự đoán, muốn cho một đặc trưng $X$ và đoán lớp thì phải dùng công thức Bayes để có phân phối có điều kiện:
+
+$$
+P(Y|X)=\frac{P(X,Y)}{P(X)}=\frac{P(X|Y)\,P(Y)}{\sum_{y}P(X|Y=y)\,P(Y=y)}
+$$
+
+Ví dụ với $X=0$: $P(Y=1|X=0) = \dfrac{3/8}{1/8+3/8} = 0.75$.
+
+2. **Dùng mô hình phân biệt:** huấn luyện một mô hình nhận đặc trưng $X$ của người (ngũ quan, phong cách ăn mặc, kiểu tóc…), đầu ra là xác suất về giới tính; xác suất này theo một phân phối chỉ có hai giá trị, nam hoặc nữ, gọi là $Y$. Quá trình này học phân phối có điều kiện $P(Y|X)$, tức phân phối của $Y$ khi biết đặc trưng $X$.
+
+Từ phân tích trên, mô hình phân biệt có vẻ tiện hơn nhiều, vì mô hình sinh muốn học phân phối đồng thời của $X, Y$ thường cần nhiều dữ liệu, còn mô hình phân biệt cần tương đối ít dữ liệu hơn, vì nó chỉ quan tâm khác biệt giữa các đặc trưng đầu vào. Nhưng mô hình sinh đã học phân phối đồng thời nên cũng cho nhiều thông tin hơn: có một mẫu $(X,Y)$ mà xác suất đồng thời $P(X,Y)$ tính ra rất nhỏ thì có thể coi là mẫu bất thường. Loại mô hình này dùng được cho phát hiện ngoại lai (outlier detection), và tất nhiên dùng để sinh dữ liệu mới.
+
+> **Biên tập:** (1) bảng gốc có các ô 1/4, 3/4, 3/4, 1/4, tổng bằng 2 nên không phải phân phối đồng thời (mỗi hàng thực ra là $P(Y|X)$); bản dịch đổi thành bảng đồng thời có tổng bằng 1 mà vẫn cho cùng $P(Y|X)$. (2) Công thức Bayes trong bản gốc viết $\frac{P(X,Y)}{P(X|Y)P(Y)}$, mà $P(X|Y)P(Y)$ chính là $P(X,Y)$ nên kết quả luôn bằng 1; mẫu số đúng là $P(X)=\sum_y P(X|Y=y)P(Y=y)$. (3) Bản gốc gợi ý khớp bảng bằng "phân phối Gauss hai chiều", không hợp với biến rời rạc; đã nói chung là mô hình phân phối có tham số.
+
+### 7.1.7 Sụp đổ chế độ (mode collapse) là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+Sụp đổ chế độ là khi một chế độ (mode) nào đó xuất hiện quá nhiều mẫu lặp lại, ví dụ:
+
+<img src="../img/qa/ch07/model_collpsing.png" alt="Sụp đổ chế độ"/>
+
+Hình 7.2 Sụp đổ chế độ
+
+Trong hình, các ngôi sao xanh bên trái là không gian mẫu thật, các ngôi sao cam là mẫu sinh ra, tụ lại ở một chỗ. Mẫu sinh ra thiếu đa dạng, lặp lại rất nhiều. Ví dụ ở hình bên phải, nhân vật trong khung đỏ xuất hiện lặp đi lặp lại.
+
+### 7.1.8 Giải quyết sụp đổ chế độ thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+**Cách 1: cải tiến hàm mục tiêu**
+
+Để tránh việc tối ưu max–min làm bộ sinh nhảy qua lại giữa các chế độ, Unrolled GAN (Metz và cộng sự, 2017) sửa mất mát của bộ sinh. Cụ thể, khi cập nhật bộ sinh, Unrolled GAN "trải" (unroll) bộ phân biệt thêm $k$ bước: mô phỏng $k$ bước cập nhật của bộ phân biệt, rồi tính mất mát của bộ sinh dựa trên bộ phân biệt sau $k$ bước đó, và lan truyền ngược qua cả $k$ bước mô phỏng. Chú ý, $k$ bước này không thực sự cập nhật tham số của bộ phân biệt, chỉ dùng để tính mất mát cho bộ sinh. Cách này giúp bộ sinh tính tới phản ứng của bộ phân biệt trong $k$ bước tới, tránh việc nhảy giữa các chế độ gây sụp đổ chế độ. Phải phân biệt rõ với cách cập nhật bộ sinh $k$ lần rồi cập nhật bộ phân biệt 1 lần. DRAGAN (Kodali và cộng sự, 2017) đưa vào thuật toán không hối tiếc (no-regret) của lý thuyết trò chơi, sửa mất mát (thêm phạt gradient quanh dữ liệu thật) để giải quyết sụp đổ chế độ. EBGAN (Zhao và cộng sự, 2017) dùng một bộ tự mã hóa làm bộ phân biệt, lấy sai số tái tạo làm "năng lượng", kèm một số hạng phạt đẩy các mẫu trong batch ra xa nhau (pulling-away term) để chống sụp đổ chế độ.
+
+**Cách 2: cải tiến cấu trúc mạng**
+
+Multi-agent diverse GAN (MAD-GAN) dùng nhiều bộ sinh và một bộ phân biệt để bảo đảm mẫu sinh ra đa dạng. Cấu trúc như sau:
+
+<img src="../img/qa/ch07/MAD_GAN.png" alt="MAD-GAN"/>
+
+Hình 7.3 MAD-GAN
+
+So với GAN thường, MAD-GAN có thêm vài bộ sinh, và bộ phân biệt ngoài việc phân biệt thật giả còn phải đoán mẫu giả do bộ sinh nào tạo ra, buộc các bộ sinh phải sinh ra mẫu khác nhau. Một biến thể (MAD-GAN-Sim) thêm số hạng điều chuẩn dùng độ tương đồng cosin để phạt việc các bộ sinh tạo mẫu giống nhau.
+
+MRGAN (Mode Regularized GAN, Che và cộng sự, 2017) thêm một bộ phân biệt để phạt sụp đổ chế độ. Cấu trúc như sau:
+
+<img src="../img/qa/ch07/MRGAN.png" alt="MRGAN"/>
+
+Hình 7.4 MRGAN
+
+Mẫu đầu vào $x$ được một bộ mã hóa (encoder) mã hóa thành biến ẩn $E(x)$, rồi bộ sinh tái tạo lại từ biến ẩn đó. Khi huấn luyện có ba mất mát. $D_M$ và $R$ (sai số tái tạo) dẫn dắt sinh mẫu giống thật. Còn $D_D$ phân biệt giữa mẫu sinh từ $E(x)$ và mẫu sinh từ $z$; cả hai đều là mẫu giả, nên bộ phân biệt này chủ yếu dùng để đánh giá mẫu sinh ra có đa dạng không, tức có sụp đổ chế độ không.
+
+**Cách 3: phân biệt theo minibatch (minibatch discrimination)**
+
+Phân biệt theo minibatch (Salimans và cộng sự, 2016) thêm vào tầng giữa của bộ phân biệt một tầng minibatch để tính thống kê của mẫu dựa trên khoảng cách L1, qua đó biết trong một batch, một mẫu gần các mẫu khác tới mức nào. Bộ phân biệt có thể dùng thông tin này để nhận ra mẫu thiếu đa dạng; còn bộ sinh thì phải cố sinh mẫu đa dạng.
+
+> **Biên tập:** (1) bản gốc mô tả Unrolled GAN là "khi cập nhật bộ sinh thì cập nhật bộ sinh $k$ lần", ngược với chính câu sau; đúng là trải bộ *phân biệt* $k$ bước. (2) Bản gốc nói EBGAN "thêm sai số tái tạo của VAE"; EBGAN dùng bộ tự mã hóa thường (không phải VAE) làm bộ phân biệt. Câu "EBGAN đã nói ở trên" cũng không đúng vì chương chưa nhắc tới EBGAN. (3) Theo bài báo MAD-GAN (Ghosh và cộng sự, 2018), cơ chế chính là bộ phân biệt đoán bộ sinh nào tạo ra mẫu; số hạng cosin là của biến thể MAD-GAN-Sim. (4) Các số trích dẫn [8], [9] của bản gốc trỏ nhầm sang bài về tăng cường tiếng nói và tái nhận dạng người; đã thay bằng tên bài đúng.
+
+## 7.2 Đánh giá khả năng sinh của GAN
+
+### 7.2.1 Đánh giá khách quan khả năng sinh của GAN thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.2 DCGAN](https://d2l.ai/chapter_generative-adversarial-networks/dcgan.html) ↗
+
+</div>
+
+Cách đánh giá GAN phổ biến nhất là đánh giá chủ quan bằng mắt người. Đánh giá chủ quan tốn nhiều nhân lực vật lực, và có các vấn đề:
+
+- Mang tính chủ quan, có những trường hợp xấu (bad case) không được nhìn thấy nên dễ đánh giá sai.
+- Nếu GAN quá khớp (học thuộc dữ liệu huấn luyện), mẫu sinh ra sẽ rất thật, điểm chủ quan của người rất cao, nhưng đó không phải GAN tốt.
+
+Vì vậy nhiều nhà nghiên cứu đã đề xuất các phương pháp đánh giá khách quan cho GAN.
+
+### 7.2.2 Inception Score
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · 15.3.1 Entropy chéo](ml/ch15_vi?id=_1531-entropy-chéo)
+
+</div>
+
+Với một GAN huấn luyện tốt trên ImageNet, khi đưa mẫu sinh ra vào mạng Inception, xác suất phân loại thu được nên có các tính chất sau:
+
+- Với mỗi ảnh, phân phối xác suất đầu ra $p_M(y|x)$ nên gần phân phối xung (tập trung vào một lớp), bảo đảm mẫu sinh ra rõ ràng, nhận ra được.
+- Trên toàn bộ ảnh, phân phối biên $p_M(y)$ nên gần phân phối đều, như vậy mới không bị bỏ sót chế độ (mode dropping), bảo đảm mẫu sinh ra đa dạng.
+
+Vì vậy có thể thiết kế chỉ số sau:
+
+$$
+IS(P_g)=\exp\Big(\mathbb E_{x\sim P_g}\big[\mathrm{KL}\big(p_M(y|x)\,\Vert\, p_M(y)\big)\big]\Big)
+$$
+
+Theo phân tích trên, nếu GAN huấn luyện tốt, $p_M(y|x)$ gần phân phối xung, $p_M(y)$ gần phân phối đều, KL giữa hai bên rất lớn, nên Inception Score cao. Thực nghiệm cho thấy Inception Score khá khớp với đánh giá chủ quan của người. Tính IS không dùng tới dữ liệu thật, giá trị cụ thể phụ thuộc vào mô hình phân loại $M$ được chọn.
+
+**Đặc điểm:** đo được phần nào độ đa dạng và độ rõ của mẫu sinh ra, nhưng không phát hiện được quá khớp. Mode Score cũng vậy. Không nên dùng trên dữ liệu khác nhiều so với ImageNet.
+
+### 7.2.3 Mode Score
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · 15.3.1 Entropy chéo](ml/ch15_vi?id=_1531-entropy-chéo)
+
+</div>
+
+Mode Score là bản cải tiến của Inception Score, thêm một số hạng đo độ giống nhau giữa phân phối nhãn dự đoán trên mẫu sinh và trên mẫu thật. Công thức:
+
+$$
+MS(P_g)=\exp\Big(\mathbb E_{x\sim P_g}\big[\mathrm{KL}\big(p_M(y|x)\,\Vert\, p_M(y)\big)\big]-\mathrm{KL}\big(p_M(y)\,\Vert\, p_M(y^*)\big)\Big)
+$$
+
+trong đó $p_M(y^*)$ là phân phối nhãn dự đoán trên dữ liệu thật.
+
+### 7.2.4 Kernel MMD (Maximum Mean Discrepancy)
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · 28.3 Hàm số hạt nhân](ml/ch28_vi?id=_283-hàm-số-hạt-nhân)
+
+</div>
+
+Công thức:
+
+$$
+\mathrm{MMD}^2(P_r,P_g)=\Big\lVert\,\mathbb E_{x_r\sim P_r}[\phi(x_r)]-\mathbb E_{x_g\sim P_g}[\phi(x_g)]\,\Big\rVert_{\mathcal H}^2
+$$
+
+Để tính Kernel MMD, trước hết chọn một hàm kernel $k(x, x') = \langle\phi(x), \phi(x')\rangle$; hàm kernel này ánh xạ mẫu vào không gian Hilbert với kernel tái sinh (Reproducing Kernel Hilbert Space, RKHS). So với không gian Euclid, RKHS có nhiều ưu điểm, ví dụ tích trong giữa các hàm tính được trực tiếp qua kernel. Khai triển công thức trên được công thức tính:
+
+$$
+\mathrm{MMD}^2(P_r,P_g)=\mathbb E_{x_r,x_r'\sim P_r,\ x_g,x_g'\sim P_g}\big[k(x_r,x_r')-2k(x_r,x_g)+k(x_g,x_g')\big]
+$$
+
+MMD càng nhỏ thì hai phân phối càng gần nhau.
+
+**Đặc điểm:** đo được phần nào chất lượng ảnh sinh ra, chi phí tính toán nhỏ. Nên dùng.
+
+> **Biên tập:** công thức thứ nhất trong bản gốc viết hiệu của hai *tổng* $\sum k(x_r) - \sum k(x_g)$ và chuẩn không bình phương; đúng là bình phương chuẩn của hiệu hai *kỳ vọng* của ánh xạ đặc trưng $\phi$ trong RKHS (khai triển ra đúng công thức thứ hai).
+
+### 7.2.5 Khoảng cách Wasserstein
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Toán · Chương 24 Bài toán tối ưu lồi](math/ch24_vi)
+
+</div>
+
+Khoảng cách Wasserstein trong bài toán vận chuyển tối ưu còn gọi là khoảng cách máy ủi đất (Earth Mover's Distance). Khoảng cách này được bàn kỹ trong WGAN. Với $n$ mẫu thật $x^r_i$ và $m$ mẫu sinh $x^g_j$:
+
+$$
+\begin{aligned}
+WD(P_r,P_g)=\ &\min_{w\in\mathbb{R}^{n\times m}_{\ge0}}\ \sum_{i=1}^n\sum_{j=1}^m w_{ij}\,d(x_i^r,x_j^g)\\
+\text{s.t.}\ &\sum_{j=1}^m w_{ij}=p_r(x_i^r)\ \ \forall i,\qquad \sum_{i=1}^n w_{ij}=p_g(x_j^g)\ \ \forall j
+\end{aligned}
+$$
+
+Khoảng cách Wasserstein đo được độ giống nhau giữa hai phân phối: khoảng cách càng nhỏ, phân phối càng giống nhau.
+
+**Đặc điểm:** nếu chọn không gian đặc trưng phù hợp thì có hiệu quả nhất định, nhưng độ phức tạp tính toán $O(n^3)$, quá cao.
+
+> **Biên tập:** công thức gốc dùng chỉ số $i$ cho cả hai tổng và đặt nhầm chỉ số trong hai ràng buộc (tổng theo $i$ lại gán bằng $p_r(x_i^r)$); đã sửa, và thêm điều kiện $w_{ij}\ge 0$ (đây là một bài toán quy hoạch tuyến tính).
+
+### 7.2.6 Fréchet Inception Distance (FID)
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.2 DCGAN](https://d2l.ai/chapter_generative-adversarial-networks/dcgan.html) ↗
+
+</div>
+
+FID tính khoảng cách giữa mẫu thật và mẫu sinh trong không gian đặc trưng. Trước hết dùng mạng Inception trích đặc trưng, rồi mô hình hóa không gian đặc trưng bằng phân phối Gauss, và tính khoảng cách dựa trên trung bình và hiệp phương sai của hai phân phối Gauss. Công thức:
+
+$$
+FID(\mathbb P_r,\mathbb P_g)=\lVert\mu_r-\mu_g\rVert^2+\operatorname{Tr}\big(C_r+C_g-2(C_rC_g)^{1/2}\big)
+$$
+
+trong đó $\mu$ và $C$ lần lượt là trung bình và ma trận hiệp phương sai. FID càng nhỏ càng tốt.
+
+**Đặc điểm:** dù chỉ tính tới hai moment đầu của không gian đặc trưng, nhưng bền vững và tính hiệu quả. FID đã thành chỉ số chuẩn để so sánh các mô hình sinh ảnh.
+
+> **Biên tập:** công thức gốc thiếu bình phương ở số hạng đầu ($\lVert\mu_r-\mu_g\rVert^2$, khoảng cách Fréchet giữa hai phân phối Gauss), và ghi ngược "$\mu, C$ lần lượt là hiệp phương sai và trung bình".
+
+### 7.2.7 Bộ phân loại 1-láng giềng gần nhất (1-NN)
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · Chương 9 $K$-nearest neighbors (KNN)](ml/ch09_vi)
+
+</div>
+
+Dùng phương pháp bỏ-một-ra (leave-one-out) kết hợp bộ phân loại 1-NN (bộ phân loại khác cũng được) để tính độ chính xác khi phân biệt ảnh thật với ảnh sinh. Nếu hai phân phối gần nhau thì độ chính xác gần 50%, ngược lại thì gần 100%. Để đánh giá GAN, tác giả dùng riêng độ chính xác trên mẫu thật và trên mẫu sinh để đo độ thật và độ đa dạng của mẫu sinh ra.
+
+- Với mẫu thật $x_r$, khi phân loại 1-NN, nếu mẫu sinh ra càng thật thì không gian mẫu thật bị mẫu sinh $x_g$ bao quanh, nên độ chính xác trên $x_r$ sẽ thấp.
+- Với mẫu sinh $x_g$, khi phân loại 1-NN, nếu mẫu sinh thiếu đa dạng, tụ lại ở vài chế độ, thì $x_g$ dễ phân biệt với $x_r$, nên độ chính xác cao.
+
+**Đặc điểm:** chỉ số đo gần lý tưởng, và phát hiện được quá khớp (GAN học thuộc dữ liệu huấn luyện cho độ chính xác dưới 50%).
+
+> **Biên tập:** bản gốc viết "nếu hai phân phối gần nhau thì độ chính xác gần 50%, ngược lại gần **0%**"; đúng là gần 100% (hai phân phối tách rời thì bộ phân loại đoán đúng hết).
+
+### 7.2.8 Các phương pháp đánh giá khác
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Toán · 4.2 Ước lượng hợp lý cực đại](math/ch04_vi?id=_42-Ước-lượng-hợp-lý-cực-đại)
+
+</div>
+
+AIS (annealed importance sampling, ước lượng log hợp lý) và KDE (ước lượng mật độ bằng kernel) cũng dùng được để đánh giá GAN, nhưng không phải là chỉ số độc lập với mô hình (model agnostic metrics): AIS cần truy cập vào chính mô hình sinh, không thể chỉ tính từ mẫu sinh ra và mẫu thật; còn KDE trong không gian ảnh nhiều chiều thì ước lượng rất kém.
+
+## 7.3 Có những mô hình sinh thường gặp nào khác?
+
+### 7.3.1 Mô hình tự hồi quy pixelRNN và pixelCNN là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Toán · Chương 3 Ôn tập Xác suất](math/ch03_vi) · [Ôn tập · Chương 6 Mạng neuron hồi tiếp (RNN)](qa/ch06_vi)
+
+</div>
+
+Mô hình tự hồi quy mô hình hóa tường minh phân phối xác suất $p_{data}(x)$ của dữ liệu ảnh và tối ưu bằng ước lượng hợp lý cực đại. Cụ thể:
+
+$$
+p_{data}(x)=\prod_{i=1}^np(x_i|x_1,x_2,\dots,x_{i-1})
+$$
+
+Công thức trên dễ hiểu: theo quy tắc nhân của xác suất, phân phối của ảnh bằng tích các xác suất có điều kiện của từng điểm ảnh $x_i$ khi biết các điểm ảnh $x_1,\dots,x_{i-1}$ trước nó. Nếu dùng RNN để mô hình hóa quan hệ phụ thuộc này thì là pixelRNN; nếu dùng CNN thì là pixelCNN (van den Oord và cộng sự, 2016). Cụ thể như sau:
+
+<img src="../img/qa/ch07/pixRNN.png" alt="pixelRNN"/>
+
+<img src="../img/qa/ch07/pixCNN.png" alt="pixelCNN"/>
+
+Hình 7.5 pixelRNN (trên) và pixelCNN (dưới)
+
+Rõ ràng, dù là pixelCNN hay pixelRNN, vì các điểm ảnh được sinh lần lượt từng cái một nên rất chậm. WaveNet, mô hình nổi tiếng trong lĩnh vực tiếng nói, là một mô hình tự hồi quy điển hình. (Các mô hình ngôn ngữ lớn như GPT cũng là mô hình tự hồi quy, sinh từng token một.)
+
+### 7.3.2 VAE là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Toán · 4.2 Ước lượng hợp lý cực đại](math/ch04_vi?id=_42-Ước-lượng-hợp-lý-cực-đại) · [Học máy · Chương 21 Principal component analysis (PCA)](ml/ch21_vi)
+
+</div>
+
+PixelCNN/RNN định nghĩa một hàm mật độ dễ tính, có thể tối ưu trực tiếp hợp lý của dữ liệu huấn luyện; còn bộ tự mã hóa biến phân (Variational Autoencoder, VAE; Kingma và Welling, 2014) định nghĩa một hàm mật độ khó tính, mô hình hóa nó qua biến ẩn $z$ và tối ưu một cận dưới của log hợp lý (ELBO). Sơ đồ nguyên lý của VAE như sau:
+
+<img src="../img/qa/ch07/VAE.png" alt="VAE"/>
+
+Hình 7.6 Bộ tự mã hóa biến phân. Chữ trong hình: 真实样本 = mẫu thật $X_k$; 均值方差计算模块 = mô-đun tính trung bình, phương sai; 正态分布 = phân phối chuẩn riêng cho từng mẫu, được kéo cho "khớp" (看齐) với $N(0, I)$; 采样变量 = biến lấy mẫu $Z_k$; 生成器 = bộ sinh; 生成样本 = mẫu sinh $\hat X_k$, được "so sánh" (对比) với mẫu thật.
+
+Trong VAE, mẫu thật $X$ được mạng neuron (bộ mã hóa) tính ra trung bình và phương sai (giả sử biến ẩn theo phân phối chuẩn), rồi lấy mẫu được biến $Z$ và tái tạo lại (bộ giải mã). VAE và GAN đều học ánh xạ từ biến ẩn $z$ sang phân phối dữ liệu thật. Nhưng khác GAN ở chỗ:
+
+- GAN có ý tưởng khá thô: dùng một bộ phân biệt để đo khoảng cách giữa phân phối do mô-đun chuyển đổi phân phối (tức bộ sinh) tạo ra và phân phối dữ liệu thật.
+- VAE thì không trực quan như vậy: VAE ràng buộc biến ẩn $z$ theo phân phối chuẩn tắc (qua số hạng KL) và tái tạo dữ liệu, nhờ đó học được ánh xạ chuyển đổi phân phối $X=G(z)$.
+
+**So sánh các mô hình sinh**
+
+- Mô hình tự hồi quy sinh dữ liệu bằng cách mô hình hóa tường minh phân phối xác suất.
+- VAE và GAN đều giả sử biến ẩn $z$ theo một phân phối nào đó, và học một ánh xạ $X=G(z)$ để chuyển phân phối của $z$ thành phân phối dữ liệu thật $p_{data}(x)$.
+- GAN dùng bộ phân biệt để đo ánh xạ $X=G(z)$ tốt hay xấu, còn VAE đo bằng KL giữa phân phối của biến ẩn $z$ và phân phối chuẩn tắc, cộng sai số tái tạo.
+
+> **Biên tập:** bản gốc dẫn số [5], [6] cho pixelRNN và VAE nhưng hai số đó trong danh mục là bài về siêu phân giải và hoàn thiện ảnh; đã thay bằng tên bài đúng. Mô hình khuếch tán (diffusion), dòng mô hình sinh ảnh chính hiện nay, ra đời sau khi chương này được viết nên không có trong bản gốc.
+
+## 7.4 Cải tiến và tối ưu GAN
+
+### 7.4.1 Sinh ảnh theo loại chỉ định thế nào: GAN có điều kiện
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+Mạng đối sinh có điều kiện (CGAN, Conditional Generative Adversarial Networks; Mirza và Osindero, 2014) là một cải tiến của GAN, phần nào giải quyết tính không xác định của kết quả GAN sinh ra. Nếu huấn luyện GAN gốc trên tập MNIST, ảnh GAN sinh ra là hoàn toàn không xác định: sinh ra số 1, số 2 hay số mấy, hoàn toàn không kiểm soát được. Để điều khiển được chữ số sinh ra, ta có thể chia tập dữ liệu, tách riêng dữ liệu của từng chữ số 0–9 để huấn luyện 10 mô hình, nhưng như vậy quá phiền và không thực tế: không chỉ phiền vì phải phân loại dữ liệu, mà chủ yếu là mỗi lớp có ít mẫu, đem huấn luyện GAN rất có thể không đủ dữ liệu. Vì vậy CGAN ra đời. Xem cấu trúc mạng của CGAN:
+
+<img src="../img/qa/ch07/CGAN网络结构.png" alt="Cấu trúc mạng CGAN"/>
+
+Hình 7.7 Cấu trúc mạng CGAN
+
+Từ cấu trúc mạng có thể thấy, với bộ sinh (Generator), đầu vào không chỉ là nhiễu ngẫu nhiên $z$ mà còn có thông tin nhãn của ảnh muốn sinh. Ví dụ với sinh ảnh MNIST, nhãn là một vector one-hot, chiều nào bằng 1 nghĩa là sinh ảnh chữ số đó. Tương tự, đầu vào của bộ phân biệt cũng có nhãn của mẫu. Như vậy bộ phân biệt và bộ sinh học được quan hệ giữa mẫu và nhãn. Hàm mất mát:
+
+$$
+\min_G \max_D V(D,G) = \mathbb E_{x\sim p_{data}(x)}[\log D(x|y)] + \mathbb E_{z\sim p_z(z)}[\log (1 - D(G(z|y)\,|\,y))]
+$$
+
+Thiết kế mất mát gần như giống GAN gốc, chỉ có đầu vào của bộ sinh và bộ phân biệt là phân phối có điều kiện. Khi lập trình, chỉ cần ghép nối (concatenate) nhiễu ngẫu nhiên $z$ với điều kiện $y$.
+
+> **Biên tập:** bản gốc viết "huấn luyện 9 mô hình" cho các chữ số 0–9 (phải là 10), và viết số hạng thứ hai là $D(G(z|y))$, thiếu điều kiện $y$ ở bộ phân biệt.
+
+### 7.4.2 CNN và GAN: DCGAN
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.2 DCGAN](https://d2l.ai/chapter_generative-adversarial-networks/dcgan.html) ↗ · [Học sâu · 7.3.2 Sải bước](dl/ch07_s3_vi?id=_732-sải-bước)
+
+</div>
+
+Các GAN nói ở trên đều xây trên mạng neuron đơn giản (kết nối đầy đủ). Nhưng với bài toán thị giác, dùng GAN gốc dựa trên mạng kết nối đầy đủ gặp nhiều vấn đề. Nếu nhiễu ngẫu nhiên đưa vào GAN có 100 chiều, ảnh đầu ra có kích thước 256x256, tức phải ánh xạ thông tin 100 chiều thành 65536 chiều (mỗi kênh). Nếu chỉ dùng mạng kết nối đầy đủ thì số tham số của mô hình rất lớn, và rất khó học (ánh xạ từ chiều thấp lên chiều cao cần thêm rất nhiều thông tin). Vì vậy DCGAN (Radford và cộng sự, 2016) ra đời. Cụ thể, DCGAN dùng **CNN** cho cả bộ sinh và bộ phân biệt của GAN truyền thống, kèm các mẹo sau:
+
+- Thay tầng gộp (pooling) bằng tích chập: trong bộ phân biệt dùng tích chập có sải bước (strided convolution), trong bộ sinh dùng tích chập sải bước phân số (fractional-strided convolution, tức tích chập chuyển vị).
+- Dùng BatchNorm cho cả bộ sinh và bộ phân biệt.
+- Bỏ các tầng kết nối đầy đủ; (gộp toàn cục làm mô hình ổn định hơn nhưng làm chậm hội tụ).
+- Bộ sinh dùng ReLU ở mọi tầng trừ tầng đầu ra, tầng đầu ra dùng tanh.
+- Bộ phân biệt dùng LeakyReLU ở mọi tầng.
+
+Cấu trúc mạng như hình:
+
+<img src="../img/qa/ch07/DCGAN结构图.png" alt="Cấu trúc bộ sinh của DCGAN"/>
+
+Hình 7.8 Bộ sinh của DCGAN
+
+> **Biên tập:** bản gốc viết DCGAN "dùng **GAN** cho cả bộ sinh và bộ phân biệt" (lỗi chữ, đúng là CNN), và đặt tên hình là "cấu trúc CGAN".
+
+### 7.4.3 Hiểu nhiễu ngẫu nhiên đầu vào của GAN thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.2 DCGAN](https://d2l.ai/chapter_generative-adversarial-networks/dcgan.html) ↗
+
+</div>
+
+Để hiểu biểu diễn bên trong của bộ sinh, tác giả DCGAN làm một thí nghiệm rất thú vị: giả sử biết những đơn vị nào phụ trách vẽ một vật thể, thì "tắt" chúng đi có làm vật thể đó biến mất khỏi ảnh sinh ra không? Thí nghiệm trong bài báo như sau: trước hết sinh 150 ảnh phòng ngủ, có và không có cửa sổ (đánh dấu khung cửa sổ bằng tay); rồi dùng hồi quy logistic dự đoán trên các bản đồ đặc trưng của tầng tích chập gần cuối trong bộ sinh xem kích hoạt có nằm trên cửa sổ không; các bản đồ đặc trưng có trọng số dương được coi là liên quan tới cửa sổ. Bỏ chúng đi rồi sinh lại ảnh, kết quả như sau:
+
+<img src="../img/qa/ch07/7.4.3.png" alt="Bỏ các bản đồ đặc trưng liên quan tới cửa sổ"/>
+
+Hình 7.9 Hàng trên: ảnh gốc; hàng dưới: cùng nhiễu đầu vào nhưng đã bỏ các bản đồ đặc trưng "cửa sổ"; cửa sổ biến mất hoặc bị thay bằng vật khác.
+
+Ngoài ra, làm phép toán số học trên vài vector nhiễu đầu vào $z$ (lấy trung bình $z$ của ba ảnh mỗi nhóm) có thể cho kết quả như phép toán trên ngữ nghĩa rất thú vị, giống word2vec: "phụ nữ cười" − "phụ nữ không cười" + "đàn ông không cười" ≈ "đàn ông cười".
+
+<img src="../img/qa/ch07/7.4.3-2.png" alt="Phép toán số học trên nhiễu đầu vào của DCGAN"/>
+
+Hình 7.10 Phép toán số học trên vector nhiễu đầu vào
+
+> **Biên tập:** bản gốc mô tả thí nghiệm cửa sổ là "che các *biến* trong không gian ẩn". Theo bài báo DCGAN, thứ bị bỏ là các *bản đồ đặc trưng (filter)* trong bộ sinh, không phải các chiều của $z$; phép toán vector ở hình sau mới thao tác trên $z$.
+
+### 7.4.4 Vì sao GAN dễ bị sụp đổ khi huấn luyện?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗ · [Học sâu · 5.4.1 Tiêu biến và Bùng nổ Gradient](dl/ch05_s4_vi?id=_541-tiêu-biến-và-bùng-nổ-gradient)
+
+</div>
+
+Huấn luyện GAN sụp đổ là khi trong quá trình huấn luyện, bộ sinh hoặc bộ phân biệt áp đảo hẳn bên kia.
+
+Với mất mát gốc của GAN, khi bộ phân biệt đạt tối ưu thì tối ưu bộ sinh tương đương cực tiểu độ phân kỳ JS giữa phân phối sinh và phân phối thật. Vì phân phối sinh ngẫu nhiên rất khó chồng lấn đáng kể với phân phối thật (cả hai thường nằm trên những đa tạp chiều thấp trong không gian nhiều chiều), mà độ phân kỳ JS lại có tính nhảy bậc (bằng hằng số $\log 2$ khi hai phân phối không chồng lấn), nên bộ sinh gặp vấn đề tiêu biến gradient. Nhưng nếu không huấn luyện bộ phân biệt tới gần tối ưu thì mục tiêu tối ưu của bộ sinh lại mất ý nghĩa. Vì vậy ta phải cân bằng cẩn thận hai bên, huấn luyện bộ phân biệt không quá tốt mà cũng không quá tệ. Nếu không sẽ bị sụp đổ, không có kết quả mong muốn.
+
+### 7.4.5 WGAN giải quyết sụp đổ khi huấn luyện thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Toán · Chương 24 Bài toán tối ưu lồi](math/ch24_vi) · [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+Tác giả WGAN (Arjovsky và cộng sự, 2017) đề xuất dùng khoảng cách Wasserstein thay cho độ phân kỳ JS: khoảng cách này vẫn trơn và cho gradient có ý nghĩa ngay cả khi hai phân phối không chồng lấn, nên giải quyết vấn đề tiêu biến gradient, đồng thời cho ra một giá trị mất mát tương quan với chất lượng ảnh, giải quyết luôn việc khó đánh giá hội tụ. Theo đối ngẫu Kantorovich–Rubinstein, khoảng cách Wasserstein viết được thành:
+
+$$
+W(p_{data}, p_g) = \sup_{\lVert f\rVert_L\le 1}\ \mathbb E_{x\sim p_{data}(x)}[f(x)] - \mathbb E_{x\sim p_g(x)}[f(x)]
+$$
+
+trong đó cận trên lấy trên mọi hàm $f$ liên tục Lipschitz với hằng số 1. WGAN xấp xỉ $f$ bằng một mạng $f_w$ (gọi là critic, thay cho bộ phân biệt) và giữ $f_w$ Lipschitz bằng cách cắt trọng số. Từ đó có mất mát của WGAN:
+
+- Mất mát bộ sinh: $-\mathbb E_{x\sim p_g(x)}[f_w(x)]$
+- Mất mát bộ phân biệt (critic): $L=-\mathbb E_{x\sim p_{data}(x)}[f_w(x)] + \mathbb E_{x\sim p_g(x)}[f_w(x)]$
+
+Công thức GAN có vẻ khó nắm, nhưng về cài đặt code thì chỉ là mấy điểm sau:
+
+- Bỏ sigmoid ở tầng cuối của bộ phân biệt.
+- Mất mát của bộ sinh và bộ phân biệt không lấy log.
+- Mỗi lần cập nhật tham số bộ phân biệt xong thì cắt giá trị tuyệt đối của chúng về không quá một hằng số $c$ (bài báo dùng $c=0.01$).
+- Không dùng bộ tối ưu có động lượng (như Adam); bài báo khuyên RMSProp.
+
+> **Biên tập:** bản gốc viết công thức $L$ không có $\sup$ và gọi nó là "định nghĩa khoảng cách Wasserstein"; định nghĩa gốc là bài toán vận chuyển tối ưu (mục 7.2.5), còn công thức trên là dạng đối ngẫu và chỉ đúng khi lấy cận trên trên các hàm 1-Lipschitz. Bản gốc cũng chỉ nêu động cơ "khó đánh giá hội tụ"; động cơ chính của WGAN là tránh tiêu biến gradient của JS. Thêm mẹo thứ tư theo bài báo.
+
+### 7.4.6 WGAN-GP: WGAN có điều chuẩn gradient
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Toán · Chương 24 Bài toán tối ưu lồi](math/ch24_vi) · [Ôn tập · 3.6.8 Batch Normalization là gì?](qa/ch03_vi?id=_368-batch-normalization-là-gì)
+
+</div>
+
+Thực nghiệm cho thấy WGAN không dễ dùng như mong đợi, nguyên nhân chính là WGAN cắt trọng số. Cắt trọng số làm phần lớn trọng số của mạng phân biệt dồn về hai giá trị biên $\pm c$, mạng gần như thành một mạng nhị phân, giảm năng lực mô hình. Vì vậy tác giả WGAN-GP (Gulrajani và cộng sự, 2017) đề xuất dùng phạt gradient thay cho cắt trọng số. Công thức:
+
+$$
+L=-\mathbb E_{x\sim p_{data}(x)}[f_w(x)] + \mathbb E_{x\sim p_g(x)}[f_w(x)]+\lambda\,\mathbb E_{\hat x\sim p_{\hat x}}\Big[\big(\lVert\nabla_{\hat x} f_w(\hat x)\rVert_2-1\big)^2\Big]
+$$
+
+trong đó $\hat x = \epsilon x_r + (1-\epsilon) x_g$ với $\epsilon \sim U[0,1]$ là điểm nội suy ngẫu nhiên giữa một mẫu thật và một mẫu sinh, và bài báo dùng $\lambda = 10$.
+
+Vì công thức trên phạt gradient của từng mẫu riêng lẻ nên không hợp dùng BN, vì BN tạo phụ thuộc giữa các mẫu trong cùng batch. Nếu cần, có thể chọn Layer Normalization. Khi huấn luyện thực tế, có thể dùng khoảng cách Wasserstein để đo mức hội tụ của mô hình:
+
+<img src="../img/qa/ch07/Wass距离随迭代次数变化.png" alt="Khoảng cách Wasserstein theo số vòng lặp"/>
+
+Hình 7.11 Ước lượng khoảng cách Wasserstein theo số vòng lặp
+
+Trục tung của hình là khoảng cách Wasserstein, trục hoành là số vòng lặp. Có thể thấy theo số vòng lặp, khoảng cách Wasserstein dần hội tụ, ảnh sinh ra cũng dần ổn định.
+
+> **Biên tập:** bản gốc gọi là "cắt **gradient**" (phải là cắt **trọng số**), và công thức phạt viết bình phương ngoài ngoặc kỳ vọng với chuẩn $p$ bất kỳ, không nói $\hat x$ lấy từ đâu; đã sửa theo bài báo WGAN-GP.
+
+### 7.4.7 LSGAN
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · E.9 Hồi quy: MAE, MSE, RMSE và $R^2$](ml/eval_vi?id=e9-hồi-quy-mae-mse-rmse-và-r2r2r2) · [Học máy · 15.3.1 Entropy chéo](ml/ch15_vi?id=_1531-entropy-chéo)
+
+</div>
+
+LSGAN (Least Squares GAN; Mao và cộng sự, 2017) chủ yếu cải thiện độ ổn định và chất lượng ảnh chưa cao của GAN chuẩn. Tác giả thay mất mát entropy chéo của GAN gốc bằng mất mát bình phương tối thiểu. Mất mát của LSGAN:
+
+$$
+\min_D J(D)=\frac{1}{2}\mathbb E_{x\sim p_{data}(x)}\big[(D(x)-a)^2\big] + \frac{1}{2}\mathbb E_{z\sim p_z(z)}\big[(D(G(z))-b)^2\big]
+$$
+
+$$
+\min_G J(G)=\frac{1}{2}\mathbb E_{z\sim p_z(z)}\big[(D(G(z))-c)^2\big]
+$$
+
+với $a$, $b$ là nhãn của mẫu thật và mẫu giả (ví dụ $a=1$, $b=0$), $c$ là giá trị mà bộ sinh muốn bộ phân biệt tin cho mẫu giả (ví dụ $c=1$).
+
+Khi cài đặt thì rất đơn giản: bỏ sigmoid ở tầng cuối, và tính mất mát bằng sai số bình phương. Lý do tác giả đưa ra trong bài báo bằng hình sau:
+
+<img src="../img/qa/ch07/LSGAN交叉熵与最小二乘损失对比图.png" alt="So sánh mất mát entropy chéo và mất mát bình phương"/>
+
+Hình 7.12 (a) Mất mát entropy chéo sau sigmoid; (b) mất mát bình phương tối thiểu.
+
+Hình là mất mát dựa trên entropy chéo và dựa trên bình phương tối thiểu mà tác giả đưa ra. Trục hoành là đầu vào của hàm mất mát, trục tung là giá trị mất mát. Có thể thấy khi đầu vào tăng, mất mát entropy chéo sau sigmoid nhanh chóng về 0, gradient cũng về 0 (bão hòa): mẫu giả đã bị phân loại "đúng phía" nhưng còn xa dữ liệu thật thì không đóng góp gradient. Còn với mất mát bên phải, gradient chỉ bằng 0 tại đúng một điểm (giá trị mục tiêu), mẫu càng xa mục tiêu càng bị phạt nặng. Vì vậy LSGAN giải quyết tốt vấn đề bão hòa của mất mát entropy chéo.
+
+### 7.4.8 Làm sao hạn chế sụp đổ khi huấn luyện GAN?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.2 DCGAN](https://d2l.ai/chapter_generative-adversarial-networks/dcgan.html) ↗ · [Ôn tập · 14.5 Cải thiện hiệu năng của GAN thế nào?](qa/ch14_vi?id=_145-cải-thiện-hiệu-năng-của-gan-thế-nào)
+
+</div>
+
+- Chuẩn hóa ảnh đầu vào về $(-1, 1)$; tầng cuối của bộ sinh dùng hàm kích hoạt tanh.
+- Mất mát của bộ sinh dùng $\max \log D(G(z))$ thay cho $\min \log(1-D(G(z)))$, vì mất mát gốc của bộ sinh bị tiêu biến gradient ở đầu quá trình huấn luyện (khi $D(G(z))\approx 0$). Khi cài đặt, tương đương đảo nhãn lúc huấn luyện bộ sinh: coi ảnh giả là thật.
+- Không lấy mẫu nhiễu từ phân phối đều, nên lấy mẫu từ phân phối Gauss.
+- Mỗi minibatch chỉ chứa toàn mẫu thật hoặc toàn mẫu giả, không trộn lẫn; nếu không dùng được BatchNorm thì dùng InstanceNorm.
+- Tránh gradient thưa, tức hạn chế ReLU, MaxPool. Có thể dùng LeakyReLU thay ReLU; giảm mẫu dùng Average Pooling hoặc tích chập có sải bước; tăng mẫu dùng PixelShuffle, ConvTranspose2d có sải bước.
+- Làm mượt nhãn hoặc thêm nhiễu vào nhãn. Làm mượt nhãn: với mẫu dương dùng số ngẫu nhiên trong 0.7–1.2 thay cho 1, với mẫu âm dùng số ngẫu nhiên trong 0–0.3 thay cho 0. Thêm nhiễu vào nhãn: khi huấn luyện bộ phân biệt, đảo ngẫu nhiên nhãn của một số mẫu.
+- Nếu được, dùng DCGAN hoặc mô hình lai: KL + GAN, VAE + GAN.
+- Dùng LSGAN, WGAN-GP.
+- Bộ sinh dùng Adam, bộ phân biệt dùng SGD.
+- Phát hiện lỗi sớm; ví dụ: mất mát bộ phân biệt bằng 0 nghĩa là huấn luyện thất bại; nếu mất mát bộ sinh giảm đều đặn thì bộ phân biệt không làm được việc của nó.
+- Đừng cố giải quyết sụp đổ bằng cách so sánh mất mát của bộ sinh và bộ phân biệt rồi chọn bên để huấn luyện, ví dụ:
+
+```text
+while loss_D > loss_G:
+    train D
+while loss_G > loss_D:
+    train G
+```
+
+- Nếu có nhãn, cố gắng dùng thông tin nhãn để huấn luyện.
+- Thêm một ít nhiễu vào đầu vào của bộ phân biệt, thêm nhiễu nhân tạo vào mọi tầng của bộ sinh.
+- Huấn luyện bộ phân biệt nhiều hơn, nhất là khi đã thêm nhiễu.
+- Với bộ sinh, dùng Dropout cả lúc huấn luyện lẫn lúc kiểm tra.
+
+> **Biên tập:** danh sách này lấy từ [ganhacks](https://github.com/soumith/ganhacks). Bản gốc chép ngược mẹo thứ hai thành "mất mát bộ sinh dùng $\min \log(1-D)$, vì mất mát gốc bị tiêu biến gradient"; $\min\log(1-D)$ *chính là* mất mát gốc gây tiêu biến gradient, mẹo của ganhacks là dùng $\max\log D$. Đã sửa.
+
+## 7.3b Ứng dụng của GAN: dịch ảnh
+
+### 7.3b.1 Dịch ảnh là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+GAN là mô hình sinh mạnh, ứng dụng rất rộng. Ứng dụng phổ biến nhất là dịch ảnh (image translation), tức chuyển một ảnh thành một ảnh khác, có thể so với dịch máy, chuyển một ngôn ngữ sang ngôn ngữ khác. Các bài toán dịch ảnh thường gặp:
+
+- khử nhiễu ảnh
+- siêu phân giải ảnh
+- hoàn thiện ảnh (inpainting)
+- chuyển phong cách (style transfer)
+- …
+
+Phần này giới thiệu một mạng dịch ảnh kinh điển và các cải tiến của nó. Dịch ảnh có thể chia thành dịch ảnh có giám sát và không giám sát:
+
+- **Dịch ảnh có giám sát:** miền gốc và miền đích có dữ liệu tương ứng một–một (ảnh cặp).
+- **Dịch ảnh không giám sát:** miền gốc và miền đích không có dữ liệu tương ứng một–một.
+
+### 7.3b.2 Dịch ảnh có giám sát: pix2pix
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗ · [d2l (tiếng Anh) · 14.11 Mạng tích chập hoàn toàn](https://d2l.ai/chapter_computer-vision/fcn.html) ↗
+
+</div>
+
+Trong bài báo pix2pix (Isola và cộng sự, 2017), khung tác giả đề xuất rất gọn gàng, thanh lịch (thuật toán tốt thường gọn gàng thanh lịch). So với các thuật toán trước cần nhiều kiến thức chuyên gia và hàm mất mát thủ công phức tạp, bài báo này rất "thô bạo": dùng CGAN để xử lý một loạt bài toán chuyển đổi. Dưới đây là vài ví dụ:
+
+<img src="../img/qa/ch07/pix2pix结果示例.png" alt="Ví dụ kết quả của pix2pix"/>
+
+Hình 7.13 Ví dụ kết quả của pix2pix
+
+Hình trên cho nhiều kết quả thú vị, ví dụ bản đồ phân vùng → ảnh đường phố, ảnh cạnh → ảnh thật. Lần đầu xem thấy khá ấn tượng; vậy làm thế nào được như vậy? Thử hình dung, nếu là ta, ta sẽ thiết kế mạng này thế nào?
+
+**Ý tưởng trực quan**
+
+Ý tưởng trực tiếp nhất là thiết kế một mạng CNN, xây trực tiếp ánh xạ đầu vào–đầu ra, giống bài toán khử nhiễu ảnh. Nhưng với các bài toán trên, làm vậy gây ra một vấn đề: **ảnh sinh ra không rõ nét**.
+
+Lấy ví dụ bản đồ phân vùng → ảnh đường phố ở góc trên bên trái: mỗi nhãn của bản đồ phân vùng, như "ô tô", có thể ứng với ô tô kiểu dáng, màu sắc khác nhau. Mô hình học được sẽ là trung bình của mọi ô tô khác nhau, gây mờ.
+
+<img src="../img/qa/ch07/pix2pix语义地图L1loss结果.png" alt="Kết quả của pix2pix chỉ dùng mất mát L1"/>
+
+Hình 7.14 Chỉ dùng mất mát L1: ảnh mờ
+
+**Giải quyết ảnh sinh ra bị mờ thế nào?**
+
+Tác giả nghĩ ra cách thêm mất mát GAN để phạt mô hình. So với mô hình sinh truyền thống, GAN sinh ảnh độ phân giải cao khá tốt. Ý tưởng cũng đơn giản: trên nền ý tưởng trực quan ở trên, thêm một bộ phân biệt để phán đoán ảnh đầu vào có phải mẫu thật không. Sơ đồ mô hình như sau:
+
+<img src="../img/qa/ch07/pix2pix模型示意图.png" alt="Sơ đồ mô hình pix2pix"/>
+
+Hình 7.15 Sơ đồ mô hình pix2pix
+
+Mô hình trên trông khác CGAN, nhưng nó chính là một CGAN, chỉ có đầu vào duy nhất là thông tin điều kiện (ảnh nguồn); bộ phân biệt nhận cặp (ảnh nguồn, ảnh đích hoặc ảnh sinh). CGAN gốc cần đầu vào là nhiễu ngẫu nhiên và điều kiện. Ở đây không đưa nhiễu vào vì trong thực nghiệm, nếu đưa cả nhiễu và điều kiện thì nhiễu thường bị điều kiện $C$ lấn át (bộ sinh học cách bỏ qua nhiễu), nên bỏ hẳn; tính ngẫu nhiên chỉ còn đến từ dropout.
+
+### 7.3b.3 Các mẹo khác của dịch ảnh
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · E.9 Hồi quy: MAE, MSE, RMSE và $R^2$](ml/eval_vi?id=e9-hồi-quy-mae-mse-rmse-và-r2r2r2) · [Học sâu · 5.6 Dropout](dl/ch05_s6_vi)
+
+</div>
+
+Từ hai ý trên, mất mát cuối cùng gồm:
+
+- mất mát L1 giữa đầu ra và nhãn (ảnh đích);
+- mất mát GAN;
+
+$$
+G^*=\arg\min_G \max_D\ \mathcal L_{cGAN}(G,D)+\lambda\,\mathcal L_{L1}(G)
+$$
+
+Ngoài ra, khi kiểm tra cũng dùng Dropout để đầu ra đa dạng hơn.
+
+Dùng mất mát L1 thay L2 vì lý do đơn giản: so với L2, L1 giữ cạnh tốt hơn, ít mờ hơn (L2 ứng với tiên nghiệm Gauss, L1 ứng với tiên nghiệm Laplace).
+
+Bộ phân biệt dùng PatchGAN (để bảo đảm thêm độ nét của ảnh sinh ra): PatchGAN chia ảnh thành nhiều miếng (patch), dùng bộ phân biệt phán đoán từng miếng (khi cài đặt thực tế có cách khéo hơn: một mạng tích chập hoàn toàn mà mỗi điểm đầu ra ứng với một vùng tiếp nhận $70\times70$), rồi lấy trung bình mất mát của mọi miếng làm mất mát cuối cùng.
+
+> **Biên tập:** bản gốc nói mất mát GAN của pix2pix là "mất mát bình phương tối thiểu của LSGAN"; bài báo pix2pix dùng mất mát cGAN chuẩn (entropy chéo), LSGAN chỉ là một tùy chọn trong code (và là mặc định của CycleGAN). Cũng nên biết bài báo ghi nhận dropout lúc kiểm tra chỉ cho đầu ra đa dạng rất ít.
+
+### 7.3b.4 Sinh ảnh và video độ phân giải cao thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+pix2pix đưa ra một khung dịch ảnh tổng quát. Để sinh ảnh và video độ phân giải cao thì cần cấu trúc mạng tốt hơn và nhiều tri thức tiên nghiệm hơn. pix2pixHD (Wang và cộng sự, 2018) đề xuất bộ sinh và bộ phân biệt đa tỉ lệ để sinh ảnh độ phân giải cao (2048x1024). Vid2Vid, trên nền pix2pixHD, dùng luồng quang học (optical flow) và ràng buộc theo thời gian để sinh video độ phân giải cao.
+
+### 7.3b.5 Dịch ảnh có giám sát có nhược điểm gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+Nhiều thuật toán dịch ảnh như họ pix2pix ở trên cần ảnh tương ứng một–một. Nhưng trong nhiều tình huống ứng dụng thường không có thông tin giám sát mạnh dạng một–một như vậy, ví dụ các tình huống sau:
+
+<img src="../img/qa/ch07/CycleGAN结果例子.png" alt="Ví dụ kết quả của CycleGAN"/>
+
+Hình 7.16 Ví dụ kết quả của CycleGAN
+
+Lấy ảnh đầu tiên hàng thứ nhất làm ví dụ (ngựa → ngựa vằn), tìm được dữ liệu ghép cặp một–một như vậy là không thực tế. Vì vậy cần đến các thuật toán dịch ảnh không giám sát.
+
+### 7.3b.6 Dịch ảnh không giám sát: CycleGAN
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗ · [Ôn tập · Bổ sung: ResNet và DenseNet](qa/ch04_vi?id=bổ-sung-resnet-và-densenet)
+
+</div>
+
+**Cấu trúc mô hình**
+
+Ý tưởng tổng thể như sau: giả sử có dữ liệu của hai miền, gọi là A và B. Ví dụ ở hàng thứ nhất của hình trên, miền A là ngựa thường, miền B là ngựa vằn. Vì chuyển đổi A→B không có thông tin giám sát, tác giả CycleGAN (Zhu và cộng sự, 2017) đề xuất chuyển đổi theo vòng:
+
+> a. A → fake_B → rec_A
+> b. B → fake_A → rec_B
+
+Với mọi ảnh của miền A, học một mạng G_B sinh ra ảnh miền B. Với mọi ảnh của miền B, cũng học một mạng G_A sinh ra ảnh miền A.
+
+Quá trình huấn luyện chia hai bước: trước hết đưa một ảnh của miền A vào G_B được fake_B, rồi đưa fake_B vào G_A được ảnh A tái tạo rec_A. Với một ảnh của miền B cũng tương tự. Ảnh tái tạo rec_A / rec_B có thể so với ảnh gốc A / B bằng mất mát L1, như vậy có được tín hiệu "có giám sát". Đáng chú ý là mạng dùng cho A → fake_B và cho fake_A → rec_B là cùng một mạng (G_B), tương tự B → fake_A và fake_B → rec_A cùng dùng G_A. Dưới đây là sơ đồ mạng trực quan:
+
+<img src="../img/qa/ch07/CycleGAN模型示意图.png" alt="Sơ đồ mô hình CycleGAN"/>
+
+Hình 7.17 Sơ đồ CycleGAN: nửa trên A → B → A, nửa dưới B → A → B; mỗi miền có một bộ phân biệt riêng.
+
+Bộ sinh của CycleGAN dùng mạng kiểu ResNet (vài khối phần dư giữa phần giảm mẫu và tăng mẫu), bộ phân biệt là PatchGAN $70\times70$ với mất mát kiểu LSGAN.
+
+**Thiết kế mất mát**
+
+Mất mát tổng là mất mát GAN của miền X và miền Y, cộng mất mát nhất quán vòng (cycle consistency loss):
+
+$$
+L(G,F,D_X,D_Y)=L_{GAN}(G,D_Y,X,Y)+L_{GAN}(F,D_X,Y,X)+\lambda L_{cycle}(G,F)
+$$
+
+với $L_{cycle}(G, F) = \mathbb E_x\lVert F(G(x)) - x\rVert_1 + \mathbb E_y\lVert G(F(y)) - y\rVert_1$. Cả quá trình huấn luyện đầu-cuối (end to end), hiệu quả rất ấn tượng, dùng khung này làm được rất nhiều việc thú vị.
+
+> **Biên tập:** (1) bản gốc viết G_A "sinh ra G_B" (lỗi chữ, phải là sinh ra ảnh miền A). (2) Bản gốc nói so ảnh tái tạo với ảnh gốc bằng *sai số bình phương trung bình*; bài báo CycleGAN dùng chuẩn **L1**. (3) Bản gốc nói bộ sinh của CycleGAN dùng U-Net; bài báo dùng bộ sinh dựa trên ResNet (theo Johnson và cộng sự, 2016), U-Net là bộ sinh của pix2pix.
+
+### 7.3b.7 Dịch ảnh không giám sát nhiều miền: StarGAN
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+CycleGAN giải quyết khá tốt bài toán chuyển ảnh không giám sát, nhưng chuyển đổi giữa một cặp miền như vậy vẫn còn vấn đề:
+
+- Phải huấn luyện một mô hình cho mỗi cặp miền, quá kém hiệu quả. Ví dụ, ta muốn chuyển quả cam thành táo đỏ và táo xanh. Với CycleGAN thì phải huấn luyện riêng một mô hình cho táo đỏ, một cho táo xanh.
+- Mỗi miền đều phải thu thập nhiều dữ liệu, quá phiền. Vẫn lấy ví dụ cam thành táo đỏ và táo xanh: dù táo đỏ hay táo xanh thì đều là táo, chỉ khác màu. Thông tin của hai nhiệm vụ này có thể dùng chung, không cần huấn luyện riêng hai mô hình; mà thu thập riêng nhiều dữ liệu táo đỏ, táo xanh thì quá tốn công.
+
+StarGAN (Choi và cộng sự, 2018) đề xuất một khung dịch ảnh không giám sát nhiều miền: một bộ sinh duy nhất nhận thêm nhãn miền đích làm đầu vào, chuyển ảnh giữa nhiều miền, và dữ liệu của các miền khác nhau có thể trộn chung để huấn luyện, tăng hiệu suất dùng dữ liệu.
+
+## 7.4b Ứng dụng của GAN: sinh văn bản
+
+### 7.4b.1 Vì sao GAN không hợp với bài toán văn bản?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 4.1 Thuật toán gradient chính sách](chapter4/chapter4_vi?id=_41-thuật-toán-gradient-chính-sách) · [Ôn tập · Chương 6 Mạng neuron hồi tiếp (RNN)](qa/ch06_vi)
+
+</div>
+
+Từ khi được đề xuất năm 2014, GAN được nghiên cứu và ứng dụng rộng rãi trong sinh ảnh. Nhưng trong lĩnh vực văn bản thì chưa có kết quả nào thật ấn tượng. Lý do chính là văn bản là dữ liệu rời rạc, mà GAN áp dụng cho dữ liệu rời rạc gặp mấy vấn đề sau:
+
+- Gradient của bộ sinh đến từ phán đoán thật/giả của bộ phân biệt. Nhưng với bài toán sinh văn bản, RNN cho ra một chuỗi phân phối xác suất, rồi lấy argmax (hoặc lấy mẫu) để có từ. Phép này làm mất mát của bộ sinh không khả vi. Cũng có thể hiểu theo góc khác: vì là argmax, tham số thay đổi một chút cũng không đổi kết quả argmax, nên GAN không hợp với dữ liệu rời rạc.
+- GAN chỉ đánh giá được mất mát của cả chuỗi, không đánh giá được nửa câu, hay ảnh hưởng của từ đang sinh tới chất lượng kết quả về sau.
+- Nếu không lấy argmax, bộ sinh sinh ra toàn số thực, còn dữ liệu thật đều là mã hóa one-hot, thì bộ phân biệt chỉ cần xem kết quả có toàn 0/1 không là phân biệt được. Điều này dễ làm huấn luyện sụp đổ.
+
+### 7.4b.2 SeqGAN để sinh văn bản
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 4.3 REINFORCE: gradient chính sách Monte Carlo](chapter4/chapter4_vi?id=_43-reinforce-gradient-chính-sách-monte-carlo) · [Tăng cường · 4.1 Thuật toán gradient chính sách](chapter4/chapter4_vi?id=_41-thuật-toán-gradient-chính-sách)
+
+</div>
+
+SeqGAN (Yu và cộng sự, 2017) kết hợp học tăng cường vào khung GAN để sinh văn bản. Sơ đồ mô hình:
+
+<img src="../img/qa/ch07/seqGAN模型.png" alt="Mô hình SeqGAN"/>
+
+Hình 7.18 Mô hình SeqGAN
+
+Trong bài toán sinh văn bản, SeqGAN khác GAN thường ở mấy điểm:
+
+- Bộ sinh không lấy argmax, mà coi việc sinh từ là một chính sách ngẫu nhiên.
+- Mỗi lần sinh một từ, dựa vào chuỗi từ hiện tại, lấy mẫu Monte Carlo (rollout) để sinh tiếp thành câu hoàn chỉnh, rồi đưa câu vào bộ phân biệt để tính phần thưởng (reward).
+- Dựa vào phần thưởng thu được, tối ưu mô hình bằng gradient chính sách (tăng gradient chính sách, REINFORCE), nhờ đó không cần lan truyền ngược qua phép lấy mẫu rời rạc.
+
+## 7.5 Ứng dụng của GAN trong các lĩnh vực khác
+
+### 7.5.1 Tăng cường dữ liệu
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 14.1 Tăng cường ảnh](https://d2l.ai/chapter_computer-vision/image-augmentation.html) ↗
+
+</div>
+
+Khả năng sinh tốt của GAN mấy năm gần đây cũng bắt đầu được dùng để tăng cường dữ liệu. Lấy tái nhận dạng người (person re-identification) làm ví dụ, có nhiều công trình dùng GAN để tăng cường dữ liệu [1–4]. Một khó khăn của tái nhận dạng người là môi trường, góc chụp của cùng một người dưới các camera khác nhau rất khác nhau, tạo ra khoảng cách miền (domain gap) lớn. Vì vậy có thể dùng GAN sinh dữ liệu dưới các camera khác nhau để tăng cường. Lấy bài [2] làm ví dụ, bài báo đề xuất một cách dùng CycleGAN để tăng cường dữ liệu. Cấu trúc mô hình như sau:
+
+<img src="../img/qa/ch07/cycleGAN数据增广.png" alt="Dùng CycleGAN tăng cường dữ liệu"/>
+
+Hình 7.19 Dùng CycleGAN chuyển ảnh giữa các camera để tăng cường dữ liệu
+
+Huấn luyện một CycleGAN cho mỗi cặp camera, nhờ đó chuyển được dữ liệu dưới một camera thành dữ liệu dưới camera khác, mà nội dung (người) vẫn giữ nguyên. Ở CVPR 2019, DG-Net [9] nâng cao thêm chất lượng ảnh sinh, sinh ảnh chất lượng cao kiểu "đổi quần áo" (như hình dưới), cung cấp dữ liệu người chất lượng cao hơn cho huấn luyện.
+
+<img src="https://github.com/NVlabs/DG-Net/raw/master/NxN.jpg" alt="Ảnh DG-Net sinh ra bằng cách hoán đổi trang phục giữa các người"/>
+
+Hình 7.20 DG-Net: hoán đổi diện mạo và cấu trúc giữa các người
+
+> **Biên tập:** bản gốc nói lấy bài [1] làm ví dụ cho cách dùng CycleGAN, nhưng bài [1] (Zheng và cộng sự, ICCV 2017) dùng DCGAN sinh ảnh không nhãn; bài dùng CycleGAN chuyển phong cách camera là [2] (*Camera Style Adaptation*, Zhong và cộng sự, 2018). Hình DG-Net được tải trực tiếp từ GitHub của NVlabs.
+
+### 7.5.2 Siêu phân giải và hoàn thiện ảnh
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+Siêu phân giải và hoàn thiện ảnh đều có thể coi là bài toán dịch ảnh; cách xử lý phần lớn là huấn luyện một mạng đầu-cuối: đầu vào là ảnh gốc, đầu ra là ảnh đã siêu phân giải hoặc đã hoàn thiện. Bài [5] (SRGAN) dùng GAN làm bộ phân biệt, khiến ảnh do mô hình siêu phân giải tạo ra rõ nét hơn, hợp với cảm nhận chủ quan của mắt người hơn. Các nhà nghiên cứu Đại học Waseda (Nhật Bản) [6] đề xuất một GAN nhất quán toàn cục + cục bộ để hoàn thiện ảnh, giúp ảnh sau khi phục hồi không chỉ rõ chi tiết mà còn nhất quán tổng thể.
+
+### 7.5.3 Lĩnh vực tiếng nói
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 Mạng đối sinh](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗
+
+</div>
+
+So với lĩnh vực ảnh nở rộ khắp nơi, GAN được ứng dụng trong tiếng nói ít hơn nhiều. Đây là vài ví dụ rời rạc về GAN trong tiếng nói. Bài [7] đề xuất SEGAN để khử nhiễu âm thanh, khắc phục việc phương pháp truyền thống chỉ hỗ trợ ít loại nhiễu và khả năng tổng quát hóa kém. Donahue và cộng sự [8] dùng GAN để tăng cường tiếng nói, nâng tỉ lệ nhận dạng của hệ thống nhận dạng tiếng nói (ASR). (Về sau, các bộ tạo âm thanh từ phổ như MelGAN, HiFi-GAN dùng mất mát đối kháng và trở thành thành phần phổ biến của hệ thống chuyển văn bản thành tiếng nói.)
+
+## Tài liệu tham khảo
+
+[1] Zheng Z, Zheng L, Yang Y. Unlabeled Samples Generated by GAN Improve the Person Re-identification Baseline in Vitro. ICCV, 2017.
+
+[2] Zhong Z, Zheng L, Zheng Z, et al. Camera Style Adaptation for Person Re-identification. CVPR, 2018.
+
+[3] Deng W, Zheng L, Ye Q, et al. Image-Image Domain Adaptation with Preserved Self-Similarity and Domain-Dissimilarity for Person Re-identification. CVPR, 2018.
+
+[4] Wei L, Zhang S, Gao W, et al. Person Transfer GAN to Bridge Domain Gap for Person Re-Identification. CVPR, 2018.
+
+[5] Ledig C, Theis L, Huszar F, et al. Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network. CVPR, 2017.
+
+[6] Iizuka S, Simo-Serra E, Ishikawa H. Globally and Locally Consistent Image Completion. ACM Transactions on Graphics, 2017, 36(4): 1–14.
+
+[7] Pascual S, Bonafonte A, Serrà J. SEGAN: Speech Enhancement Generative Adversarial Network. Interspeech, 2017.
+
+[8] Donahue C, Li B, Prabhavalkar R. Exploring Speech Enhancement with Generative Adversarial Networks for Robust Speech Recognition. ICASSP, 2018.
+
+[9] Zheng Z, Yang X, Yu Z, Zheng L, Yang Y, Kautz J. Joint Discriminative and Generative Learning for Person Re-identification. CVPR, 2019.
+
+> **Biên tập:** sửa năm và hội nghị của vài mục theo bản công bố chính thức (bản gốc ghi năm của bản arXiv).

@@ -1,0 +1,570 @@
+# Chương 14 Tinh chỉnh siêu tham số
+
+> Ghi chú của người biên soạn: trang này dịch từ sách *Deep Learning 500 câu hỏi* (深度学习500问) do **Tan Jiyong (谈继勇)** chủ biên cùng cộng đồng đóng góp ([bản gốc](https://github.com/scutan90/DeepLearning-500-questions/tree/master/ch14_超参数调整), [mã nguồn](https://github.com/scutan90/DeepLearning-500-questions), giấy phép [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html); phần dịch cũng theo GPL-3.0). Số câu hỏi giữ như bản gốc. Chỗ bản gốc sai hoặc thiếu đã được sửa ngay trong bài và ghi ở ô **Biên tập**; ô **Lý thuyết** dẫn sang bài học tương ứng trên site.
+
+> **Biên tập:** bản gốc ghi người biên soạn là Kiều Thành Lỗi (乔成磊, Đại học Đồng Tế) và Vương Siêu Phong (王超锋), bản sửa ngày 25/10/2018. Ví dụ về lập lịch tốc độ học dùng API của TensorFlow 1.x (`tf.train.*_decay`); ở TF2 tương ứng là `tf.keras.optimizers.schedules`, ở PyTorch là `torch.optim.lr_scheduler`. Bản gốc đánh số trùng hai mục 14.4.4; mục thứ hai đánh lại là 14.4.4b. Đường dẫn ảnh trong bản gốc dùng dấu `\` của Windows nên không hiện trên GitHub; bản dịch đã sửa.
+
+## 14.1 Lời nói đầu
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 12.11 Lập lịch Tốc độ học](dl/ch12_s11_vi) · [Học sâu · 3.6.3 Lựa chọn Mô hình](dl/ch03_s6_vi?id=_363-lựa-chọn-mô-hình)
+
+</div>
+
+Một trong những việc khó nhất khi huấn luyện mô hình học sâu là số lượng tham số phải xử lý: từ độ rộng mỗi tầng, số tầng (độ sâu), cách kết nối của bản thân mạng, tới thiết kế và gỡ lỗi siêu tham số của hàm mất mát, hay tốc độ học, kích thước batch, tham số của bộ tối ưu… Lượng lớn tham số này đều ảnh hưởng trực tiếp hay gián tiếp tới năng lực hiệu dụng cuối cùng của mô hình mạng. Với chừng ấy tham số, nếu tối ưu từng cái một thì cả thời gian lẫn tài nguyên đều không thực tế. Thực tế cho thấy một số siêu tham số quan trọng hơn các siêu tham số khác, vì thế hiểu vai trò và ảnh hưởng có thể có của từng siêu tham số là kỹ năng không thể thiếu khi huấn luyện học sâu.
+
+Tinh chỉnh siêu tham số có thể nói là khâu quan trọng nhất nối lý thuyết với thực tế trong học sâu. Hiện học sâu vẫn còn nhiều phần chưa giải thích được; làm sao thiết kế và tối ưu được mạng tốt có thể đem lại hỗ trợ quan trọng cho việc khám phá lý thuyết học sâu. Tinh chỉnh siêu tham số thường chia làm hai cách: chỉnh tay và tối ưu tự động. Bạn đọc có thể xem trước sơ đồ tư duy dưới đây. Chương này không trình bày kỹ nguyên lý của mọi siêu tham số; nếu cần, có thể xem các chương nền tảng phía trước hoặc tài liệu liên quan. Tất nhiên, các gợi ý tối ưu siêu tham số dưới đây là nhận thức rút ra từ thực hành của các tác giả và một phần tài liệu, không hề chặt chẽ và chắc chắn hiệu quả; nhiều nhà nghiên cứu có thể không đồng ý với một số quan điểm hoặc có trực giác khác, điều đó hoàn toàn để ngỏ thảo luận, vì nó phụ thuộc rất nhiều vào chính dữ liệu.
+
+Sơ đồ tư duy của chương (bản gốc là ảnh chữ Trung, bản dịch chép lại thành danh sách):
+
+- **Khái niệm:** siêu tham số là gì? · mạng neuron có những siêu tham số nào? · vì sao phải tối ưu siêu tham số? · mức độ quan trọng của siêu tham số · khoảng giá trị phù hợp của siêu tham số
+- **Phương pháp**
+  - *Chỉnh tay:* gỡ lỗi mô hình hiệu quả thế nào? · có những chiến lược điều chỉnh tốc độ học nào? · tinh chỉnh mô hình với batch size cực đoan thế nào? · có những chiến lược tinh chỉnh (fine-tune) mô hình nào? · chỉnh tham số trong tình huống đặc biệt: phát hiện đối tượng (ưu nhược của mô hình huấn luyện sẵn; huấn luyện bộ phát hiện từ đầu thế nào?), GAN (cải thiện hiệu năng GAN thế nào?)
+  - *Chỉnh tự động:* AutoML là gì? · có những phương pháp tìm siêu tham số tự động nào? · tìm kiếm kiến trúc mạng: vì sao kích thước kernel đều là số lẻ, chia sẻ trọng số có những dạng nào và vì sao cần, chiến lược thiết kế của NASNet
+
+## 14.2 Khái niệm siêu tham số
+
+### 14.2.1 Siêu tham số là gì? Tham số và siêu tham số khác nhau thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 3.6.3 Lựa chọn Mô hình](dl/ch03_s6_vi?id=_363-lựa-chọn-mô-hình) · [Học sâu · 6.2 Quản lý Tham số](dl/ch06_s2_vi)
+
+</div>
+
+Điểm phân biệt lớn nhất giữa hai thứ là có được điều chỉnh bằng dữ liệu hay không. Tham số mô hình thường do dữ liệu điều khiển việc điều chỉnh; siêu tham số thì không do dữ liệu điều khiển, mà do con người điều chỉnh trước hoặc trong quá trình huấn luyện. Ví dụ các giá trị cụ thể bên trong kernel tích chập là tham số mô hình, do dữ liệu điều khiển; còn tốc độ học là siêu tham số do con người điều chỉnh. Cần chú ý: thông thường số lượng kernel và kích thước kernel cũng là siêu tham số, đừng nhầm với các giá trị bên trong kernel.
+
+### 14.2.2 Mạng neuron có những siêu tham số nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 5.6 Dropout](dl/ch05_s6_vi) · [Học sâu · 3.7 Suy giảm Trọng số](dl/ch03_s7_vi) · [Học sâu · 12.5 Hạ Gradient Ngẫu nhiên theo Minibatch](dl/ch12_s5_vi)
+
+</div>
+
+Thường có thể chia siêu tham số thành ba loại: tham số mạng, tham số tối ưu và tham số điều chuẩn.
+
+- **Tham số mạng:** cách tương tác giữa các tầng (cộng, nhân hay ghép nối…), số lượng và kích thước kernel, số tầng (độ sâu) và hàm kích hoạt…
+- **Tham số tối ưu:** thường là tốc độ học (learning rate), kích thước batch (batch size), tham số của từng bộ tối ưu và một số tham số điều chỉnh được của hàm mất mát.
+- **Tham số điều chuẩn:** hệ số suy giảm trọng số, tỉ lệ dropout.
+
+### 14.2.3 Vì sao phải tối ưu siêu tham số?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 3.7.1 Chuẩn và Suy giảm Trọng số](dl/ch03_s7_vi?id=_371-chuẩn-và-suy-giảm-trọng-số) · [Học máy · E.10 Bias và variance](ml/eval_vi?id=e10-bias-và-variance)
+
+</div>
+
+Về bản chất, đây là quan hệ giữa việc tối ưu mô hình để tìm nghiệm tốt nhất và số hạng điều chuẩn. Mục đích của tối ưu mô hình là tìm nghiệm tối ưu toàn cục (hoặc một cực tiểu địa phương tốt hơn), tức khớp dữ liệu huấn luyện tốt nhất có thể; còn số hạng điều chuẩn lại muốn mô hình càng đơn giản càng tốt. Hai thứ này thường đối lập nhau ở mức nào đó, nhưng mục tiêu chung là một: cực tiểu hóa rủi ro kỳ vọng. Tối ưu mô hình nhắm cực tiểu hóa rủi ro thực nghiệm nên dễ quá khớp, còn số hạng điều chuẩn dùng để ràng buộc độ phức tạp của mô hình. Vì vậy cân bằng quan hệ giữa hai bên để có nghiệm tốt nhất hoặc khá tốt chính là mục đích của tinh chỉnh siêu tham số.
+
+> **Biên tập:** bản gốc viết "số hạng điều chuẩn lại muốn mô hình khớp tối ưu nhất có thể", ngược nghĩa với phần sau của chính đoạn này; đã sửa thành "muốn mô hình càng đơn giản càng tốt".
+
+### 14.2.4 Thứ tự quan trọng của siêu tham số
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 12.11 Lập lịch Tốc độ học](dl/ch12_s11_vi) · [Học sâu · 12.6 Động lượng](dl/ch12_s6_vi) · [Học sâu · 12.10 Adam](dl/ch12_s10_vi) · [Học sâu · 5.6 Dropout](dl/ch05_s6_vi) · [Ôn tập · 3.5.5 Rốt cuộc điều chỉnh batch size ảnh hưởng thế nào tới kết quả huấn luyện?](qa/ch03_vi?id=_355-rốt-cuộc-điều-chỉnh-batch-size-ảnh-hưởng-thế-nào-tới-kết-quả-huấn-luyện)
+
+</div>
+
+**Thứ nhất: tốc độ học, các tham số điều chỉnh được của hàm mất mát.** Trong các tham số mạng, tham số tối ưu, tham số điều chuẩn, siêu tham số quan trọng nhất có lẽ là tốc độ học. Tốc độ học trực tiếp điều khiển độ lớn bước cập nhật gradient khi huấn luyện, ảnh hưởng trực tiếp tới **năng lực hiệu dụng** của mô hình. Các tham số điều chỉnh được của hàm mất mát thường phải chỉnh theo hàm mất mát cụ thể, và phần lớn trường hợp cũng ảnh hưởng rất trực tiếp tới năng lực hiệu dụng. Các hàm mất mát này thường chia ba loại:
+
+1. **Mất mát phụ** kết hợp với hàm mất mát thông thường, giúp tối ưu cách biểu diễn đặc trưng. Ví dụ Center Loss trong học độ đo, thường kết hợp với mất mát entropy chéo theo một trọng số để làm nhiệm vụ cụ thể. Khi đó nên giữ giá trị mất mát phụ chênh không quá hai bậc độ lớn (lớn hơn hay nhỏ hơn) so với mất mát entropy chéo.
+2. **Nhiều hàm mất mát của mô hình đa nhiệm vụ**, các hàm mất mát độc lập hoặc liên quan nhau, mỗi hàm phục vụ một nhiệm vụ. Việc chỉnh tùy thuộc vào mức liên quan giữa các nhiệm vụ; hiện tác giả chưa có kinh nghiệm chung nào để gợi ý.
+3. **Hàm mất mát độc lập**, thường có hiệu quả rõ rệt trên nhiệm vụ cụ thể. Ví dụ focal loss trong RetinaNet, các tham số $\gamma$, $\alpha$ ảnh hưởng khá lớn tới kết quả cuối. Bài báo thường cho giá trị đề xuất cho loại mất mát này ($\gamma=2$, $\alpha=0.25$ với focal loss).
+
+**Thứ hai: kích thước batch, tham số động lượng $\beta$ của bộ tối ưu động lượng (Gradient Descent with Momentum).** Kích thước batch quyết định hướng hạ gradient được ước lượng chính xác tới đâu. Batch quá nhỏ, trường hợp cực đoan như batch size bằng 1, tức mỗi mẫu sửa hướng gradient một lần, thì các mẫu càng khác nhau càng khó hội tụ. Nếu mạng có chuẩn hóa theo batch (BatchNorm), batch size quá nhỏ còn khó hội tụ hơn, thậm chí sụp đổ, vì mẫu càng ít thì thống kê càng không đại diện, nhiễu cũng tăng theo. Còn batch size quá lớn làm hướng gradient gần như cố định, dễ rơi vào cực tiểu "nhọn", làm giảm độ chính xác trên dữ liệu mới. Khoảng tham khảo thường là $[1, 1024]$, nhưng không tuyệt đối, phải tùy tình huống và dữ liệu. Tham số động lượng $\beta$ dùng để tính trung bình có trọng số giảm dần theo hàm mũ của gradient, rồi dùng giá trị đó cập nhật tham số; đặt bằng 0.9 là lựa chọn phổ biến và hiệu quả.
+
+**Cuối cùng: siêu tham số của bộ tối ưu Adam, hệ số suy giảm trọng số, tỉ lệ dropout và tham số mạng.** Cần nói rõ: xếp cuối **không có nghĩa là các tham số này không quan trọng**, mà nghĩa là trong phần lớn thực hành **không nên thử quá nhiều**. Ví dụ $\beta_1, \beta_2, \epsilon$ của Adam, đặt 0.9, 0.999, $10^{-8}$ thường đã cho kết quả tốt. Hệ số suy giảm trọng số thường có giá trị đề xuất, ví dụ 0.0005, dùng giá trị đề xuất là được, không cần thử nhiều. Dropout thường dùng giữa các tầng kết nối đầy đủ để chống quá khớp, nên giữ tỉ lệ trong $[0.2, 0.5]$. Khi dùng dropout cần chú ý hai điểm: một, trong RNN, nếu đặt thẳng dropout lên đường hồi tiếp của ô nhớ thì vòng lặp sẽ khuếch đại nhiễu, làm rối việc học; thường nên đặt ở đầu vào và đầu ra; hai, không nên đặt BatchNorm ngay sau dropout: dropout làm phương sai lúc huấn luyện khác lúc suy luận, BatchNorm học thống kê sai, gây ra "dịch chuyển phương sai" (variance shift), trường hợp cực đoan làm mô hình sụp hẳn lúc suy luận. Tham số mạng cũng thuộc phạm vi siêu tham số; thường tăng số tầng sẽ tăng năng lực mô hình, nhưng năng lực hiệu dụng thật của mô hình còn phụ thuộc vào số lượng và chất lượng mẫu, quan hệ giữa các tầng…, nên thường cố định số tầng trước, tối ưu tới một mức nào đó hoặc khi có nhiều tài nguyên phần cứng thì mới chỉnh tiếp độ sâu.
+
+> **Biên tập:** (1) Về dropout trong RNN: có thể dropout cả trên đường hồi tiếp nếu dùng **cùng một mặt nạ** cho mọi bước thời gian (variational dropout, Gal và Ghahramani 2016); điều cần tránh là lấy mặt nạ mới ở mỗi bước. (2) Với AdamW (cách dùng phổ biến hiện nay cho Transformer), hệ số suy giảm trọng số thường lớn hơn nhiều, cỡ 0.01–0.1, vì nó được tách khỏi gradient; con số 0.0005 là cho SGD với điều chuẩn L2. (3) Câu "batch size quyết định hướng hạ gradient" trong bản gốc bị lỗi chữ; đã diễn đạt lại.
+
+### 14.2.5 Một số siêu tham số ảnh hưởng tới hiệu năng mô hình thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 12.11 Lập lịch Tốc độ học](dl/ch12_s11_vi) · [Học sâu · 3.7 Suy giảm Trọng số](dl/ch03_s7_vi) · [Học sâu · 5.6 Dropout](dl/ch05_s6_vi) · [Học máy · E.10 Bias và variance](ml/eval_vi?id=e10-bias-và-variance)
+
+</div>
+
+| Siêu tham số | Ảnh hưởng tới năng lực mô hình | Lý do | Lưu ý |
+|---|---|---|---|
+| Tốc độ học | Chỉnh tới tối ưu thì tăng năng lực hiệu dụng | Tốc độ học quá cao hay quá thấp đều làm tối ưu thất bại, giảm năng lực hiệu dụng | Tốc độ học tối ưu có thể thay đổi theo từng giai đoạn huấn luyện, nên cần một chiến lược giảm tốc độ học hiệu quả |
+| Siêu tham số của hàm mất mát | Chỉnh tới tối ưu thì tăng năng lực hiệu dụng | Siêu tham số của hàm mất mát phần lớn đều có thể ảnh hưởng tới việc tối ưu; siêu tham số không phù hợp làm cả hàm mất mát rất hợp với mục tiêu cũng khó tối ưu, giảm năng lực hiệu dụng | Có siêu tham số mà kết quả rất nhạy, có cái ảnh hưởng không nhiều. Khi chỉnh, nên tham khảo giá trị đề xuất trong bài báo, rồi thử giá trị lớn nhất, nhỏ nhất quanh bậc độ lớn đó để xem ảnh hưởng |
+| Kích thước batch | Quá lớn hay quá nhỏ đều dễ giảm năng lực hiệu dụng | Phần lớn trường hợp, chọn batch size vừa với phần cứng không ảnh hưởng đáng kể tới năng lực mô hình | Với một số hàm mục tiêu đặc biệt, cách chọn mẫu có thể ảnh hưởng tới năng lực hiệu dụng, ví dụ N-pair loss trong học độ đo (metric learning): loại mất mát này cần mẫu đa dạng nên có thể phụ thuộc batch size |
+| Dropout | Giảm tỉ lệ thì tăng năng lực mô hình | Tỉ lệ dropout nhỏ hơn nghĩa là số tham số hoạt động tăng, các tham số thích nghi lẫn nhau nhiều hơn, năng lực mô hình tăng, nhưng chưa chắc tăng năng lực hiệu dụng | |
+| Hệ số suy giảm trọng số | Chỉnh tới tối ưu thì tăng năng lực hiệu dụng | Suy giảm trọng số giới hạn độ lớn của tham số, có tác dụng điều chuẩn | |
+| Động lượng của bộ tối ưu | Chỉnh tới tối ưu, có thể tăng năng lực hiệu dụng | Tham số động lượng thường dùng để tăng tốc huấn luyện, đồng thời dễ vượt qua điểm cực trị, tránh kẹt ở cực tiểu địa phương | |
+| Độ sâu mô hình | Cùng điều kiện, tăng độ sâu thì tăng năng lực | Cùng điều kiện, tăng độ sâu nghĩa là mô hình có nhiều tham số hơn, khả năng khớp mạnh hơn | Cùng điều kiện, càng sâu càng nhiều tham số, càng tốn thời gian và phần cứng |
+| Kích thước kernel | Tăng kích thước thì tăng năng lực | Tăng kích thước kernel nghĩa là tăng số tham số | |
+
+### 14.2.6 Khoảng giá trị phù hợp của một số siêu tham số
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 12.11 Lập lịch Tốc độ học](dl/ch12_s11_vi) · [Học sâu · 12.10 Adam](dl/ch12_s10_vi) · [Học sâu · 12.9 Adadelta](dl/ch12_s9_vi)
+
+</div>
+
+| Siêu tham số | Khoảng đề xuất | Lưu ý |
+|---|---|---|
+| Tốc độ học ban đầu | SGD: [1e-2, 1e-1]<br>momentum: [1e-3, 1e-2]<br>Adagrad: [1e-3, 1e-2]<br>Adadelta: [1e-2, 1e-1]<br>RMSprop: [1e-3, 1e-2]<br>Adam: [1e-3, 1e-2]<br>Adamax: [1e-3, 1e-2]<br>Nadam: [1e-3, 1e-2] | Các khoảng này thường cho trường hợp huấn luyện từ đầu. Nếu tinh chỉnh, tốc độ học ban đầu có thể giảm thêm một tới hai bậc độ lớn |
+| Siêu tham số của hàm mất mát | Khi kết hợp nhiều hàm mất mát, các giá trị mất mát nên gần nhau, không chênh quá hai bậc độ lớn | Áp dụng cho trường hợp kết hợp nhiều mất mát, không hẳn luôn đúng. Siêu tham số của một hàm mất mát đơn lẻ phải xét theo thực tế |
+| Kích thước batch | [1, 1024] | Khi batch size quá lớn (trên 6000) hoặc bằng 1, cần chú ý điều chỉnh chiến lược học hoặc cách chuẩn hóa bên trong |
+| Tỉ lệ dropout | [0, 0.5] | |
+| Hệ số suy giảm trọng số | [0, 1e-3] | Thường 1e-4 hoặc 5e-4 với SGD; với AdamW thường 0.01–0.1 |
+| Kích thước kernel | [7x7], [5x5], [3x3], [1x1], [7x1, 1x7] | |
+
+> **Biên tập:** (1) Bảng gốc ghi suy giảm trọng số trong $[0, 10^{-4}]$, mâu thuẫn với giá trị đề xuất 0.0005 ở mục 14.2.4; đã mở rộng thành $[0, 10^{-3}]$. (2) Với Adam, tốc độ học $10^{-2}$ thường đã quá lớn; giá trị hay dùng là $10^{-4}$ đến $10^{-3}$ (mặc định của PyTorch và Keras là $10^{-3}$; huấn luyện Transformer thường $10^{-4}$–$6\times10^{-4}$ kèm khởi động). (3) Adadelta theo bài báo gốc không có tốc độ học; trong PyTorch tham số `lr` của nó là hệ số nhân, mặc định 1.0. (4) "momentum: [1e-3, 1e-2]" thấp hơn thực tế: ResNet trên ImageNet huấn luyện bằng SGD có động lượng với tốc độ học 0.1 (batch 256).
+
+## 14.3 Chiến lược chỉnh siêu tham số khi huấn luyện mạng
+
+### 14.3.1 Gỡ lỗi mô hình thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học máy · E.11 Đường học](ml/eval_vi?id=e11-Đường-học) · [Học sâu · 2.5 Tính Vi phân Tự động](dl/ch02_s5_vi) · [Học máy · 16.4 Lan truyền ngược](ml/ch16_vi?id=_164-lan-truyền-ngược)
+
+</div>
+
+Trước khi bàn cách gỡ lỗi mô hình, hãy sửa một ngộ nhận. Thường khi nghĩ tới gỡ lỗi mô hình, ta nghĩ tới hàng loạt mô hình mạng neuron xuất sắc và mẹo gỡ lỗi. Nhưng cần chỉ ra rằng dữ liệu mới là gốc rễ của mô hình: nếu có một lô dữ liệu chất lượng tốt, hay xử lý được chất lượng dữ liệu tốt, lợi ích thường lớn hơn việc chọn hay thiết kế mô hình. Sau đó mới tới việc thiết kế, chọn mô hình và các mẹo huấn luyện.
+
+1. **Khám phá và làm sạch dữ liệu.** Khám phá tập dữ liệu là bước quan trọng nhất trước khi thiết kế thuật toán. Lấy phân loại ảnh làm ví dụ: ta cần biết rõ các lớp trong tập dữ liệu và số mẫu mỗi lớp có cân bằng không, các ảnh có vấn đề khác miền (cross-domain) không (ví dụ ảnh cào từ mạng thường chất lượng không đều, có nhiễu). Nếu số lớp vượt xa số mẫu mỗi lớp (ví dụ 10000 lớp mà mỗi lớp chỉ 10 ảnh), các cách thông thường có thể không hiệu quả, khi đó học ít mẫu (few-shot learning) hoặc tăng cường thêm dữ liệu có thể là lựa chọn tốt. Hay với phát hiện đối tượng, khoảng kích thước của đối tượng cần phát hiện trong tập dữ liệu ảnh hưởng lớn tới hiệu năng bộ phát hiện. Vì vậy nhắm vào đối tượng lớn hay nhỏ, đối tượng có dày đặc không đều phụ thuộc hoàn toàn vào chính tập dữ liệu. Nên khám phá và làm sạch thêm dữ liệu luôn là bước quan trọng nhất trong học sâu, điều mà nhiều người mới hay bỏ qua.
+2. **Khám phá kết quả của mô hình.** Thường cần phân tích sâu hơn hiệu năng mô hình trên tập kiểm định; đây là bước rất quan trọng để tăng hiệu năng tiếp. Kiểm tra và trực quan hóa kết quả trên cả tập huấn luyện lẫn tập kiểm định giúp thấy trực quan mô hình có độ chệch lớn không và kết quả có đúng không. Lấy phân loại ảnh làm ví dụ: khi số mẫu giữa các lớp rất mất cân bằng, cần chú ý kết quả của lớp ít mẫu trên tập kiểm định có chênh nhiều so với tập huấn luyện không; với các lớp hay sai, có thể phân tích số liệu và trực quan hóa kết quả để hiểu rõ hành vi mô hình.
+3. **Theo dõi sai số huấn luyện và kiểm định.** Trước hết, nhiều khi ta bỏ qua tính chuẩn mực của code và việc kiểm tra cài đặt thuật toán có đúng không, điều này dễ gây hậu quả nghiêm trọng. Khi cả huấn luyện lẫn kiểm định đều có vấn đề, trước tiên hãy kiểm tra code của mình đúng chưa. Sau đó, dựa vào sai số huấn luyện và kiểm định để theo dõi trạng thái khớp của mô hình. Nếu tập huấn luyện nhỏ, theo dõi sai số càng quan trọng. Xác định được trạng thái khớp rồi thì chọn chiến lược tốc độ học hay các siêu tham số hiệu quả khác sẽ dễ dàng hơn.
+4. **Kiểm tra giá trị lan truyền ngược.** Trường hợp này thường dành cho khi tự thiết kế một phép toán mới. Hiện phần lớn framework phổ biến đều có phần tự động tính đạo hàm, nhưng chưa chắc hoàn toàn đúng ý bạn. Cách kiểm tra đạo hàm đúng hay không là so kết quả tự động tính đạo hàm với kết quả tính bằng sai phân hữu hạn. Sai phân hữu hạn chính là định nghĩa đạo hàm, dùng một giá trị rất nhỏ để xấp xỉ đạo hàm:
+
+$$
+f'(x_0) = \lim_{\Delta x\rightarrow0}\frac{\Delta y}{\Delta x} = \lim_{\Delta x\rightarrow0}\frac{f(x_0+\Delta x) -f(x_0)}{\Delta x}
+\approx \frac{f(x_0+h) - f(x_0-h)}{2h}.
+$$
+
+> **Biên tập:** công thức gốc viết giới hạn theo $n\rightarrow0$ (phải là $\Delta x\rightarrow 0$) và đặt nhầm ngoặc $f(x_0+\Delta x - f(x_0))$. Khi kiểm tra thật nên dùng **sai phân trung tâm** (vế cuối) với $h \approx 10^{-6}$ và số thực double: sai số $O(h^2)$ thay vì $O(h)$. PyTorch có sẵn `torch.autograd.gradcheck` làm đúng việc này.
+
+### 14.3.2 Vì sao phải điều chỉnh tốc độ học?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 12.1.2 Những Thách thức Tối ưu trong Học sâu](dl/ch12_s1_vi?id=_1212-những-thách-thức-tối-ưu-trong-học-sâu) · [Học sâu · 12.11 Lập lịch Tốc độ học](dl/ch12_s11_vi) · [Học sâu · 12.4.2 Tốc độ học Động](dl/ch12_s4_vi?id=_1242-tốc-độ-học-Động)
+
+</div>
+
+Tốc độ học có thể nói là siêu tham số quan trọng nhất khi huấn luyện mô hình. Thường một hay một bộ tốc độ học tốt vừa tăng tốc huấn luyện, vừa cho độ chính xác khá tốt, thậm chí tốt nhất. Tốc độ học quá lớn hay quá nhỏ đều ảnh hưởng trực tiếp tới sự hội tụ. Ta biết khi huấn luyện tới một mức nào đó, mất mát không giảm nữa; lúc này gradient bậc một của mô hình gần 0, và ma trận Hessian tương ứng thường rơi vào hai trường hợp:
+
+1. **Xác định dương**, tức mọi trị riêng đều dương. Lúc này thường được một cực tiểu địa phương; nếu cực tiểu này gần cực tiểu toàn cục thì mô hình đã có hiệu năng khá, còn nếu cách xa thì hiệu năng còn phải cải thiện.
+2. **Trị riêng có dương có âm.** Lúc này mô hình rất có thể kẹt ở điểm yên ngựa, và hiệu năng sẽ kém. Trường hợp này hay gặp nhất ở đầu quá trình huấn luyện.
+
+Cả hai trường hợp đều có ở giai đoạn đầu và giữa quá trình huấn luyện; nếu vẫn giữ tốc độ học cố định, mô hình có thể dao động qua lại hoặc kẹt ở điểm yên ngựa, không tối ưu tiếp được. Vì vậy giảm hoặc tăng tốc độ học giúp mô hình giảm dao động hoặc thoát khỏi điểm yên ngựa.
+
+### 14.3.3 Có những chiến lược điều chỉnh tốc độ học nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 12.11.3 Các Chính sách](dl/ch12_s11_vi?id=_12113-các-chính-sách) · [Học sâu · 12.11.2 Bộ lập lịch](dl/ch12_s11_vi?id=_12112-bộ-lập-lịch)
+
+</div>
+
+Thường phần lớn chiến lược điều chỉnh tốc độ học là giảm dần tốc độ học, nhưng đôi khi tăng tốc độ học cũng có hiệu quả bất ngờ. Dưới đây lấy các hàm có sẵn của TensorFlow làm ví dụ; $\eta_0$ là tốc độ học ban đầu, $t$ là số bước hiện tại (`global_step`), $T$ là `decay_steps`.
+
+**1. `exponential_decay` và `natural_exp_decay`**
+
+```python
+exponential_decay(learning_rate, global_step, decay_steps, decay_rate,
+                  staircase=False, name=None)
+
+natural_exp_decay(learning_rate, global_step, decay_steps, decay_rate,
+                  staircase=False, name=None)
+```
+
+Giảm theo hàm mũ là cách giảm phổ biến nhất, đơn giản trực tiếp: đầu quá trình giảm nhiều giúp hội tụ, về sau giảm ít giúp tinh chỉnh. Cả hai đều là giảm theo hàm mũ: `exponential_decay` cho $\eta_0 \cdot r^{t/T}$, `natural_exp_decay` cho $\eta_0 \cdot e^{-r\,t/T}$ (với $r$ là `decay_rate`). Đặt `staircase=True` thì $t/T$ được làm tròn xuống, tốc độ học giảm theo bậc thang.
+
+<img src="../img/qa/ch14/指数衰减.jpeg" alt="Giảm tốc độ học theo hàm mũ"/>
+
+Hình 14.1 Giảm theo hàm mũ: đường đỏ liên tục, đường xanh dạng bậc thang (`staircase=True`); ở đây $\eta_0=1$, $r=0.8$, $T=100$.
+
+**2. `piecewise_constant`**
+
+```python
+piecewise_constant(x, boundaries, values, name=None)
+```
+
+Đặt tốc độ học theo từng đoạn: giống giảm theo hàm mũ dạng bậc thang, khác ở chỗ mức giảm ở mỗi giai đoạn không theo hàm mũ mà tự đặt tay tốc độ học cho từng giai đoạn. Cách này chủ yếu có lợi cho tinh chỉnh.
+
+**3. `polynomial_decay`**
+
+```python
+polynomial_decay(learning_rate, global_step, decay_steps,
+                 end_learning_rate=0.0001, power=1.0,
+                 cycle=False, name=None)
+```
+
+Giảm theo đa thức, tính như sau:
+
+$$
+t' = \min(t,\ T), \qquad
+\eta_{t} = (\eta_0-\eta_{end})\left(1-\frac{t'}{T}\right)^{power} +\eta_{end}
+$$
+
+Khác với hai cách trên, giảm theo đa thức điều chỉnh tốc độ học ở mỗi bước. Chủ yếu xem tham số `power`: `power` bằng 1 là đường thẳng đỏ trong hình dưới; `power` nhỏ hơn 1 (ví dụ 0.5, tức căn bậc hai) là đường xanh dương (lồi lên); `power` lớn hơn 1 là đường xanh lá (lõm xuống).
+
+<img src="../img/qa/ch14/多项式衰减.jpeg" alt="Giảm theo đa thức"/>
+
+Hình 14.2 Giảm theo đa thức với $T=500$: đỏ `power=1`, xanh dương `power<1`, xanh lá `power>1`.
+
+Ngoài ra cần chú ý tham số `cycle`, ứng với kiểu điều chỉnh tuần hoàn. Mục đích chính của chiến lược tuần hoàn là tránh về sau cứ dao động quanh một cực tiểu địa phương; nếu nhảy ra khỏi vùng đó có thể được kết quả tốt hơn. Kiểu tuần hoàn không chỉ dùng được với đa thức mà còn kết hợp được với các hàm tuần hoàn tương tự, như hình dưới.
+
+<img src="../img/qa/ch14/cycle衰减.jpeg" alt="Giảm theo đa thức có chu kỳ"/>
+
+Hình 14.3 Giảm theo đa thức với `cycle=True`: hết mỗi chu kỳ tốc độ học nhảy lên lại rồi giảm tiếp, chu kỳ sau dài hơn chu kỳ trước.
+
+**4. `inverse_time_decay`**
+
+```python
+inverse_time_decay(learning_rate, global_step, decay_steps, decay_rate,
+                   staircase=False, name=None)
+```
+
+Giảm theo nghịch đảo thời gian, $\eta_t = \dfrac{\eta_0}{1 + r\,t/T}$; dạng đường giống giảm theo hàm mũ nhưng đuôi giảm chậm hơn, như hình:
+
+<img src="../img/qa/ch14/逆时衰减.jpeg" alt="Giảm theo nghịch đảo thời gian"/>
+
+Hình 14.4 Giảm theo nghịch đảo thời gian
+
+**5. `cosine_decay`**
+
+```python
+cosine_decay(learning_rate, global_step, decay_steps, alpha=0.0,
+             name=None)
+```
+
+Giảm theo cosin, tức giảm tốc độ học theo dạng nửa chu kỳ hàm cosin: $\eta_t = \eta_0\left[(1-\alpha)\cdot\tfrac12\left(1+\cos\tfrac{\pi\,t'}{T}\right)+\alpha\right]$, như hình:
+
+<img src="../img/qa/ch14/余弦衰减.jpeg" alt="Giảm theo cosin"/>
+
+Hình 14.5 Giảm theo cosin
+
+**6. `cosine_decay_restarts`**
+
+```python
+cosine_decay_restarts(learning_rate, global_step, first_decay_steps,
+                      t_mul=2.0, m_mul=1.0, alpha=0.0, name=None)
+```
+
+Giảm theo cosin có khởi động lại (SGDR, Loshchilov và Hutter, 2017), tức phiên bản cosin của chiến lược tuần hoàn, tác dụng như `cycle` trong giảm theo đa thức. Khác ở chỗ mỗi lần khởi động lại, tốc độ học cosin quay về tốc độ học ban đầu (nhân với `m_mul`, mặc định 1) và chu kỳ dài thêm `t_mul` lần, còn bản đa thức thì giảm dần theo từng chu kỳ.
+
+<img src="../img/qa/ch14/余弦cycle衰减.jpeg" alt="Giảm theo cosin có khởi động lại"/>
+
+Hình 14.6 Giảm theo cosin có khởi động lại
+
+**7. `linear_cosine_decay`**
+
+```python
+linear_cosine_decay(learning_rate, global_step, decay_steps,
+                    num_periods=0.5, alpha=0.0, beta=0.001,
+                    name=None)
+```
+
+Giảm tuyến tính–cosin: tích của một hàm giảm tuyến tính và một hàm cosin, do Bello và cộng sự (2017) tìm ra bằng tìm kiếm tự động.
+
+<img src="../img/qa/ch14/线性余弦衰减.jpeg" alt="Giảm tuyến tính–cosin"/>
+
+Hình 14.7 Giảm tuyến tính–cosin
+
+> **Biên tập:** bản gốc nói giảm tuyến tính–cosin "chủ yếu dùng trong lĩnh vực học tăng cường". Thực ra lịch này được *tìm ra bằng* học tăng cường trong bài *Neural Optimizer Search with Reinforcement Learning* (Bello và cộng sự, 2017), và được dùng cho bài toán học có giám sát (phân loại ảnh, dịch máy) chứ không dành riêng cho học tăng cường.
+
+**8. `noisy_linear_cosine_decay`**
+
+Giảm tuyến tính–cosin có nhiễu: thêm nhiễu ngẫu nhiên vào giảm tuyến tính–cosin, tăng tính ngẫu nhiên khi tìm nghiệm.
+
+<img src="../img/qa/ch14/噪声线性余弦衰减.jpeg" alt="Giảm tuyến tính–cosin có nhiễu"/>
+
+Hình 14.8 Giảm tuyến tính–cosin có nhiễu
+
+> **Biên tập:** bản gốc thiếu chiến lược được dùng nhiều nhất hiện nay: **khởi động (warmup) rồi giảm**. Vài trăm tới vài nghìn bước đầu tăng tuyến tính tốc độ học từ gần 0 lên $\eta_0$, sau đó giảm theo cosin (hoặc tuyến tính) về gần 0. Warmup giúp ổn định giai đoạn đầu khi trọng số còn ngẫu nhiên và thống kê của Adam chưa chính xác; nó gần như bắt buộc khi huấn luyện Transformer hoặc dùng batch rất lớn. Ngoài ra có chính sách "một chu kỳ" (1cycle, Smith 2018): tăng rồi giảm tốc độ học trong một chu kỳ duy nhất.
+
+### 14.3.4 Huấn luyện mạng với kích thước batch cực đoan thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Ôn tập · 3.6.8 Batch Normalization là gì?](qa/ch03_vi?id=_368-batch-normalization-là-gì) · [Học sâu · 12.5.2 Minibatch](dl/ch12_s5_vi?id=_1252-minibatch) · [Ôn tập · 3.5.4 Tăng batch size một cách mù quáng có hại gì?](qa/ch03_vi?id=_354-tăng-batch-size-một-cách-mù-quáng-có-hại-gì)
+
+</div>
+
+Batch cực đoan thường chỉ trường hợp batch size bằng 1 hoặc lớn hơn 6000. Cả hai trường hợp, nếu dùng không hợp lý, đều làm hiệu năng cuối của mô hình không đạt tối ưu, thậm chí sụp đổ.
+
+Trong phát hiện đối tượng, phân vùng ảnh hay ảnh 3D, khi kích thước ảnh đầu vào lớn, batch size thường rất nhỏ. Ở 14.2.4 ta đã nói trường hợp này làm gradient không ổn định và thống kê của BatchNorm không chính xác. Gradient không ổn định thường không quá nghiêm trọng; nếu khi huấn luyện thấy gradient không ổn định làm hiệu năng giảm nặng, có thể dùng chiến lược **tích lũy gradient**: mỗi lần tính xong không cập nhật ngay mà tích lũy sai số của nhiều lần rồi mới cập nhật một lần, đây là chiến lược cập nhật gradient hiệu quả khi bộ nhớ có hạn. Batch size quá nhỏ thường ảnh hưởng lớn nhất tới BatchNorm; nếu mạng có BatchNorm mà batch size chỉ 1 hoặc 2 thì kết quả huấn luyện bị ảnh hưởng rất lớn. Khi đó thường có hai chiến lược:
+
+1. Nếu mô hình dùng mạng huấn luyện sẵn, có thể đóng băng tham số (và thống kê) của các tầng BatchNorm trong mạng huấn luyện sẵn, giảm hiệu quả ảnh hưởng của batch size tới thống kê.
+2. Khi mạng không quá sâu hay quá phức tạp, có thể bỏ hẳn BatchNorm, hoặc dùng GroupNorm thay BatchNorm. Cách đầu không cần giải thích thêm. GroupNorm do FAIR đề xuất (Wu và He, 2018) để giảm ảnh hưởng của batch tới chuẩn hóa: chia đặc trưng thành các nhóm theo kênh, rồi chuẩn hóa trong từng nhóm, tức phép chuẩn hóa hoàn toàn không phụ thuộc batch size. GroupNorm đã được chứng minh cho hiệu năng khá tốt khi huấn luyện với batch cực nhỏ. Tất nhiên nó thêm một siêu tham số là số nhóm; thường không nên đặt số nhóm bằng 1 (khi đó thành LayerNorm) hoặc bằng số kênh (mỗi kênh một nhóm, khi đó thành InstanceNorm), có thể thử vài giá trị theo mạng cụ thể (bài báo dùng 32 nhóm).
+
+Để giảm chi phí thời gian huấn luyện, hệ phân tán nhiều máy nhiều card thường huấn luyện với batch size cực lớn. Cũng ở 14.2.4, ta đã nói batch size cực lớn làm hướng gradient quá nhất quán, dẫn tới độ chính xác giảm mạnh. Khi đó thường dùng thuật toán **co giãn tốc độ thích ứng theo tầng** (Layer-wise Adaptive Rate Scaling, LARS; You và cộng sự, 2017). Về lý thuyết, batch size tăng làm giảm số lần cập nhật gradient trong lan truyền ngược, nên để đạt cùng hiệu quả cần tăng tốc độ học. Nhưng tốc độ học tăng lên lại dễ làm mô hình không hội tụ. Để giải mâu thuẫn này, LARS tính một tốc độ học cục bộ thích ứng cho từng tầng (tỉ lệ với $\lVert w\rVert / \lVert \nabla w\rVert$ của tầng đó) để cập nhật tham số tầng đó, nhờ vậy tăng đáng kể độ ổn định khi huấn luyện. Dùng LARS cùng huấn luyện độ chính xác hỗn hợp, Tencent với batch size 65536 đã huấn luyện ResNet-50 trên ImageNet trong 6.6 phút (AlexNet trong 4 phút); còn Google dùng TPU đã rút thời gian huấn luyện ResNet-50 xuống khoảng 2 phút.
+
+> **Biên tập:** bản gốc ghi Tencent huấn luyện **ResNet-50** trong 4 phút. Theo bài báo của Tencent (Jia và cộng sự, 2018, *Highly Scalable Deep Learning Training System with Mixed-Precision: Training ImageNet in Four Minutes*), 4 phút là của **AlexNet**, còn ResNet-50 mất 6.6 phút. Kết quả khoảng 2 phút của Google là Ying và cộng sự (2018) trên một TPU v3 Pod. Với Adam, phiên bản tương ứng của LARS là LAMB (You và cộng sự, 2019).
+
+## 14.4 Dùng mạng huấn luyện sẵn hợp lý
+
+### 14.4.1 Tinh chỉnh (fine-tune) là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 14.2 Tinh chỉnh](https://d2l.ai/chapter_computer-vision/fine-tuning.html) ↗ · [Học sâu · 6.3 Khởi tạo Tham số](dl/ch06_s3_vi)
+
+</div>
+
+Tinh chỉnh (fine-tune), đúng như tên gọi, là chỉ cần chỉnh nhẹ tham số là có hiệu năng tốt; đây là một cách hiện thực học chuyển giao. Khác biệt bản chất giữa tinh chỉnh và huấn luyện từ đầu (train from scratch) nằm ở việc khởi tạo tham số. Huấn luyện từ đầu thường là khởi tạo ngẫu nhiên mọi tham số của mạng (tất nhiên khởi tạo ngẫu nhiên cũng có mẹo); mô hình khởi tạo ngẫu nhiên thường không có khả năng dự đoán gì, cần lượng lớn dữ liệu hoặc dữ liệu của miền cụ thể để huấn luyện từ số không, nên muốn có một mô hình tốt thường khá khó. Còn mạng tinh chỉnh thì các tham số đã được điều chỉnh khá tốt trên tập dữ liệu khác (ví dụ ImageNet), đã có khả năng biểu diễn khá tốt. Vì vậy ta chỉ cần học với tốc độ học khá nhỏ trên tập dữ liệu của miền mình cần là có mô hình khá tốt. Khi tinh chỉnh, thường không phải thiết kế lại cấu trúc mạng: mô hình huấn luyện sẵn đã có cấu trúc tốt, chỉ cần sửa một số tầng. Trên tập dữ liệu nhỏ, tinh chỉnh thường tốt hơn nhiều so với huấn luyện từ đầu, vì khi dữ liệu ít, huấn luyện nhiều tham số dễ quá khớp.
+
+### 14.4.2 Có những cách tinh chỉnh nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 14.2 Tinh chỉnh](https://d2l.ai/chapter_computer-vision/fine-tuning.html) ↗
+
+</div>
+
+Lấy phân loại ảnh làm ví dụ: thường vì các tập dữ liệu cần số lớp khác nhau nên phải sửa tầng đầu ra trên cùng của mạng. Khi đó có hai cách tinh chỉnh:
+
+- **Không đóng băng tầng nào** của mô hình; dùng tốc độ học lớn hơn cho tầng cuối đã sửa, tốc độ học nhỏ hơn cho các tầng không sửa, huấn luyện toàn bộ mô hình qua nhiều epoch. Tức là huấn luyện một bước.
+- **Đóng băng mọi tầng trừ tầng trên cùng đã sửa**, tức không cập nhật tham số của phần bị đóng băng; tinh chỉnh vài epoch, rồi mở băng vài tầng dưới tầng trên cùng hoặc mở hết mọi tầng, huấn luyện thêm vài epoch nữa. Tức là huấn luyện nhiều bước.
+
+Cả hai đều là tinh chỉnh. Hiện có rất nhiều mô hình huấn luyện sẵn tốt; xác định mô hình nào hợp với nhiệm vụ của mình và cho hiệu năng tốt nhất cần nhiều thời gian thăm dò. Khi đó cách thứ nhất là cách huấn luyện khá tốt, không phải thao tác nhiều bước. Còn khi đã tìm được mô hình khá hợp, bạn có thể thử lại cách thứ hai, có thể được hiệu năng cao hơn cách đầu một chút, vì chỉnh quá nhiều tham số trên tập dữ liệu nhỏ làm tăng khả năng quá khớp; tất nhiên không tuyệt đối.
+
+### 14.4.3 Vì sao khi tinh chỉnh lại đóng băng các tầng dưới, huấn luyện tầng trên trước?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 14.2 Tinh chỉnh](https://d2l.ai/chapter_computer-vision/fine-tuning.html) ↗ · [Học sâu · 7.2.6 Ánh xạ Đặc trưng và Vùng Tiếp nhận](dl/ch07_s2_vi?id=_726-Ánh-xạ-Đặc-trưng-và-vùng-tiếp-nhận)
+
+</div>
+
+Đây là cách thứ hai (đóng băng, huấn luyện nhiều bước) ở 14.4.2. Đầu tiên đóng băng mọi tầng trừ tầng trên cùng đã sửa, huấn luyện tầng trên cùng; có thể hiểu quá trình này là huấn luyện thích nghi miền cho tầng trên cùng, chủ yếu để nó thích nghi với không gian đặc trưng sẵn có của mô hình, tránh việc tầng trên cùng khởi tạo ngẫu nhiên tệ hại (gradient lớn, hỗn loạn) làm nhiễu và phá hỏng các tầng đã có khả năng biểu diễn, ảnh hưởng hiệu năng cuối. Sau đó, nhiều hướng dẫn của các framework học sâu mở băng nửa số tầng tính từ trên xuống rồi tinh chỉnh tiếp. Lợi ích ở chỗ đặc trưng càng ở tầng dưới thường càng tổng quát, càng lên trên thì ngữ nghĩa cấp cao càng đầy đủ, điều này dễ hiểu qua vùng tiếp nhận. Vì vậy nếu dữ liệu huấn luyện sẵn và dữ liệu tinh chỉnh khác nhau về ngữ nghĩa càng nhiều (ví dụ dùng mô hình huấn luyện sẵn trên ImageNet cho ảnh y tế), thì đặc trưng ở các tầng càng gần đỉnh càng khác về ngữ nghĩa, nên thường cũng cần chỉnh lại tương ứng.
+
+> **Biên tập:** bản gốc dẫn "cách thứ hai trong 14.12"; không có mục 14.12, đúng là mục 14.4.2.
+
+### 14.4.4 Tinh chỉnh thế nào với các đặc điểm dữ liệu khác nhau?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 14.2 Tinh chỉnh](https://d2l.ai/chapter_computer-vision/fine-tuning.html) ↗ · [Học sâu · 4.7.1 Các Loại Dịch chuyển Phân phối](dl/ch04_s7_vi?id=_471-các-loại-dịch-chuyển-phân-phối)
+
+</div>
+
+- **Ít dữ liệu, dữ liệu giống tập gốc:** thường chỉ cần sửa tầng đầu ra cuối rồi huấn luyện; huấn luyện quá nhiều tham số dễ quá khớp.
+- **Ít dữ liệu, dữ liệu khác nhiều so với tập gốc:** vì dữ liệu khác nhiều, sau khi tinh chỉnh xong tầng đầu ra trên cùng, có thể tinh chỉnh tiếp nửa số tầng tính từ trên xuống.
+- **Nhiều dữ liệu, dữ liệu khác nhiều so với tập gốc:** có thể huấn luyện lại từ đầu, nhưng thực tế khởi tạo từ mô hình huấn luyện sẵn rồi huấn luyện toàn bộ thường vẫn hội tụ nhanh hơn.
+- **Nhiều dữ liệu, dữ liệu giống tập gốc:** tham số mô hình huấn luyện sẵn là khởi tạo rất tốt, có thể mở băng mọi tầng và tinh chỉnh với tốc độ học khá nhỏ.
+
+> **Biên tập:** (1) Bản gốc nói trường hợp nhiều dữ liệu và khác miền thì "thường không cần mô hình huấn luyện sẵn, huấn luyện lại là được". Hướng dẫn CS231n (nguồn gốc của bảng bốn trường hợp này) viết ngược lại: trong thực tế khởi tạo từ mô hình huấn luyện sẵn vẫn thường có lợi. (2) Với trường hợp ít dữ liệu và khác miền, CS231n gợi ý huấn luyện bộ phân loại trên đặc trưng từ một tầng *sớm hơn* của mạng (vì đặc trưng tầng cao đã quá đặc thù cho tập gốc), thay vì mở băng thêm các tầng.
+
+### 14.4.4b Ưu nhược điểm của việc dùng mô hình huấn luyện sẵn trong phát hiện đối tượng?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 14.3 Phát hiện đối tượng và hộp bao](https://d2l.ai/chapter_computer-vision/bounding-box.html) ↗ · [d2l (tiếng Anh) · 14.2 Tinh chỉnh](https://d2l.ai/chapter_computer-vision/fine-tuning.html) ↗
+
+</div>
+
+Trong phát hiện đối tượng, dù là mô hình một giai đoạn như YOLO, SSD, RetinaNet hay hai giai đoạn như Faster R-CNN, R-FCN và FPN, đều dựa trên mô hình phân loại đã huấn luyện sẵn trên ImageNet.
+
+Ưu điểm:
+
+1. Giống phần lớn trường hợp tinh chỉnh, mạng huấn luyện sẵn đã có đặc trưng ngữ nghĩa tốt, tăng tốc huấn luyện hiệu quả;
+2. Với phần lớn mô hình hai giai đoạn, việc huấn luyện chưa hoàn toàn đầu-cuối (end-to-end) theo nghĩa chặt, nên dùng mô hình huấn luyện sẵn trích được ngay đặc trưng ngữ nghĩa, giúp tối ưu mạng hai giai đoạn dễ hơn.
+
+Nhược điểm là giữa mô hình phân loại và mô hình phát hiện vẫn có khác biệt về nhiệm vụ:
+
+1. Mô hình phân loại phần lớn được huấn luyện trên dữ liệu một đối tượng, khả năng bắt nhiều đối tượng cùng lúc hơi yếu, và không quan tâm vị trí đối tượng, ở mức nào đó làm mô hình mất một phần thông tin không gian, điều này thường bất lợi cho mô hình phát hiện;
+2. Vấn đề thích nghi miền: nếu mô hình huấn luyện sẵn (ImageNet) và tình huống dùng thật của bộ phát hiện (ảnh y tế, ảnh vệ tinh) khác nhau nhiều, hiệu năng sẽ bị ảnh hưởng;
+3. Dùng mô hình huấn luyện sẵn nghĩa là khó tự do thay đổi cấu trúc mạng và tham số, hạn chế phạm vi ứng dụng.
+
+### 14.4.5 Huấn luyện từ đầu (train from scratch) trong phát hiện đối tượng thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 14.7 SSD](https://d2l.ai/chapter_computer-vision/ssd.html) ↗ · [Ôn tập · 3.6.8 Batch Normalization là gì?](qa/ch03_vi?id=_368-batch-normalization-là-gì)
+
+</div>
+
+Kết hợp nghiên cứu liên quan của FAIR (He và cộng sự, 2019, *Rethinking ImageNet Pre-training*), ta biết phát hiện đối tượng cũng như các nhiệm vụ khác: chỉ cần đủ dữ liệu và huấn luyện đủ lâu, hiệu quả, huấn luyện từ đầu vẫn được bộ phát hiện không kém bộ phát hiện dùng mô hình huấn luyện sẵn. Dưới đây là vài gợi ý:
+
+1. Khi tập dữ liệu không lớn, vẫn cần tăng cường dữ liệu.
+2. Mô hình huấn luyện sẵn có khởi tạo tốt hơn; huấn luyện từ đầu cần nhiều vòng lặp và thời gian hơn để huấn luyện, tối ưu bộ phát hiện. Mô hình hai giai đoạn vì không huấn luyện đầu-cuối chặt chẽ nên có thể cần nhiều vòng lặp và thời gian hơn nữa, còn mô hình phát hiện một giai đoạn huấn luyện tương đối dễ hơn (ví dụ DSOD và ScratchDet).
+3. Vấn đề lớn nhất khi huấn luyện từ đầu trong phát hiện đối tượng vẫn là batch size quá nhỏ. Có thể dùng thêm GPU kèm **BatchNorm đồng bộ** (SyncBN, tính thống kê trên batch gộp của mọi GPU) để tăng batch size hiệu dụng; nếu không có thêm GPU thì dùng GroupNorm thay BatchNorm.
+4. Vì mô hình phân loại yếu về bắt nhiều đối tượng và không nhạy với vị trí không gian, có thể học theo DetNet, huấn luyện một mạng xương sống dành riêng cho phát hiện đối tượng, thích nghi tốt hơn với nhiều đối tượng, nhiều kích thước và vị trí.
+
+> **Biên tập:** bản gốc viết "BatchNorm bất đồng bộ"; kỹ thuật đúng là BatchNorm **đồng bộ** giữa các GPU (MegDet, Peng và cộng sự, 2018). Sửa luôn tên viết đảo "DSOD以ScratchDet及".
+
+## 14.5 Cải thiện hiệu năng của GAN thế nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 20.1 GAN](https://d2l.ai/chapter_generative-adversarial-networks/gan.html) ↗ · [d2l (tiếng Anh) · 20.2 DCGAN](https://d2l.ai/chapter_generative-adversarial-networks/dcgan.html) ↗
+
+</div>
+
+Tối ưu hiệu năng GAN thường cần làm ở các mặt sau:
+
+- Thiết kế hoặc chọn hàm chi phí hợp với mục đích hơn.
+- Thêm số hạng phạt bổ sung.
+- Tránh để bộ phân biệt quá tự tin và bộ sinh quá khớp.
+- Dùng phương pháp tối ưu mô hình tốt hơn.
+- Thêm nhãn để làm rõ mục tiêu tối ưu.
+
+Các mẹo huấn luyện GAN thường dùng:
+
+- Chuẩn hóa đầu vào về khoảng $(-1, 1)$, hàm kích hoạt ở tầng cuối của bộ sinh dùng tanh (trừ BEGAN).
+- Dùng hàm mất mát của Wasserstein GAN.
+- Nếu có dữ liệu có nhãn thì cố gắng dùng nhãn; cũng có người đề xuất đảo nhãn (khi huấn luyện bộ sinh, coi ảnh giả là thật) cho kết quả tốt; ngoài ra dùng làm mượt nhãn (label smoothing), một phía hoặc hai phía.
+- Dùng BatchNorm theo minibatch (minibatch ảnh thật và minibatch ảnh giả để riêng); nếu không dùng BatchNorm thì có thể dùng InstanceNorm hoặc WeightNorm.
+- Tránh dùng ReLU và tầng gộp (pooling) để giảm khả năng gradient thưa; có thể dùng Leaky ReLU.
+- Bộ tối ưu nên chọn Adam, tốc độ học không đặt quá lớn, có thể tham khảo giá trị ban đầu $10^{-4}$ (DCGAN dùng $2\times10^{-4}$, $\beta_1 = 0.5$), có thể giảm dần tốc độ học trong quá trình huấn luyện.
+- Thêm nhiễu Gauss vào các tầng của bộ phân biệt D, coi như một dạng điều chuẩn.
+
+> **Biên tập:** phần mẹo này tóm tắt từ danh sách [ganhacks](https://github.com/soumith/ganhacks) của Soumith Chintala và cộng sự (2016). Đó là kinh nghiệm thời DCGAN; các mô hình sinh ảnh hiện nay phần lớn là mô hình khuếch tán, còn GAN hiện đại (StyleGAN2…) dùng các kỹ thuật riêng như phạt $R_1$, chuẩn hóa phổ (spectral normalization).
+
+## 14.6 AutoML
+
+### 14.6.1 AutoML là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 19.1 Tối ưu siêu tham số là gì](https://d2l.ai/chapter_hyperparameter-optimization/hyperopt-intro.html) ↗
+
+</div>
+
+Hiện nay một mô hình học máy hay học sâu tốt không thể thiếu mấy mặt sau:
+
+1. tiền xử lý dữ liệu tốt;
+2. cấu trúc và chức năng mô hình phù hợp;
+3. chiến lược huấn luyện và siêu tham số tốt;
+4. thao tác hậu xử lý phù hợp;
+5. phân tích kết quả chặt chẽ.
+
+Các mặt này đều có ảnh hưởng then chốt tới kết quả cuối, và cũng là công việc chính của kỹ sư dữ liệu và nhà nghiên cứu hiện nay. Nhưng mỗi mặt đều rất rườm rà, nhất là xây dựng và huấn luyện mô hình, trong khi phần lớn trường hợp các công việc này dùng được mà không cần kiến thức chuyên môn quá sâu. Vì vậy tác dụng chính của AutoML là giúp xây dựng mô hình và tinh chỉnh siêu tham số hiệu quả, ví dụ tìm kiếm kiến trúc mạng học sâu, phân tích mức quan trọng của siêu tham số… Tất nhiên AutoML không đơn giản là tìm kiếm vét cạn hay ngẫu nhiên; nó vẫn cần kiến thức học máy như tối ưu Bayes, học tăng cường, học meta (meta-learning), học chuyển giao… Hiện có một số bộ công cụ AutoML khá tốt, như Hyperopt (James Bergstra), NNI của Microsoft, AutoKeras…
+
+Hiện AutoML đã thành điểm nóng nghiên cứu mới, ai quan tâm có thể tham khảo [AutoML literature](https://www.automl.org/automl/literature-on-neural-architecture-search/).
+
+> **Biên tập:** bản gốc ghi Hyperopt là của "Alex Honchar"; tác giả của Hyperopt là James Bergstra (cùng Dan Yamins, David Cox). Công cụ phổ biến hiện nay còn có Optuna, Ray Tune.
+
+### 14.6.2 Có những phương pháp tìm siêu tham số tự động nào?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [d2l (tiếng Anh) · 19.1 Tối ưu siêu tham số là gì](https://d2l.ai/chapter_hyperparameter-optimization/hyperopt-intro.html) ↗ · [Học sâu · 3.6.3 Lựa chọn Mô hình](dl/ch03_s6_vi?id=_363-lựa-chọn-mô-hình)
+
+</div>
+
+Hiện tìm kiếm tự động chủ yếu gồm tìm kiếm lưới, tìm kiếm ngẫu nhiên và tối ưu siêu tham số dựa trên mô hình.
+
+**Tìm kiếm lưới (grid search):** thường dùng khi ít siêu tham số. Liệt kê tập ứng viên đại khái cho từng siêu tham số, rồi thử lần lượt mọi tổ hợp. Nếu điều kiện cho phép, lặp lại tìm kiếm lưới sẽ tốt hơn, tất nhiên mỗi lần lặp phải dựa vào tổ hợp tốt nhất của lần trước để chỉnh mịn hơn. Vấn đề lớn nhất của tìm kiếm lưới là thời gian tính tăng theo hàm mũ với số siêu tham số.
+
+**Tìm kiếm ngẫu nhiên (random search):** là cách thay thế tìm kiếm lưới (Bergstra và Bengio, 2012). Khác tìm kiếm lưới ở chỗ ta không cần đặt tập giá trị rời rạc cho siêu tham số, mà định nghĩa một phân phối cho từng siêu tham số để sinh giá trị ngẫu nhiên. Tìm kiếm ngẫu nhiên có ưu thế rõ so với tìm kiếm lưới khi có những siêu tham số không quan trọng: như hình dưới, với cùng 9 lần thử, lưới chỉ thử được 3 giá trị khác nhau của tham số quan trọng, còn tìm kiếm ngẫu nhiên thử được 9 giá trị. Ví dụ tìm kiếm lưới cho batch size trong $\{16, 32, 64\}$ rồi thử lần lượt, cách thử như vậy rõ ràng hiệu quả thấp hơn. Tất nhiên tìm kiếm ngẫu nhiên cũng có thể lặp lại trong khoảng hẹp hơn để tối ưu mịn.
+
+<img src="../img/qa/ch14/14.14.png" alt="Tìm kiếm lưới và tìm kiếm ngẫu nhiên"/>
+
+Hình 14.9 Tìm kiếm lưới (trái) và tìm kiếm ngẫu nhiên (phải) với một tham số quan trọng (trục ngang) và một tham số không quan trọng (trục đứng); đường cong xanh là hiệu năng theo từng tham số.
+
+**Tối ưu siêu tham số dựa trên mô hình:** khác hai chiến lược trên, cách này biến bài toán tinh chỉnh siêu tham số thành bài toán tối ưu. Trực giác sẽ nghĩ tới xây một mô hình khả vi rồi dùng hạ gradient để tối ưu. Đáng tiếc là siêu tham số thường rời rạc, mà chi phí tính toán vẫn rất cao.
+
+Thuật toán tìm kiếm dựa trên mô hình phổ biến nhất là **tối ưu Bayes**. Khác với tìm kiếm lưới và ngẫu nhiên vốn độc lập với kết quả các lần trước, tối ưu Bayes dùng kết quả tìm kiếm trong quá khứ để định hướng lần tìm tiếp theo. Nó gồm bốn phần: 1. hàm mục tiêu, phần lớn trường hợp là mất mát của mô hình trên tập kiểm định; 2. không gian tìm kiếm, tức các siêu tham số cần tìm; 3. chiến lược tối ưu, gồm mô hình xác suất được xây dựng (ví dụ quá trình Gauss, hay bộ ước lượng Parzen dạng cây TPE) và cách chọn siêu tham số tiếp theo (hàm thu nhận, acquisition function); 4. kết quả tìm kiếm trong quá khứ. Đầu tiên đặt một giả định tiên nghiệm trên không gian tìm kiếm, tức giả định một cách chọn siêu tham số, rồi liên tục cập nhật mô hình xác suất; mục tiêu cuối là tìm bộ siêu tham số có sai số nhỏ nhất trên tập kiểm định.
+
+### 14.6.3 Tìm kiếm kiến trúc mạng neuron (NAS) là gì?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [AutoML.org (tiếng Anh) · Tài liệu về NAS](https://www.automl.org/automl/literature-on-neural-architecture-search/) ↗ · [Tăng cường · Chương 4 Gradient chính sách](chapter4/chapter4_vi)
+
+</div>
+
+2015–2017 là giai đoạn thiết kế mạng CNN thịnh nhất, phần lớn cấu trúc mạng do các nhà nghiên cứu thiết kế tay. Quá trình này thường rất rườm rà. Nguyên nhân chính là việc ghép các mô-đun thành phần thường là một bài toán tối ưu hộp đen; ngoài ra, việc chọn và tối ưu các siêu tham số cấu trúc và siêu tham số huấn luyện là bài toán tối ưu không lồi, hoặc bài toán tối ưu hỗn hợp, vừa có không gian rời rạc vừa có không gian liên tục. NAS (Neural Architecture Search) ra đời để giải quyết việc thiết kế mạng tốt, hiệu quả bằng chiến lược máy và tự động hóa. Chiến lược này thường không có tiêu chuẩn thống nhất; các mạng khác nhau theo nhu cầu thực tế thường có thiết kế khác nhau, ví dụ mô hình cho thiết bị di động sẽ cân bằng giữa hiệu suất và độ chính xác. Hiện NAS cũng là phần quan trọng nhất trong AutoML. NAS thường chia ba mặt: không gian tìm kiếm (tìm ở đâu), chiến lược tìm kiếm (tìm thế nào) và đánh giá ước lượng hiệu năng.
+
+- **Không gian tìm kiếm**, tức tìm ở đâu, định nghĩa các biến của bài toán tối ưu. Không gian tìm kiếm quy mô khác nhau thì độ khó cũng khác nhau. Thời đầu, vì cấu trúc mạng và số tầng tương đối đơn giản, số tham số ít, người ta hay dùng các thuật toán tiến hóa như thuật toán di truyền để tối ưu cả siêu tham số lẫn trọng số của mạng (neuroevolution). Đến nay mô hình ngày càng phức tạp, số tham số ngày càng lớn, việc tiến hóa trực tiếp cả trọng số không còn khả thi. Nhưng nếu ta cho trước một số cấu trúc mạng và siêu tham số theo tiên nghiệm, hiệu năng mô hình đã bị giới hạn trong không gian đã cho, không gian tìm kiếm trở nên hữu hạn, nên chỉ cần tối ưu tham số kiến trúc của mô hình phức tạp và siêu tham số tương ứng (trọng số vẫn học bằng hạ gradient).
+- **Chiến lược tìm kiếm**, tức tìm thế nào, định nghĩa cách tìm nhanh và chính xác cấu hình kiến trúc mạng tốt nhất. Các phương pháp thường gặp gồm: tìm kiếm ngẫu nhiên, tối ưu Bayes, học tăng cường, thuật toán tiến hóa và tìm kiếm dựa trên gradient (như DARTS). Đại diện chính là phương pháp tìm kiếm dùng học tăng cường của Google Brain năm 2017.
+- **Đánh giá ước lượng**, định nghĩa cách đánh giá hiệu quả cho quá trình tìm kiếm. Trong học sâu, dữ liệu thường rất lớn; tìm kiếm mô hình trên dữ liệu lớn như vậy chắc chắn rất tốn thời gian, gây khó khăn lớn cho tối ưu, nên cần các chiến lược đánh giá xấp xỉ hiệu quả. Thường có ba hướng:
+  1. **Huấn luyện với độ trung thực thấp.** Độ trung thực thấp trong thực tế có thể hiểu theo nhiều cách, như ít vòng lặp hơn, dùng một phần nhỏ dữ liệu, hoặc giữ cấu trúc nhưng giảm số kênh… Các cách này đều giảm mạnh thời gian tính khi thử cấu trúc, tất nhiên có một ít sai lệch. Nhưng tìm kiếm kiến trúc không nhắm một bộ tham số cố định mà nhắm một cấu trúc mô hình tốt. Khi chọn cuối cùng, chỉ cần huấn luyện đầy đủ vài cấu trúc tốt nhất rồi chọn.
+  2. **Dùng mô hình thay thế (surrogate model).** Ngoài huấn luyện độ trung thực thấp, các nhà nghiên cứu đề xuất một mô hình hồi quy gọi là mô hình thay thế, dùng các chiến lược như nội suy để dự đoán hiệu năng trên vùng tham số đã biết, nhằm dùng ít điểm nhất mà vẫn dự đoán được kết quả tốt nhất.
+  3. **Chuyển giao ở mức tham số**, ví dụ thừa kế trọng số hay chưng cất tri thức. Dùng trọng số của mô hình đã huấn luyện để tìm cho bài toán mới thường cho tìm kiếm một điểm khởi đầu tốt. Nhờ tích lũy được lượng lớn dữ liệu tối ưu trong quá khứ, việc tìm cho bài toán mới được giúp rất nhiều.
+
+> **Biên tập:** bản gốc nói các thuật toán tiến hóa "không còn dùng tiếp được". Không đúng: AmoebaNet (Real và cộng sự, 2019) dùng tiến hóa có điều chỉnh tuổi để tìm kiến trúc, cho kết quả ngang hoặc hơn NASNet trên ImageNet. Thứ không còn khả thi là tiến hóa trực tiếp cả *trọng số* của mạng lớn. Chiến lược dựa trên gradient (DARTS, Liu và cộng sự, 2019) do người biên tập bổ sung.
+
+### 14.6.4 Chiến lược thiết kế của NASNet
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Tăng cường · 4.3 REINFORCE: gradient chính sách Monte Carlo](chapter4/chapter4_vi?id=_43-reinforce-gradient-chính-sách-monte-carlo) · [Tăng cường · 4.1 Thuật toán gradient chính sách](chapter4/chapter4_vi?id=_41-thuật-toán-gradient-chính-sách)
+
+</div>
+
+NASNet là mạng đầu tiên do Google Brain tìm ra bằng chiến lược tìm kiếm kiến trúc mạng và huấn luyện thành công trên ImageNet, hiệu năng vượt mọi mô hình thiết kế tay thời đó. Về chiến lược tìm kiếm của NASNet, trước hết cần đọc bài báo của Google Brain ở ICLR 2017 *Neural Architecture Search with Reinforcement Learning* (Zoph và Le). Đây là công trình đầu tiên tìm kiến trúc thành công với kết quả khá tốt trên tập CIFAR-10. NASNet phần lớn theo ý tưởng thiết kế của khung tìm kiếm này.
+
+Ý tưởng cốt lõi của NASNet là dùng học tăng cường để khám phá các cấu trúc trong không gian tìm kiếm dựa trên phản hồi. Sơ đồ tìm kiếm như hình dưới: định nghĩa một bộ điều khiển (controller) lấy RNN làm lõi. Bộ điều khiển lấy mẫu một mô hình trong không gian tìm kiếm với xác suất $p$. Có mô hình mạng A thì huấn luyện nó, khi hội tụ thì được độ chính xác R trên tập kiểm định; R được dùng làm **phần thưởng** để cập nhật bộ điều khiển RNN bằng gradient chính sách (REINFORCE), sao cho các kiến trúc có R cao được lấy mẫu với xác suất cao hơn.
+
+<img src="../img/qa/ch14/NAS搜索策略.png" alt="Quy trình tìm kiếm kiến trúc"/>
+
+Hình 14.10 Quy trình chiến lược tìm kiếm kiến trúc
+
+Bộ điều khiển RNN dự đoán kích thước, số lượng bộ lọc và sải bước của tầng tích chập. Mỗi kết quả dự đoán làm đầu vào cho bước tiếp theo; khi số tầng đạt ngưỡng đặt trước thì ngừng dự đoán, và ngưỡng này tăng dần trong quá trình huấn luyện. Ở đây bộ điều khiển chỉ dự đoán tích chập, chưa tìm các cấu trúc rẽ nhánh như họ Inception hay kết nối tắt như ResNet. Vì thế bộ điều khiển cần mở rộng để dự đoán cả các kết nối tắt, không gian tìm kiếm cũng lớn lên tương ứng. Để dự đoán các cấu trúc này, mỗi tầng trong bộ điều khiển RNN thêm một neuron dự đoán kết nối tắt, bài báo gọi là điểm neo (anchor point); hơi khác là dự đoán của điểm neo này do trạng thái của điểm neo ở mọi tầng trước quyết định.
+
+<img src="../img/qa/ch14/RNN控制器.png" alt="Bộ điều khiển RNN"/>
+
+Hình 14.11 Bộ điều khiển RNN
+
+NASNet về cơ bản theo cơ chế sinh cấu trúc mạng ở trên, và cải tiến thêm hai điểm:
+
+1. **Đưa vào theo tiên nghiệm ý tưởng xếp chồng mô-đun của họ Inception và ResNet.** Nó định nghĩa hai loại mô-đun tích chập là Normal Cell và Reduction Cell: loại đầu không giảm mẫu, loại sau là mô-đun giảm mẫu. Cấu trúc ghép từ hai loại mô-đun này dễ dàng chuyển kiến trúc tìm được trên tập dữ liệu nhỏ (CIFAR-10) sang tập dữ liệu lớn (ImageNet) bằng cách xếp chồng số mô-đun khác nhau, tăng mạnh hiệu suất tìm kiếm.
+
+<img src="../img/qa/ch14/NASNet的RNN控制器.png" alt="Bộ điều khiển RNN của NASNet"/>
+
+Hình 14.12 Bộ điều khiển RNN của NASNet
+
+2. **Tối ưu bộ điều khiển RNN:** đưa sẵn các loại tích chập và gộp với kích thước, kiểu khác nhau vào không gian tìm kiếm, dự đoán cả một mô-đun tích chập thay vì dự đoán từng tầng tích chập. Như hình, bộ điều khiển RNN không còn dự đoán siêu tham số bên trong một tích chập đơn lẻ, mà tìm kiếm từng phần trong một mô-đun; không gian tìm kiếm giới hạn trong các phép toán sau:
+
+| | |
+|---|---|
+| identity | 1x3 rồi 3x1 convolution |
+| 1x7 rồi 7x1 convolution | 3x3 dilated convolution |
+| 3x3 average pooling | 3x3 max pooling |
+| 5x5 max pooling | 7x7 max pooling |
+| 1x1 convolution | 3x3 convolution |
+| 3x3 depthwise-separable conv | 5x5 depthwise-separable conv |
+| 7x7 depthwise-separable conv | |
+
+Về cách nối bên trong mô-đun, có hai cách: cộng từng phần tử (element-wise addition) và ghép nối (concatenate). Cách tìm kiếm và quy trình của NASNet có giá trị tham khảo rất tốt cho các công trình NAS sau này.
+
+> **Biên tập:** bản gốc viết "khi mô hình hội tụ được độ chính xác R thì *truyền gradient* về bộ điều khiển RNN". Độ chính xác R không khả vi theo tham số bộ điều khiển nên không có gradient nào để truyền; R là *phần thưởng* trong thuật toán gradient chính sách REINFORCE, xem chương 4 của khóa Học tăng cường. Chi phí của cách này rất lớn: bài NASNet dùng 500 GPU trong 4 ngày; ENAS (mục 14.6.6) giảm xuống còn dưới một ngày trên một GPU.
+
+### 14.6.5 Khi thiết kế mạng, vì sao kích thước kernel tích chập đều là số lẻ?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.3.1 Đệm](dl/ch07_s3_vi?id=_731-Đệm) · [Ôn tập · 12.4.3 Kích thước kernel tích chập thường là số lẻ](qa/ch12_vi?id=_1243-kích-thước-kernel-tích-chập-thường-là-số-lẻ)
+
+</div>
+
+Ta thấy trong phần lớn thiết kế mạng đều dùng kernel kích thước lẻ như 3x3 / 5x5 / 7x7; hai lý do chính:
+
+- Bảo đảm có một điểm ảnh ở tâm, tránh lệch thông tin vị trí.
+- Khi đệm biên, hai phía đều được đệm như nhau, ma trận gốc vẫn đối xứng.
+
+### 14.6.6 Khi thiết kế mạng, chia sẻ trọng số có những dạng nào? Vì sao cần chia sẻ trọng số?
+
+<div class="qa-theory">
+
+**Lý thuyết:** [Học sâu · 7.1.2 Ràng buộc MLP](dl/ch07_s1_vi?id=_712-ràng-buộc-mlp) · [Học sâu · 6.2.2 Tham số Ràng buộc](dl/ch06_s2_vi?id=_622-tham-số-ràng-buộc) · [Ôn tập · Chương 6 Mạng neuron hồi tiếp (RNN)](qa/ch06_vi)
+
+</div>
+
+Các dạng chia sẻ trọng số:
+
+- Trong học sâu, tiêu biểu nhất là phép tích chập của mạng tích chập: so với mạng neuron kết nối đầy đủ, tích chập giảm mạnh số tham số;
+- Trong mạng đa nhiệm vụ, để giảm khối lượng tính của từng nhiệm vụ, thường dùng chung một mạng xương sống;
+- Một số mạng hồi quy có cấu trúc trên cùng một thang (như RNN dùng chung trọng số qua các bước thời gian).
+
+Lợi ích của chia sẻ trọng số:
+
+Chia sẻ trọng số ở mức nào đó tăng liên hệ giữa các tham số, giúp học được đặc trưng chung tốt hơn. Đồng thời giảm mạnh số tham số của mạng, tiết kiệm tính toán và bộ nhớ (tất nhiên mạng hồi quy có cấu trúc thì không tiết kiệm tính toán). Ngoài ra chia sẻ trọng số có tác dụng điều chuẩn tốt: mục đích của điều chuẩn là giảm độ phức tạp mô hình, chống quá khớp, mà chia sẻ trọng số đúng là giảm số tham số và độ phức tạp của mô hình.
+
+Vì vậy một cách chia sẻ trọng số được thiết kế tốt, trong khi giảm khối lượng tính, thường cho kết quả tốt hơn mạng không chia sẻ.
+
+Chia sẻ trọng số không chỉ giúp đơn giản hóa tham số, giảm độ phức tạp trong các cấu trúc mạng do con người thiết kế (human-invented), mà trong cấu trúc mạng của tìm kiếm kiến trúc (NAS) còn giúp tăng hiệu suất tính của các mô hình con (child model), làm quá trình tìm kiếm tái hiện được trên một GPU, xem Efficient NAS ([ENAS](https://arxiv.org/abs/1802.03268)).
