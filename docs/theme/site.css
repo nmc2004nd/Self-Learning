@@ -373,7 +373,9 @@ body[data-course="math"] .sidebar-nav > ul > li[data-course]:not([data-course="m
 body[data-course="ml"] .sidebar-nav > ul > li[data-course]:not([data-course="ml"]),
 body[data-course="dl"] .sidebar-nav > ul > li[data-course]:not([data-course="dl"]),
 body[data-course="rl"] .sidebar-nav > ul > li[data-course]:not([data-course="rl"]),
-body[data-course="qa"] .sidebar-nav > ul > li[data-course]:not([data-course="qa"]) { display: none; }
+body[data-course="qa"] .sidebar-nav > ul > li[data-course]:not([data-course="qa"]),
+body[data-course="dlnote"] .sidebar-nav > ul > li[data-course]:not([data-course="dlnote"]) { display: none; }
+body[data-course="tools"] .sidebar-nav > ul > li[data-course]:not([data-course="tools"]) { display: none; }
 
 /* Ngăn kéo (màn hình hẹp) và lớp phủ */
 /* main của docsify tạo lớp xếp chồng riêng (z-index: 0): bỏ đi để ngăn kéo nằm trên thanh trên và lớp phủ */

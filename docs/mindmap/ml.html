@@ -11,22 +11,23 @@
 :root {
   --bg: #f3f8ff; --card: #ffffff; --text: #0f1d45; --muted: #5b6b8c; --border: #e1eaf8; --line: #c9d8f2;
   --accent: #3b82f6; --shadow: 0 6px 20px rgba(30, 64, 175, .10); --hit: #f59e0b;
-  --b1: #8b5cf6; --b2: #0ea5e9; --b3: #10b981; --b4: #3b82f6; --b5: #ec4899;
+  --b1: #8b5cf6; --b2: #0ea5e9; --b3: #10b981; --b4: #3b82f6; --b5: #ec4899; --b6: #f59e0b;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0a1124; --card: #101b36; --text: #e8efff; --muted: #97a7c9; --border: #22335c; --line: #2c4170;
     --accent: #60a5fa; --shadow: 0 6px 20px rgba(0, 0, 0, .35); --hit: #fbbf24;
-    --b1: #a78bfa; --b2: #38bdf8; --b3: #34d399; --b4: #60a5fa; --b5: #f472b6; color-scheme: dark;
+    --b1: #a78bfa; --b2: #38bdf8; --b3: #34d399; --b4: #60a5fa; --b5: #f472b6; --b6: #fbbf24; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0a1124; --card: #101b36; --text: #e8efff; --muted: #97a7c9; --border: #22335c; --line: #2c4170;
   --accent: #60a5fa; --shadow: 0 6px 20px rgba(0, 0, 0, .35); --hit: #fbbf24;
-  --b1: #a78bfa; --b2: #38bdf8; --b3: #34d399; --b4: #60a5fa; --b5: #f472b6; color-scheme: dark;
+  --b1: #a78bfa; --b2: #38bdf8; --b3: #34d399; --b4: #60a5fa; --b5: #f472b6; --b6: #fbbf24; color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: var(--text); overflow: hidden;
@@ -112,7 +113,7 @@ svg#map.drag { cursor: grabbing; }
 <div class="legend">
   <span><span class="bd">Bài học</span> có bài tương ứng trên site</span>
   <span><i class="nt"></i>ghi chú, giải thích</span>
-  <span>Nguồn: <a id="src" href="https://github.com/dformoso/machine-learning-mindmap" target="_blank" rel="noopener">Machine Learning Mindmap</a> của Daniel Martinez; tên mục giữ tiếng Anh, phần giải thích đã dịch</span>
+  <span id="credit">Nguồn: <a id="src" href="https://github.com/dformoso/machine-learning-mindmap" target="_blank" rel="noopener">Machine Learning Mindmap</a> của Daniel Martinez; tên mục giữ tiếng Anh, phần giải thích đã dịch</span>
 </div>
 <div class="lightbox" id="lb" role="dialog" aria-label="Ảnh phóng to"><img alt=""></div>
 <script>
@@ -125,7 +126,21 @@ svg#map.drag { cursor: grabbing; }
     dl: { name: 'Sơ đồ tư duy học sâu', subs: ['Khái niệm', 'Kiến trúc', 'Ứng dụng', 'Thư viện', 'TensorFlow'],
       src: ['https://github.com/dformoso/deeplearning-mindmap', 'Deep Learning Mindmap'] }
   };
-  var KEY = /[?&]map=dl\b/.test(location.search) ? 'dl' : 'ml', CFG = MAPS[KEY], SUBS = CFG.subs;
+  // Sơ đồ ghi chú lập trình của dl_note (Harley Zhang): tiếng Việt hoàn toàn, không có PDF gốc.
+  var DLNOTE = { src: ['https://github.com/harleyszhang/dl_note', 'dl_note'], vi: true,
+    credit: 'của Harley Zhang (Apache-2.0); đã dịch, có ghi chú Biên tập ở chỗ bản gốc sai' };
+  MAPS['py-data'] = Object.assign({ name: 'Python: kiểu dữ liệu và tính năng nâng cao' }, DLNOTE);
+  MAPS['py-func'] = Object.assign({ name: 'Python: lập trình hàm' }, DLNOTE);
+  MAPS['py-oop'] = Object.assign({ name: 'Python: hướng đối tượng cơ bản' }, DLNOTE);
+  MAPS['py-oop2'] = Object.assign({ name: 'Python: hướng đối tượng nâng cao' }, DLNOTE);
+  MAPS['cpp-thread'] = Object.assign({ name: 'C++: đa luồng' }, DLNOTE);
+  var km = /[?&]map=([\w-]+)/.exec(location.search);
+  var KEY = km && MAPS[km[1]] ? km[1] : 'ml', CFG = MAPS[KEY], SUBS = CFG.subs || [];
+  if (CFG.vi) {
+    document.getElementById('lang').hidden = true;
+    document.getElementById('pdf').hidden = true;
+    document.getElementById('credit').innerHTML = 'Nguồn: <a id="src" target="_blank" rel="noopener"></a> ' + CFG.credit;
+  }
   document.title = CFG.name + ' · Hope for Future';
   document.querySelector('.title b').textContent = CFG.name;
   document.getElementById('map').setAttribute('aria-label', CFG.name + ' dạng cây');
@@ -210,7 +225,7 @@ svg#map.drag { cursor: grabbing; }
     })(root, 0);
   }
 
-  function color(n) { return n.depth === 0 ? 'var(--accent)' : 'var(--b' + n.branch + ')'; }
+  function color(n) { return n.depth === 0 ? 'var(--accent)' : 'var(--b' + ((n.branch - 1) % 6 + 1) + ')'; }
 
   function render() {
     layout();

@@ -91,7 +91,7 @@ def build(md_path):
     rel = os.path.relpath(fig_dir, md_path.parent)
 
     # Chạy từ docs/code/py (khoá Học sâu: docs/code/dl), giống hướng dẫn "Chạy trên máy" trên trang.
-    if md_path.parent.name == "dl":
+    if md_path.parent.name in ("dl", "dlnote", "tools"):
         # code của sách ghi tệp ra thư mục hiện hành (mục 6.6): chạy trong thư mục tạm, không làm bẩn kho mã
         import tempfile
         os.chdir(tempfile.mkdtemp(prefix="dl_run_"))

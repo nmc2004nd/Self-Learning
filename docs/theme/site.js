@@ -54,7 +54,13 @@
       links: [['EasyRL (Datawhale)', 'https://github.com/datawhalechina/easy-rl'], ['Sách của Shiyu Zhao', 'https://github.com/MathFoundationRL/Book-Mathematical-Foundation-of-Reinforcement-Learning'], ['Gymnasium', 'https://gymnasium.farama.org'], ['OpenAI Spinning Up', 'https://spinningup.openai.com']] },
     { id: 'qa', name: 'Ôn tập phỏng vấn', tab: 'Phỏng vấn', short: 'QA', home: '/qa/README_vi', icon: 'circle-help', prefix: /^\/qa\//, blurb: 'Hỏi đáp học sâu, kèm lý thuyết',
       desc: 'Câu hỏi phỏng vấn học sâu, mỗi phần dẫn về bài lý thuyết',
-      links: [['DeepLearning-500-questions', 'https://github.com/scutan90/DeepLearning-500-questions'], ['Dive into Deep Learning', 'https://d2l.ai'], ['Machine Learning cơ bản', 'https://machinelearningcoban.com']] }
+      links: [['DeepLearning-500-questions', 'https://github.com/scutan90/DeepLearning-500-questions'], ['Dive into Deep Learning', 'https://d2l.ai'], ['Machine Learning cơ bản', 'https://machinelearningcoban.com']] },
+    { id: 'dlnote', name: 'Ghi chú học sâu', tab: 'Ghi chú DL', short: 'DLN', home: '/dlnote/README_vi', icon: 'notebook-pen', prefix: /^\/dlnote\//, blurb: 'Nén, tăng tốc, triển khai mô hình',
+      desc: 'Ghi chú thực chiến: thành phần mạng, backbone, mẹo huấn luyện, nén và triển khai',
+      links: [['dl_note (Harley Zhang)', 'https://github.com/harleyszhang/dl_note'], ['torchao', 'https://github.com/pytorch/ao'], ['A White Paper on NN Quantization', 'https://arxiv.org/abs/2106.08295']] },
+    { id: 'tools', name: 'Công cụ lập trình', tab: 'Công cụ', short: 'TOOL', home: '/tools/README_vi', icon: 'terminal', prefix: /^\/tools\//, blurb: 'SSH, Python, C++, HuggingFace',
+      desc: 'Công cụ cho người làm học sâu: máy chủ từ xa, Python, C++, thư viện mô hình',
+      links: [['dl_note (Harley Zhang)', 'https://github.com/harleyszhang/dl_note'], ['Python docs', 'https://docs.python.org/3/'], ['cppreference', 'https://en.cppreference.com'], ['Transformers docs', 'https://huggingface.co/docs/transformers']] }
   ];
   var COURSE_KEY = 'hff-course';
   function courseById(id) {
@@ -95,7 +101,19 @@
     'Nâng cao': ['adv', 'rocket'],
     'Chuyên đề': ['topic', 'sparkles'],
     'Nền tảng toán học': ['math', 'sigma'],
-    'Hỏi đáp học sâu': ['adv', 'circle-help']
+    'Hỏi đáp học sâu': ['adv', 'circle-help'],
+    'Nén mô hình': ['adv', 'layers'],
+    'Toán và học máy': ['base', 'sigma'],
+    'Nền tảng học sâu': ['policy', 'brain-circuit'],
+    'Backbone kinh điển': ['math', 'network'],
+    'Mẹo huấn luyện': ['value', 'sliders-horizontal'],
+    'Triển khai mô hình': ['topic', 'rocket'],
+    'Dòng lệnh và máy chủ': ['base', 'terminal'],
+    'Lập trình Python': ['policy', 'code-xml'],
+    'Lập trình C++': ['value', 'blocks'],
+    'Thư viện học sâu': ['adv', 'layers'],
+    'PyTorch cơ bản': ['topic', 'flag'],
+    'PyTorch nâng cao': ['math', 'blocks']
   };
   // Nhãn nguồn chèn trước một nhóm, theo khoá học: '<khoá>:<nhóm>'.
   var NAV_PARTS = {
@@ -105,10 +123,12 @@
     'math:base': ['Machine Learning cơ bản', 'Vũ Hữu Tiệp · CC BY-SA 4.0'],
     'ml:math': ['Chủ đề bổ sung', 'Người biên soạn viết thêm'],
     'dl:base': ['Dive into Deep Learning', 'Zhang, Lipton, Li, Smola · CC BY-SA 4.0'],
-    'qa:adv': ['Deep Learning 500 câu hỏi', 'Tan Jiyong và cộng sự · GPL-3.0']
+    'qa:adv': ['Deep Learning 500 câu hỏi', 'Tan Jiyong và cộng sự · GPL-3.0'],
+    'dlnote:base': ['dl_note', 'Harley Zhang · Apache-2.0'],
+    'tools:base': ['dl_note', 'Harley Zhang · Apache-2.0']
   };
   var PAGE_ICON = {
-    '/': 'house', '/ml/README_vi': 'chart-spline', '/dl/README_vi': 'brain-circuit', '/qa/README_vi': 'circle-help', '/qa/ch01_vi': 'sigma', '/qa/ch02_vi': 'chart-spline', '/qa/ch03_vi': 'brain', '/qa/ch04_vi': 'layout-grid', '/qa/ch05_vi': 'eye', '/qa/ch06_vi': 'repeat', '/qa/ch07_vi': 'sparkles', '/qa/ch08_vi': 'target', '/qa/ch09_vi': 'layout-grid', '/qa/ch10_vi': 'gamepad-2', '/qa/ch11_vi': 'compass', '/qa/ch12_vi': 'blocks', '/qa/ch13_vi': 'mountain', '/qa/ch14_vi': 'sliders-horizontal', '/qa/ch15_vi': 'gauge', '/qa/ch16_vi': 'globe', '/qa/ch17_vi': 'rocket', '/qa/ch18_vi': 'network', '/dl/ch07_vi': 'eye', '/dl/notation_vi': 'whole-word', '/dl/ch01_vi': 'sprout', '/dl/ch02_vi': 'terminal', '/dl/ch06_vi': 'blocks', '/dl/ch03_vi': 'trending-up', '/dl/ch04_vi': 'layers', '/dl/ch05_vi': 'brain', '/dl/ch12_vi': 'mountain', '/math/README_vi': 'sigma', '/ml/ch07_vi': 'trending-up', '/ml/ch08_vi': 'chart-spline', '/ml/ch09_vi': 'network',
+    '/': 'house', '/ml/README_vi': 'chart-spline', '/dl/README_vi': 'brain-circuit', '/qa/README_vi': 'circle-help', '/dlnote/README_vi': 'notebook-pen', '/tools/README_vi': 'terminal', '/tools/ssh_vi': 'globe', '/tools/mm_py_data_vi': 'map', '/tools/mm_py_func_vi': 'map', '/tools/mm_py_oop_vi': 'map', '/tools/mm_py_oop2_vi': 'map', '/tools/mm_cpp_thread_vi': 'map', '/tools/py_demo_vi': 'code-xml', '/tools/cpp_demo_vi': 'code-xml', '/tools/hf_vi': 'sparkles', '/tools/pt_tensor_vi': 'layout-grid', '/tools/pt_ops_vi': 'repeat', '/tools/pt_math_vi': 'sigma', '/tools/pt_arch_vi': 'map', '/tools/pt_codebase_vi': 'library', '/tools/pt_tensorimpl_vi': 'table-2', '/tools/pt_c10_vi': 'timer', '/tools/pt_build_vi': 'pickaxe', '/dlnote/math_prob_vi': 'dices', '/dlnote/math_ml_vi': 'brain', '/dlnote/math_grad_vi': 'mountain', '/dlnote/dl_conv_vi': 'layout-grid', '/dlnote/dl_bn_vi': 'sliders-horizontal', '/dlnote/dl_act_vi': 'chart-spline', '/dlnote/dl_loss_vi': 'target', '/dlnote/dl_init_vi': 'dices', '/dlnote/dl_bp_vi': 'repeat', '/dlnote/dl_optim_vi': 'compass', '/dlnote/dl_summary_vi': 'circle-help', '/dlnote/bb_summary_vi': 'library', '/dlnote/bb_resnet_vi': 'layers', '/dlnote/bb_resnetv2_vi': 'repeat', '/dlnote/bb_densenet_vi': 'network', '/dlnote/bb_mobilenet_vi': 'gauge', '/dlnote/bb_shufflenet_vi': 'dices', '/dlnote/bb_repvgg_vi': 'blocks', '/dlnote/bb_cspnet_vi': 'layout-grid', '/dlnote/bb_vovnet_vi': 'target', '/dlnote/alch_hyper_vi': 'sliders-horizontal', '/dlnote/alch_norm_vi': 'funnel', '/dlnote/alch_imbalance_vi': 'chart-column', '/dlnote/alch_augment_vi': 'sparkles', '/dlnote/alch_reg_vi': 'shield-check', '/dlnote/alch_vis_vi': 'eye', '/dlnote/compress_overview_vi': 'library', '/dlnote/compress_light_vi': 'gauge', '/dlnote/compress_prune_vi': 'network', '/dlnote/compress_prune_torch_vi': 'code-xml', '/dlnote/compress_quant_vi': 'layers', '/dlnote/compress_kd_vi': 'sprout', '/dlnote/deploy_overview_vi': 'map', '/dlnote/deploy_flops_vi': 'gauge', '/dlnote/deploy_fuse_vi': 'blocks', '/dlnote/deploy_onnx_vi': 'repeat', '/dlnote/deploy_trt_vi': 'rocket', '/dlnote/deploy_ncnn_sample_vi': 'monitor-play', '/dlnote/deploy_ncnn_net_vi': 'code-xml', '/dlnote/deploy_chips_vi': 'layers', '/qa/ch01_vi': 'sigma', '/qa/ch02_vi': 'chart-spline', '/qa/ch03_vi': 'brain', '/qa/ch04_vi': 'layout-grid', '/qa/ch05_vi': 'eye', '/qa/ch06_vi': 'repeat', '/qa/ch07_vi': 'sparkles', '/qa/ch08_vi': 'target', '/qa/ch09_vi': 'layout-grid', '/qa/ch10_vi': 'gamepad-2', '/qa/ch11_vi': 'compass', '/qa/ch12_vi': 'blocks', '/qa/ch13_vi': 'mountain', '/qa/ch14_vi': 'sliders-horizontal', '/qa/ch15_vi': 'gauge', '/qa/ch16_vi': 'globe', '/qa/ch17_vi': 'rocket', '/qa/ch18_vi': 'network', '/dl/ch07_vi': 'eye', '/dl/notation_vi': 'whole-word', '/dl/ch01_vi': 'sprout', '/dl/ch02_vi': 'terminal', '/dl/ch06_vi': 'blocks', '/dl/ch03_vi': 'trending-up', '/dl/ch04_vi': 'layers', '/dl/ch05_vi': 'brain', '/dl/ch12_vi': 'mountain', '/math/README_vi': 'sigma', '/ml/ch07_vi': 'trending-up', '/ml/ch08_vi': 'chart-spline', '/ml/ch09_vi': 'network',
     '/ml/ch10_vi': 'chart-scatter', '/ml/ch12_vi': 'mountain', '/ml/ch13_vi': 'sliders-horizontal', '/ml/ch14_vi': 'gauge',
     '/ml/ch15_vi': 'layers', '/ml/ch16_vi': 'brain',
     '/ml/ch00_vi': 'book-open', '/ml/ch05_vi': 'blocks', '/ml/ch06_vi': 'sliders-horizontal', '/ml/ch11_vi': 'dices', '/ml/appendix_b_vi': 'eye',
@@ -482,7 +502,7 @@
       return '<a data-path="' + path + '" href="#' + path + '">' + icon + '<span>' + label + '</span>' + (extra || '') + '</a>';
     }
     var courses = [
-      { id: 'math' }, { id: 'ml' }, { id: 'dl' }, { id: 'rl' }, { id: 'qa' }, { soon: 'LLM và ứng dụng' }
+      { id: 'math' }, { id: 'ml' }, { id: 'dl' }, { id: 'rl' }, { id: 'qa' }, { id: 'dlnote' }, { id: 'tools' }, { soon: 'LLM và ứng dụng' }
     ].map(function (c) {
       if (c.soon) return '<span class="is-soon">' + ICON.lock + '<span>' + c.soon + '</span><small>Sắp có</small></span>';
       var co = courseById(c.id);
@@ -1271,11 +1291,15 @@
 
   // Trang ôn tập phỏng vấn: tô ô "Biên tập", và chế độ tự kiểm tra (ẩn đáp án, bấm câu hỏi để mở).
   var QA_KEY = 'hff-qa-hide';
-  function qaPage(section) {
+  // Ô "Biên tập" (khoá Ôn tập và Ghi chú học sâu): blockquote mở đầu bằng **Biên tập:**.
+  function markEdits(section) {
     Array.prototype.forEach.call(section.querySelectorAll('blockquote'), function (q) {
       var b = q.querySelector('p:first-child > strong:first-child');
       if (b && b.textContent.trim() === 'Biên tập:') q.classList.add('qa-edit');
     });
+  }
+  function qaPage(section) {
+    markEdits(section);
     // Câu hỏi là mọi h3, cộng các h2 không có h3 con (vài chương đặt câu hỏi ngay ở cấp ##).
     var qs = Array.prototype.filter.call(section.querySelectorAll('h2, h3'), function (h) {
       if (h.tagName === 'H3') return true;
@@ -1330,8 +1354,9 @@
     enhanceSidebar();
     var course = courseOf(currentPath);
     if (course) setCourseView(course, true);
-    if (course === 'ml' || course === 'math' || course === 'dl' || course === 'qa') renderStrayMath(section);
+    if (course === 'ml' || course === 'math' || course === 'dl' || course === 'qa' || course === 'dlnote' || course === 'tools') renderStrayMath(section);
     if (course === 'qa') qaPage(section);
+    if (course === 'dlnote' || course === 'tools') markEdits(section);
     var landing = !!section.querySelector('.home-hero, .hub-hero, .rm-page');
     document.body.classList.toggle('is-home', landing);
     document.body.classList.toggle('is-hub', !!section.querySelector('.hub-hero'));
